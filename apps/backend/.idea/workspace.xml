@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="f11eae00-fc2a-4d22-ad9e-c86aa8106500" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../../backend/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/build.gradle" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/gradle/wrapper/gradle-wrapper.jar" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/gradle/wrapper/gradle-wrapper.properties" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/gradlew" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/gradlew.bat" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/settings.gradle" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/generated/com/ssafy/db/entity/QBaseEntity.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/generated/com/ssafy/db/entity/QUser.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/GroupCallApplication.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/api/controller/AuthController.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/api/controller/UserController.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/api/request/UserLoginPostReq.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/api/request/UserRegisterPostReq.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/api/response/UserLoginPostRes.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/api/response/UserRes.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/api/service/UserService.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/api/service/UserServiceImpl.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/common/auth/JwtAuthenticationFilter.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/common/auth/SsafyUserDetailService.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/common/auth/SsafyUserDetails.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/common/exception/handler/NotFoundHandler.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/common/model/response/BaseResponseBody.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/common/util/JwtTokenUtil.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/common/util/ResponseBodyWriteUtil.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/config/IndexController.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/config/JpaConfig.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/config/PasswordEncoderConfig.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/config/SecurityConfig.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/config/SpringfoxConfig.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/config/SwaggerConfig.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/config/WebMvcConfig.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/db/entity/BaseEntity.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/db/entity/User.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/db/repository/UserRepository.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/java/com/ssafy/db/repository/UserRepositorySupport.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/resources/application.properties" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/resources/dist/assets/SpoqaHanSansNeo-Bold-oAKFRloA.ttf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/resources/dist/assets/SpoqaHanSansNeo-Medium-BARTOIWD.ttf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/resources/dist/assets/SpoqaHanSansNeo-Regular-C9kFRjRf.ttf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/resources/dist/assets/index-CcBUIAsm.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/resources/dist/assets/index-DNAO3cYi.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/resources/dist/assets/placeholder-Dm2tZTrJ.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/resources/dist/assets/ssafy-logo-CxoD_ydP.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/resources/dist/assets/vendor-tinDoX7i.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/resources/dist/assets/vue-vendor-BqUmP3gs.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/resources/dist/assets/vue-vendor-D16qGYCJ.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/resources/dist/favicon.ico" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/resources/dist/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../backend/src/main/resources/keystore/ssafy-web.p12" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/.env" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/package-lock.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/public/favicon.ico" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/App.vue" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Bold.eot" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Bold.ttf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Bold.woff" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Bold.woff2" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Light.eot" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Light.ttf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Light.woff" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Light.woff2" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Medium.eot" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Medium.ttf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Medium.woff" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Medium.woff2" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Regular.eot" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Regular.ttf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Regular.woff" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Regular.woff2" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Thin.eot" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Thin.ttf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Thin.woff" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/fonts/SpoqaHanSansNeo-Thin.woff2" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/images/placeholder.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/images/sample-image.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/assets/images/ssafy-logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/common/api/accountAPI.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/common/config.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/common/css/common.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/common/lib/axios.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/common/lib/element-plus.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/common/lib/getIsDesktop.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/common/lib/vue-router.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/common/util.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/main.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/store/accountStore.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/store/index.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/store/menuStore.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/store/platformInfoStore.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/views/conferences/conference-detail.vue" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/views/history/history.vue" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/views/home/components/conference.vue" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/views/home/home.vue" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/views/main/components/login-dialog.vue" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/views/main/components/main-footer.vue" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/views/main/components/main-header.vue" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/views/main/components/main-sidebar.vue" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/views/main/main.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/views/main/main.vue" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/src/views/main/menu.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../frontend/vite.config.js" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../.." />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 0
+}]]></component>
+  <component name="ProjectId" id="38YEubKfM4BJ6Zkha2JRsH5AjfY" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "git-widget-placeholder": "master",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "C:/Users/SSAFY/Desktop/pjt/S14P11C105/apps/backend",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-26cb7f24e5b0-intellij.indexing.shared.core-IU-253.29346.240" />
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-IU-253.29346.240" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="f11eae00-fc2a-4d22-ad9e-c86aa8106500" name="Changes" comment="" />
+      <created>1768968328558</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1768968328558</updated>
+      <workItem from="1768968329857" duration="2524000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>
