@@ -44,6 +44,18 @@ app-example
 
 # editor
 .vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+gen/
 
 # env
 .env
+
+# Gradle & Build
+.gradle/
+build/
+bin/
+apps/backend/dnc/.idea/gradle.xml
