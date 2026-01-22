@@ -25,6 +25,7 @@ DROP TABLE IF EXISTS food_records;
 DROP TABLE IF EXISTS glucose_data;
 DROP TABLE IF EXISTS sensors;
 DROP TABLE IF EXISTS user_settings;
+DROP TABLE IF EXISTS oauth_tokens;
 DROP TABLE IF EXISTS users;
 
 SET FOREIGN_KEY_CHECKS = 1;
@@ -61,6 +62,26 @@ CREATE TABLE user_settings (
                                           ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id),
     CONSTRAINT fk_user_settings_user
+        FOREIGN KEY (user_id) REFERENCES users (user_id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- 2-2. oauth_tokens (1:N)
+CREATE TABLE oauth_tokens (
+    token_id      BIGINT      NOT NULL AUTO_INCREMENT,
+    user_id       BIGINT      NOT NULL,
+    provider      VARCHAR(50) NOT NULL,
+    access_token  VARCHAR(2048) NOT NULL,
+    refresh_token VARCHAR(2048) NULL,
+    token_type    VARCHAR(50) NULL,
+    scope         VARCHAR(255) NULL,
+    expires_at    TIMESTAMP NULL,
+    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                  ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (token_id),
+    UNIQUE KEY uk_oauth_tokens_user_provider (user_id, provider),
+    CONSTRAINT fk_oauth_tokens_user
         FOREIGN KEY (user_id) REFERENCES users (user_id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB;

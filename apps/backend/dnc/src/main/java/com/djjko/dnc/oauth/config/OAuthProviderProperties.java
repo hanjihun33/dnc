@@ -10,6 +10,7 @@ public class OAuthProviderProperties {
     private String redirectUri;
     private String authUri;
     private String tokenUri;
+    private String apiBase;
     private List<String> scopes = new ArrayList<>();
 
     public String getClientId() {
@@ -50,6 +51,14 @@ public class OAuthProviderProperties {
 
     public void setTokenUri(String tokenUri) {
         this.tokenUri = tokenUri;
+    }
+
+    public String getApiBase() {
+        return apiBase;
+    }
+
+    public void setApiBase(String apiBase) {
+        this.apiBase = apiBase;
     }
 
     public List<String> getScopes() {

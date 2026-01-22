@@ -6,18 +6,24 @@ import java.nio.charset.StandardCharsets;
 import com.djjko.dnc.oauth.config.OAuthProviderProperties;
 import com.djjko.dnc.oauth.config.OAuthProvidersProperties;
 import com.djjko.dnc.oauth.dto.OAuthTokenResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 
 @Service
 public class OAuthService {
 
+    private static final Logger log = LoggerFactory.getLogger(OAuthService.class);
     private final OAuthProvidersProperties providersProperties;
     private final RestTemplate restTemplate;
 
@@ -28,6 +34,7 @@ public class OAuthService {
 
     public String buildAuthorizeUrl(String providerName, String state) {
         OAuthProviderProperties provider = providersProperties.getProvider(providerName);
+        log.info("OAuth authorize redirect_uri for {}: {}", providerName, provider.getRedirectUri());
         String scope = String.join(" ", provider.getScopes());
 
         StringBuilder url = new StringBuilder(provider.getAuthUri());
@@ -65,6 +72,48 @@ public class OAuthService {
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
 
         return restTemplate.postForObject(URI.create(provider.getTokenUri()), request, OAuthTokenResponse.class);
+    }
+
+    public OAuthTokenResponse refreshToken(String providerName, String refreshToken) {
+        OAuthProviderProperties provider = providersProperties.getProvider(providerName);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("grant_type", "refresh_token");
+        body.add("refresh_token", refreshToken);
+        body.add("client_id", provider.getClientId());
+        body.add("client_secret", provider.getClientSecret());
+
+        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
+
+        return restTemplate.postForObject(URI.create(provider.getTokenUri()), request, OAuthTokenResponse.class);
+    }
+
+    public String fetchEgvData(String providerName, String accessToken, String startDate, String endDate) {
+        OAuthProviderProperties provider = providersProperties.getProvider(providerName);
+        String base = provider.getApiBase();
+        if (base == null || base.isBlank()) {
+            throw new IllegalStateException("API base URL is not configured for " + providerName);
+        }
+
+        String url = String.format(
+            "%s/users/self/egvs?startDate=%s&endDate=%s",
+            base, startDate, endDate
+        );
+        log.info("Dexcom EGV request url: {}", url);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        HttpEntity<Void> request = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
+            return response.getBody();
+        } catch (RestClientException ex) {
+            throw ex;
+        }
     }
 
     private String encode(String value) {

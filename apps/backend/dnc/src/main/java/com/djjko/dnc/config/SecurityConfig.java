@@ -20,7 +20,14 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf.disable())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/**", "/api/v1/oauth/*/callback", "/error").permitAll()
+                .requestMatchers(
+                    "/api/v1/auth/**",
+                    "/api/v1/oauth/*/authorize",
+                    "/api/v1/oauth/*/callback",
+                    "/swagger-ui/**",
+                    "/v3/api-docs/**",
+                    "/error"
+                ).permitAll()
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form.disable())

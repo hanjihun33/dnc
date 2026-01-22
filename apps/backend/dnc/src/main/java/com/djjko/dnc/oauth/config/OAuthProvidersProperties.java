@@ -21,7 +21,7 @@ public class OAuthProvidersProperties {
     public OAuthProviderProperties getProvider(String name) {
         OAuthProviderProperties provider = providers.get(name);
         if (provider == null) {
-            throw new IllegalArgumentException("Unsupported OAuth provider: " + name);
+            throw new IllegalArgumentException("지원하지 않는 provider입니다.: " + name);
         }
         return provider;
     }
