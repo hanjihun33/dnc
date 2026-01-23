@@ -1,0 +1,65 @@
+pipeline {
+    agent any
+    
+    environment {
+        // 모든 서비스의 공통 루트 경로
+        DEPLOY_ROOT_PATH = "/home/ubuntu/dang-nang-kong"
+    }
+
+    stages {
+        stage('1. 코드 체크아웃 및 전체 동기화') {
+            steps {
+                checkout scm
+                script {
+                    echo "🔄 모든 소스 코드를 서버로 동기화합니다..."
+                    // 프로젝트 전체를 한꺼번에 서버로 복사 (이후 서비스별 빌드에서 참조)
+                    sh """
+                        mkdir -p ${env.DEPLOY_ROOT_PATH}
+                        cp -u ${WORKSPACE}/*.yml ${env.DEPLOY_ROOT_PATH}/ || true
+                        cp -u ${WORKSPACE}/.env ${env.DEPLOY_ROOT_PATH}/ || true
+                        
+                        mkdir -p ${env.DEPLOY_ROOT_PATH}/apps
+                        cp -ruT apps/ ${env.DEPLOY_ROOT_PATH}/apps/
+                    """
+                }
+            }
+        }
+
+        stage('2. [승인] 백엔드 배포') {
+            // 팀장님이 주신 "apps/backend/dnc" 경로를 감시합니다.
+            when { changeset "apps/backend/**" }
+            steps {
+                script {
+                    input message: "백엔드 변경이 감지되었습니다. 배포할까요?", ok: "🚀 배포 시작"
+                    echo "🐳 백엔드 Docker 이미지 빌드 및 컨테이너 재시작..."
+                    sh "cd ${env.DEPLOY_ROOT_PATH} && docker-compose up -d --build backend"
+                }
+            }
+        }
+
+        stage('3. [승인] AI 서버 배포') {
+            when { changeset "apps/ai/**" }
+            steps {
+                script {
+                    input message: "AI 서버 변경이 감지되었습니다. 배포할까요?", ok: "🚀 배포 시작"
+                    sh "cd ${env.DEPLOY_ROOT_PATH} && docker-compose up -d --build ai"
+                }
+            }
+        }
+
+        stage('4. [승인] 프론트엔드 배포') {
+            when { changeset "apps/frontend/**" }
+            steps {
+                script {
+                    input message: "프론트엔드 변경이 감지되었습니다. 배포할까요?", ok: "🚀 배포 시작"
+                    sh "cd ${env.DEPLOY_ROOT_PATH} && docker-compose up -d --build frontend"
+                }
+            }
+        }
+    }
+
+    post {
+        success { echo "✅ '두쫀코' 서비스 선택적 배포 성공!" }
+        failure { echo "❌ 배포 실패. 로그를 확인해 주세요." }
+    }
+}
