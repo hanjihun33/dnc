@@ -4,28 +4,56 @@ file:
     url-path: /images/
 
 spring:
+  task:
+    scheduling:
+      enabled: true # 스케줄링 기능
   application:
     name: dnc
   servlet:
     multipart:
-      # Optional: override temp upload location.
-      # location: ${user.home}/uploads
       file-size-threshold: 10MB
       max-file-size: 10MB
       max-request-size: 50MB
+
+  # [1] 데이터베이스 접속 정보
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${DB_URL:jdbc:mysql://localhost:3306/dnc_db?serverTimezone=UTC}
-    username: ${DB_USERNAME:ssafy}
-    password: ${DB_PASSWORD:}
+    url: jdbc:mysql://localhost:3306/dnc_db?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: ssafy
+
     hikari:
       idle-timeout: 300000
       minimum-idle: 3
       maximum-pool-size: 5
       connection-timeout: 600000
-      data-source-properties:
-        profileSQL: true
+      # data-source-properties:  <-- 로그가 시끄러우면
+      #   profileSQL: true
 
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false       # SQL 로그 끄기
+    properties:
+      hibernate:
+        format_sql: false # SQL 예쁘게 출력하기도 끄기
+        dialect: org.hibernate.dialect.MySQL8Dialect
+
+# [2] 로그 레벨 설정
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: ERROR        # 쿼리 로그는 에러 날 때만!
+    org.hibernate.type: ERROR       # 파라미터 값 로그 숨기기
+    com.zaxxer.hikari: ERROR        # DB 연결 로그 숨기기
+
+# [3] JWT 설정
 jwt:
-  secret: ${JWT_SECRET}
-  expiration_time: ${JWT_EXPIRATION_TIME:3600000}
+  secret: ${JWT_SECRET:DefaultSecretKeyForTestingPurposeOnlyPleaseChangeThisInProduction12345} # 임시 키 넣어둠 (환경변수 없어도 돌아가게)
+  expiration_time: 3600000
+
+# [4] Dexcom API 설정
+dexcom:
+  base-url: https://sandbox-api.dexcom.com
+  client-id: 7KaRpwoqMFGyYsLFcmH0DSiiiGkLhsdX # ★ Dexcom 앱 등록 후 받은 Client ID를 입력하세요.
+  client-secret: bPQO4Ul2XDEqGKY9 # ★ Dexcom 앱 등록 후 받은 Client Secret을 입력하세요.
