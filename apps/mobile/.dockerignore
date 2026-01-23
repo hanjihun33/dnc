@@ -1,0 +1,11 @@
+node_modules
+.git
+.expo
+.expo-shared
+npm-debug.log
+yarn-error.log
+android
+ios
+dist
+web-build
+.DS_Store
