@@ -41,7 +41,7 @@ pipeline {
                     // 서버의 루트 경로로 이동하여 해당 서비스만 재빌드
                     sh """
                         cd ${env.DEPLOY_ROOT_PATH}
-                        docker compose up -d --build ${env.SERVICE_NAME}
+                        docker-compose up -d --build ${env.SERVICE_NAME}
                     """
                 }
                 echo "🎉 ${env.SERVICE_NAME} 배포가 완료되었습니다!"
