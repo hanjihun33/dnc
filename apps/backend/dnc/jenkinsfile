@@ -1,0 +1,73 @@
+pipeline {
+    agent any
+
+    // apps/backend 폴더 내의 변경사항이 있을 때만 빌드 트리거
+    triggers {
+        gitlab(
+            triggerOnPush: true, 
+            triggerOnMergeRequest: true, 
+            includePathPatternRegex: "apps/backend/.*"
+        )
+    }
+    
+    environment {
+        SERVICE_NAME = "backend"
+        // 젠킨스가 Clone 받은 프로젝트 내의 백엔드 경로
+        SOURCE_PATH = "apps/backend/dnc" 
+        
+        // 서버의 실제 프로젝트 루트 경로 (docker-compose.yml이 있는 곳)
+        DEPLOY_ROOT_PATH = "/home/ubuntu/dang-nang-kong"
+    }
+
+    stages {
+        stage('1. 코드 체크아웃') {
+            steps {
+                // GitLab에서 최신 코드를 젠킨스 워크스페이스로 가져옴
+                checkout scm
+                echo "✅ 최신 코드를 가져왔습니다."
+            }
+        }
+
+        stage('2. 배포 승인') {
+            steps {
+                script {
+                    // 사용자 승인 대기 (Timeout 없음)
+                    input message: "${SERVICE_NAME} 배포를 진행할까요?", ok: "🚀 배포 시작"
+                }
+            }
+        }
+
+        stage('3. 코드 동기화 및 배포') {
+            steps {
+                script {
+                    echo "🔄 1. 최신 코드를 서버의 실제 경로로 동기화합니다..."
+                    
+                    // [중요] Jenkins Workspace의 최신 코드를 -> 서버의 배포 폴더로 복사
+                    // -r: 하위 폴더 포함, -u: 최신 파일만 업데이트, -T: 대상 폴더 자체로 취급
+                    // apps/backend/dnc/. -> /home/ubuntu/.../apps/backend/dnc/
+                    sh """
+                        mkdir -p ${env.DEPLOY_ROOT_PATH}/${env.SOURCE_PATH}
+                        cp -ruT ${env.SOURCE_PATH}/ ${env.DEPLOY_ROOT_PATH}/${env.SOURCE_PATH}/
+                    """
+
+                    echo "🐳 2. Docker Compose로 서비스 재시작..."
+                    // 서버의 루트 경로(docker-compose.yml 위치)로 이동
+                    dir("${env.DEPLOY_ROOT_PATH}") {
+                        // 해당 서비스만 빌드(--build)하고 백그라운드(-d)로 실행
+                        sh "docker-compose up -d --build ${env.SERVICE_NAME}"
+                    }
+                }
+                echo "🎉 ${env.SERVICE_NAME} 배포가 완료되었습니다!"
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo "✅ 배포 성공!"
+        }
+        failure {
+            echo "❌ 배포 실패. 로그를 확인하세요."
+        }
+    }
+}
