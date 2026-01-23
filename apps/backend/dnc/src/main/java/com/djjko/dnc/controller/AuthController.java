@@ -1,10 +1,10 @@
 package com.djjko.dnc.controller;
 
-import com.djjko.dnc.dto.request.AuthLoginRequest;
-import com.djjko.dnc.dto.request.AuthSignupRequest;
-import com.djjko.dnc.dto.response.AuthLoginResponse;
-import com.djjko.dnc.dto.response.AuthLogoutResponse;
-import com.djjko.dnc.dto.response.AuthSignupResponse;
+import com.djjko.dnc.model.dto.request.AuthLoginRequest;
+import com.djjko.dnc.model.dto.request.AuthSignupRequest;
+import com.djjko.dnc.model.dto.response.AuthLoginResponse;
+import com.djjko.dnc.model.dto.response.AuthLogoutResponse;
+import com.djjko.dnc.model.dto.response.AuthSignupResponse;
 import com.djjko.dnc.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;

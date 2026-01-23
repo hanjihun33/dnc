@@ -1,4 +1,4 @@
-package com.djjko.dnc.dto;
+package com.djjko.dnc.model.dto;
 
 import java.time.LocalDateTime;
 

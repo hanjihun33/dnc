@@ -1,4 +1,4 @@
-package com.djjko.dnc.oauth.dto;
+package com.djjko.dnc.model.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

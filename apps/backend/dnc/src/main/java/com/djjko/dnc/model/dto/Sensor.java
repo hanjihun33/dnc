@@ -1,4 +1,4 @@
-package com.djjko.dnc.dto;
+package com.djjko.dnc.model.dto;
 
 import java.time.LocalDateTime;
 
@@ -13,12 +13,15 @@ import lombok.Setter;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserSettings {
+public class Sensor {
 
+    private Long sensorId;
     private Long userId;
-    private Integer targetMinGlucose;
-    private Integer targetMaxGlucose;
-    private Boolean isAlarmOn;
+    private String deviceId;
+    private String provider;
+    private String status;
+    private LocalDateTime startedAt;
+    private LocalDateTime endedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

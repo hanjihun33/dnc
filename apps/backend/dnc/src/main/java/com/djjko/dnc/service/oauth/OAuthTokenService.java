@@ -1,12 +1,12 @@
-package com.djjko.dnc.oauth.service;
+package com.djjko.dnc.service.oauth;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
-import com.djjko.dnc.entity.OAuthToken;
-import com.djjko.dnc.entity.User;
-import com.djjko.dnc.oauth.dto.OAuthTokenResponse;
-import com.djjko.dnc.repository.OAuthTokenRepository;
+import com.djjko.dnc.model.entity.OAuthToken;
+import com.djjko.dnc.model.entity.User;
+import com.djjko.dnc.model.dto.response.OAuthTokenResponse;
+import com.djjko.dnc.model.repository.OAuthTokenRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;

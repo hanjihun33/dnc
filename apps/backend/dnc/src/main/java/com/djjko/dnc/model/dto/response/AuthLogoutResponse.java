@@ -1,4 +1,4 @@
-package com.djjko.dnc.dto.response;
+package com.djjko.dnc.model.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

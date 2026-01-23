@@ -1,11 +1,11 @@
-package com.djjko.dnc.oauth.service;
+package com.djjko.dnc.service.oauth;
 
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import com.djjko.dnc.oauth.config.OAuthProviderProperties;
-import com.djjko.dnc.oauth.config.OAuthProvidersProperties;
-import com.djjko.dnc.oauth.dto.OAuthTokenResponse;
+import com.djjko.dnc.config.oauth.OAuthProviderProperties;
+import com.djjko.dnc.config.oauth.OAuthProvidersProperties;
+import com.djjko.dnc.model.dto.response.OAuthTokenResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
@@ -103,6 +103,31 @@ public class OAuthService {
             base, startDate, endDate
         );
         log.info("Dexcom EGV request url: {}", url);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        HttpEntity<Void> request = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
+            return response.getBody();
+        } catch (RestClientException ex) {
+            throw ex;
+        }
+    }
+
+    public String fetchDataRange(String providerName, String accessToken, String lastSyncTime) {
+        OAuthProviderProperties provider = providersProperties.getProvider(providerName);
+        String base = provider.getApiBase();
+        if (base == null || base.isBlank()) {
+            throw new IllegalStateException("API base URL is not configured for " + providerName);
+        }
+
+        String url = String.format("%s/users/self/dataRange", base);
+        if (lastSyncTime != null && !lastSyncTime.isBlank()) {
+            url = String.format("%s?lastSyncTime=%s", url, encode(lastSyncTime));
+        }
+        log.info("Dexcom dataRange request url: {}", url);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);

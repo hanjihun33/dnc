@@ -1,8 +1,8 @@
-package com.djjko.dnc.repository;
+package com.djjko.dnc.model.repository;
 
 import java.util.Optional;
 
-import com.djjko.dnc.entity.User;
+import com.djjko.dnc.model.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserRepository extends JpaRepository<User, Long> {

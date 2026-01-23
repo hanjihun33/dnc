@@ -1,11 +1,11 @@
 package com.djjko.dnc.service;
 
-import com.djjko.dnc.dto.request.AuthLoginRequest;
-import com.djjko.dnc.dto.request.AuthSignupRequest;
-import com.djjko.dnc.dto.response.AuthLoginResponse;
-import com.djjko.dnc.dto.response.AuthSignupResponse;
-import com.djjko.dnc.entity.User;
-import com.djjko.dnc.repository.UserRepository;
+import com.djjko.dnc.model.dto.request.AuthLoginRequest;
+import com.djjko.dnc.model.dto.request.AuthSignupRequest;
+import com.djjko.dnc.model.dto.response.AuthLoginResponse;
+import com.djjko.dnc.model.dto.response.AuthSignupResponse;
+import com.djjko.dnc.model.entity.User;
+import com.djjko.dnc.model.repository.UserRepository;
 import com.djjko.dnc.security.JwtUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;

@@ -1,4 +1,4 @@
-package com.djjko.dnc.dto;
+package com.djjko.dnc.model.dto;
 
 import java.time.LocalDateTime;
 
@@ -13,15 +13,16 @@ import lombok.Setter;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Sensor {
+public class GlucoseData {
 
-    private Long sensorId;
+    private Long glucoseId;
     private Long userId;
-    private String deviceId;
-    private String provider;
-    private String status;
-    private LocalDateTime startedAt;
-    private LocalDateTime endedAt;
+    private Long sensorId;
+    private Integer value;
+    private String trend;
+    private Float trendRate;
+    private String dexcomRecordId;
+    private String source;
+    private LocalDateTime measuredAt;
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 }

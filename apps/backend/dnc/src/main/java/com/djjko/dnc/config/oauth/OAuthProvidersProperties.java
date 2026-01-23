@@ -1,4 +1,4 @@
-package com.djjko.dnc.oauth.config;
+package com.djjko.dnc.config.oauth;
 
 import java.util.HashMap;
 import java.util.Map;

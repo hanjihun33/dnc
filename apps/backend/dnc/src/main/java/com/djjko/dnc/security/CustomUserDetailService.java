@@ -1,7 +1,7 @@
 package com.djjko.dnc.security;
 
-import com.djjko.dnc.entity.User;
-import com.djjko.dnc.repository.UserRepository;
+import com.djjko.dnc.model.entity.User;
+import com.djjko.dnc.model.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;

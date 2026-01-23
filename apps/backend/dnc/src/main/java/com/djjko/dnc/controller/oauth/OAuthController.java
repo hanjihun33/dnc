@@ -1,12 +1,12 @@
-package com.djjko.dnc.oauth.controller;
+package com.djjko.dnc.controller.oauth;
 
 import java.net.URI;
 import java.util.UUID;
 
-import com.djjko.dnc.oauth.dto.OAuthTokenResponse;
-import com.djjko.dnc.oauth.service.OAuthService;
-import com.djjko.dnc.oauth.service.OAuthTokenService;
-import com.djjko.dnc.repository.UserRepository;
+import com.djjko.dnc.model.dto.response.OAuthTokenResponse;
+import com.djjko.dnc.service.oauth.OAuthService;
+import com.djjko.dnc.service.oauth.OAuthTokenService;
+import com.djjko.dnc.model.repository.UserRepository;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -70,7 +70,7 @@ public class OAuthController {
 
     @PostMapping("/{provider}/refresh")
     public OAuthTokenResponse refreshToken(@PathVariable String provider) {
-        com.djjko.dnc.entity.User user = resolveRequiredUser();
+        com.djjko.dnc.model.entity.User user = resolveRequiredUser();
         String refreshToken = oAuthTokenService.getToken(user, provider).getRefreshToken();
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refresh token is missing");
@@ -86,13 +86,24 @@ public class OAuthController {
         @RequestParam String startDate,
         @RequestParam String endDate
     ) {
-        com.djjko.dnc.entity.User user = resolveRequiredUser();
+        com.djjko.dnc.model.entity.User user = resolveRequiredUser();
         String accessToken = oAuthTokenService.getToken(user, provider).getAccessToken();
         String body = oAuthService.fetchEgvData(provider, accessToken, startDate, endDate);
         return ResponseEntity.ok(body);
     }
 
-    private java.util.Optional<com.djjko.dnc.entity.User> resolveAuthenticatedUser() {
+    @GetMapping("/{provider}/data-range")
+    public ResponseEntity<String> fetchDataRange(
+        @PathVariable String provider,
+        @RequestParam(required = false) String lastSyncTime
+    ) {
+        com.djjko.dnc.model.entity.User user = resolveRequiredUser();
+        String accessToken = oAuthTokenService.getToken(user, provider).getAccessToken();
+        String body = oAuthService.fetchDataRange(provider, accessToken, lastSyncTime);
+        return ResponseEntity.ok(body);
+    }
+
+    private java.util.Optional<com.djjko.dnc.model.entity.User> resolveAuthenticatedUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null
             || !authentication.isAuthenticated()
@@ -102,7 +113,7 @@ public class OAuthController {
         return userRepository.findByEmail(authentication.getName());
     }
 
-    private com.djjko.dnc.entity.User resolveRequiredUser() {
+    private com.djjko.dnc.model.entity.User resolveRequiredUser() {
         return resolveAuthenticatedUser()
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Login required"));
     }
