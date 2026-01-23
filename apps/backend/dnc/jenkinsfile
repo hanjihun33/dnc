@@ -38,8 +38,8 @@ pipeline {
                     """
 
                     echo "🐳 2. Docker Compose로 서비스 재시작..."
-                    // 서버의 루트 경로로 이동하여 해당 서비스만 재빌드
-                    sh """
+                    // 서버의 루트 경로로 이동하여 해당 서비스만 재빌드.
+                    sh """ 
                         cd ${env.DEPLOY_ROOT_PATH}
                         docker-compose up -d --build ${env.SERVICE_NAME}
                     """
