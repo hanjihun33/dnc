@@ -139,7 +139,7 @@ CREATE TABLE food_records (
 
 -- 2-6. food_metadata
 CREATE TABLE food_metadata (
-    food_code        VARCHAR(20)  NOT NULL,
+    food_code        INT NOT NULL AUTO_INCREMENT,
     food_name        VARCHAR(100) NOT NULL,
     base_weight      FLOAT NULL,
     cal_per_base     FLOAT NULL,
@@ -147,18 +147,17 @@ CREATE TABLE food_metadata (
     sugars_per_base  FLOAT NULL,
     fat_per_base     FLOAT NULL,
     protein_per_base FLOAT NULL,
-    sodium_per_base  FLOAT NULL,
     created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                                    ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (food_code)
+    PRIMARY KEY ( food_code)
 ) ENGINE=InnoDB;
 
 -- 2-7. food_analyses (AI 분석 결과)
 CREATE TABLE food_analyses (
     analysis_id      BIGINT NOT NULL AUTO_INCREMENT,
     food_id          BIGINT NOT NULL,
-    food_code        VARCHAR(20) NULL,
+    food_code        INT NULL,
     estimated_weight FLOAT NULL,
     ai_confidence    FLOAT NULL,
     ai_comment       TEXT NULL,
