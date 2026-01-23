@@ -36,3 +36,22 @@ spring:
 jwt:
   secret: ${JWT_SECRET}
   expiration_time: ${JWT_EXPIRATION_TIME:3600000}
+
+oauth:
+  providers:
+    dexcom:
+      client-id: ${DEXCOM_CLIENT_ID:}
+      client-secret: ${DEXCOM_CLIENT_SECRET:}
+      redirect-uri: ${DEXCOM_REDIRECT_URI:http://localhost:8080/api/v1/oauth/dexcom/callback}
+      auth-uri: ${DEXCOM_AUTH_URI:https://sandbox-api.dexcom.com/v3/oauth2/login}
+      token-uri: ${DEXCOM_TOKEN_URI:https://sandbox-api.dexcom.com/v3/oauth2/token}
+      api-base: ${DEXCOM_API_BASE:https://sandbox-api.dexcom.com/v3}
+      scopes:
+        - offline_access
+    caresense:
+      client-id: ${CARESENSE_CLIENT_ID:}
+      client-secret: ${CARESENSE_CLIENT_SECRET:}
+      redirect-uri: ${CARESENSE_REDIRECT_URI:http://localhost:8080/api/v1/oauth/caresense/callback}
+      auth-uri: ${CARESENSE_AUTH_URI:}
+      token-uri: ${CARESENSE_TOKEN_URI:}
+      scopes: []
