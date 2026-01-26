@@ -53,6 +53,7 @@ logging:
     org.hibernate.SQL: ERROR        # 쿼리 로그는 에러 날 때만!
     org.hibernate.type: ERROR       # 파라미터 값 로그 숨기기
     com.zaxxer.hikari: ERROR        # DB 연결 로그 숨기기
+    org.springframework.security: DEBUG
 
 jwt:
   secret: ${JWT_SECRET:9c2f4d1a7b8e3c6f5a0d2b7e9f1c4a8d9b6e3a0c5f2d0y5s}
@@ -71,8 +72,8 @@ oauth:
       scopes:
         - offline_access
     caresense:
-      client-id: ${CARESENSE_CLIENT_ID:7KaRpwoqMFGyYsLFcmH0DSiiiGkLhsdX}
-      client-secret: ${CARESENSE_CLIENT_SECRET:bPQO4Ul2XDEqGKY9}
+      client-id: ${CARESENSE_CLIENT_ID:}
+      client-secret: ${CARESENSE_CLIENT_SECRET:}
       redirect-uri: ${CARESENSE_REDIRECT_URI:http://localhost:8080/api/v1/oauth/caresense/callback}
       auth-uri: ${CARESENSE_AUTH_URI:}
       token-uri: ${CARESENSE_TOKEN_URI:}
