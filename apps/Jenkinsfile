@@ -43,24 +43,16 @@ pipeline {
             }
         }
         
-        stage('1. 코드 체크아웃 및 전체 동기화') {
+        stage('1. 코드 체크아웃 및 소스 동기화') {
             steps {
                 checkout scm
                 script {
-                    echo "🔄 소스 코드 및 설정 파일을 서버로 동기화합니다..."
-                    sh """
-                        mkdir -p ${env.DEPLOY_ROOT_PATH}
-                        # 루트의 설정 파일들 복사
-                        cp -u ${WORKSPACE}/*.yml ${env.DEPLOY_ROOT_PATH}/ || true
-                        cp -u ${WORKSPACE}/.env ${env.DEPLOY_ROOT_PATH}/ || true
-                        
-                        # 서비스 소스(apps)와 Nginx 설정(nginx) 폴더 전체 동기화
-                        mkdir -p ${env.DEPLOY_ROOT_PATH}/apps
-                        cp -ruT apps/ ${env.DEPLOY_ROOT_PATH}/apps/
-                        
-                        mkdir -p ${env.DEPLOY_ROOT_PATH}/nginx
-                        cp -ruT nginx/ ${env.DEPLOY_ROOT_PATH}/nginx/
-                    """
+                    // 서버의 배포 폴더 구조를 만듭니다.
+                    sh "mkdir -p ${env.DEPLOY_ROOT_PATH}/apps"
+                    
+                    // 깃랩에 있는 apps 폴더만 서버로 복사합니다.
+                    // .env, .yml, nginx 폴더는 서버에 있는 것을 그대로 유지합니다.
+                    sh "cp -ruT apps/ ${env.DEPLOY_ROOT_PATH}/apps/"
                 }
             }
         }
