@@ -54,3 +54,5 @@ application-dev.yaml
 uploads/
 logs/
 *.log
+apps/backend/dnc/local.properties
+.idea/
