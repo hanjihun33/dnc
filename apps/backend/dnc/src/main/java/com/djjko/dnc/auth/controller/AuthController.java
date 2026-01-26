@@ -4,6 +4,7 @@ import com.djjko.dnc.auth.dto.request.AuthLoginRequest;
 import com.djjko.dnc.auth.dto.request.AuthSignupRequest;
 import com.djjko.dnc.auth.dto.response.AuthLoginResponse;
 import com.djjko.dnc.auth.dto.response.AuthLogoutResponse;
+import com.djjko.dnc.auth.dto.response.AuthReissueResponse;
 import com.djjko.dnc.auth.dto.response.AuthSignupResponse;
 import com.djjko.dnc.auth.service.AuthService;
 import jakarta.validation.Valid;
@@ -11,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,5 +40,11 @@ public class AuthController {
     @PostMapping("/logout")
     public AuthLogoutResponse logout() {
         return new AuthLogoutResponse("Logged out");
+    }
+
+    @PostMapping("/reissue")
+    public ResponseEntity<AuthReissueResponse> reissue(@RequestHeader("Authorization") String refreshToken) {
+        AuthReissueResponse response = authService.reissue(refreshToken);
+        return ResponseEntity.ok(response);
     }
 }

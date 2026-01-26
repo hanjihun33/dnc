@@ -7,6 +7,7 @@ import com.djjko.dnc.auth.dto.response.OAuthTokenResponse;
 import com.djjko.dnc.auth.service.oauth.OAuthService;
 import com.djjko.dnc.auth.service.oauth.OAuthTokenService;
 import com.djjko.dnc.auth.repository.UserRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/oauth")
 public class OAuthController {
@@ -42,6 +44,8 @@ public class OAuthController {
     ) {
         String resolvedState = (state == null || state.isBlank()) ? UUID.randomUUID().toString() : state;
         String authorizeUrl = oAuthService.buildAuthorizeUrl(provider, resolvedState);
+
+        log.info("Redirecting to {} auth URL: {}", provider, authorizeUrl);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(URI.create(authorizeUrl));
