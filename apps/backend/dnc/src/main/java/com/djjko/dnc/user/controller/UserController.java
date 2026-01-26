@@ -6,13 +6,19 @@ import com.djjko.dnc.user.dto.UserProfileUpdateRequest;
 import com.djjko.dnc.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.ResponseEntity;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -51,6 +57,37 @@ public class UserController {
         @Valid @RequestBody UserHealthUpdateRequest request
     ) {
         return userService.updateHealth(userId, request);
+    }
+
+    @Operation(summary = "프로필 이미지 업로드")
+    @PatchMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public UserProfileResponse updateProfileImage(
+        @Parameter(description = "임시 사용자 ID", example = "1")
+        @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId,
+        @Parameter(description = "프로필 이미지 파일")
+        @Schema(type = "string", format = "binary")
+        @RequestPart("image") MultipartFile image
+    ) {
+        return userService.updateProfileImage(userId, image);
+    }
+
+    @Operation(summary = "프로필 이미지 삭제")
+    @DeleteMapping("/me/profile-image")
+    public UserProfileResponse deleteProfileImage(
+        @Parameter(description = "임시 사용자 ID", example = "1")
+        @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId
+    ) {
+        return userService.deleteProfileImage(userId);
+    }
+
+    @Operation(summary = "회원 탈퇴")
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> deleteAccount(
+        @Parameter(description = "임시 사용자 ID", example = "1")
+        @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId
+    ) {
+        userService.deleteAccount(userId);
+        return ResponseEntity.noContent().build();
     }
 
 }
