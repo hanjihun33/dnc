@@ -25,6 +25,7 @@ DROP TABLE IF EXISTS food_records;
 DROP TABLE IF EXISTS glucose_data;
 DROP TABLE IF EXISTS sensors;
 DROP TABLE IF EXISTS user_settings;
+DROP TABLE IF EXISTS oauth_tokens;
 DROP TABLE IF EXISTS users;
 
 SET FOREIGN_KEY_CHECKS = 1;
@@ -41,7 +42,9 @@ CREATE TABLE users (
     nickname           VARCHAR(50)   NOT NULL,
     name               VARCHAR(100)  NOT NULL,
     birth_date         DATE          NOT NULL,
-    diabetes_type      ENUM('TYPE1','TYPE2','GESTATIONAL','OTHER') NULL,
+    diabetes_type      ENUM('TYPE1','TYPE2','PREDIABETES','OTHER') NULL,
+    diagnosis_year     SMALLINT     NULL,
+    diagnosis_month    TINYINT      NULL,
     gender             VARCHAR(20)   NULL,
     height_cm          DECIMAL(5,2)  NULL,
     weight_kg          DECIMAL(5,2)  NULL,
@@ -67,6 +70,26 @@ CREATE TABLE user_settings (
                                           ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id),
     CONSTRAINT fk_user_settings_user
+        FOREIGN KEY (user_id) REFERENCES users (user_id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- 2-2. oauth_tokens (1:N)
+CREATE TABLE oauth_tokens (
+    token_id      BIGINT      NOT NULL AUTO_INCREMENT,
+    user_id       BIGINT      NOT NULL,
+    provider      VARCHAR(50) NOT NULL,
+    access_token  VARCHAR(2048) NOT NULL,
+    refresh_token VARCHAR(2048) NULL,
+    token_type    VARCHAR(50) NULL,
+    scope         VARCHAR(255) NULL,
+    expires_at    TIMESTAMP NULL,
+    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                  ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (token_id),
+    UNIQUE KEY uk_oauth_tokens_user_provider (user_id, provider),
+    CONSTRAINT fk_oauth_tokens_user
         FOREIGN KEY (user_id) REFERENCES users (user_id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
@@ -145,7 +168,7 @@ CREATE TABLE food_records (
 
 -- 2-6. food_metadata
 CREATE TABLE food_metadata (
-    food_code        INT NOT NULL AUTO_INCREMENT,
+    food_code        VARCHAR(20)  NOT NULL,
     food_name        VARCHAR(100) NOT NULL,
     base_weight      FLOAT NULL,
     cal_per_base     FLOAT NULL,
@@ -153,17 +176,18 @@ CREATE TABLE food_metadata (
     sugars_per_base  FLOAT NULL,
     fat_per_base     FLOAT NULL,
     protein_per_base FLOAT NULL,
+    sodium_per_base  FLOAT NULL,
     created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                                    ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY ( food_code)
+    PRIMARY KEY (food_code)
 ) ENGINE=InnoDB;
 
 -- 2-7. food_analyses (AI 분석 결과)
 CREATE TABLE food_analyses (
     analysis_id      BIGINT NOT NULL AUTO_INCREMENT,
     food_id          BIGINT NOT NULL,
-    food_code        INT NULL,
+    food_code        VARCHAR(20) NULL,
     estimated_weight FLOAT NULL,
     ai_confidence    FLOAT NULL,
     ai_comment       TEXT NULL,
