@@ -41,7 +41,10 @@ public class AuthService {
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .nickname(request.getNickname())
+                .name(request.getName()) // Added from incoming branch
+                .birthDate(request.getBirthDate()) // Added from incoming branch
                 .provider("local")
+                .providerId(null) // Added from incoming branch
                 .build();
 
         User saved = userRepository.save(user);
