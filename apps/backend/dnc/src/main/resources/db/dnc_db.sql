@@ -43,8 +43,8 @@ CREATE TABLE users (
     name               VARCHAR(100)  NOT NULL,
     birth_date         DATE          NOT NULL,
     diabetes_type      ENUM('TYPE1','TYPE2','PREDIABETES','OTHER') NULL,
-    diagnosis_year     SMALLINT     NULL,
-    diagnosis_month    TINYINT      NULL,
+    diagnosis_year     INT     NULL,
+    diagnosis_month    INT      NULL,
     gender             VARCHAR(20)   NULL,
     height_cm          DECIMAL(5,2)  NULL,
     weight_kg          DECIMAL(5,2)  NULL,
@@ -52,8 +52,10 @@ CREATE TABLE users (
     provider           VARCHAR(20)   NOT NULL DEFAULT 'local',
     provider_id        VARCHAR(255)  NULL,
     created_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
-                                         ON UPDATE CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    dexcom_access_token VARCHAR(2000) NULL,
+    dexcom_refresh_token VARCHAR(2000) NULL,
+    token_expires_at   TIMESTAMP     NULL,
     PRIMARY KEY (user_id),
     UNIQUE KEY uk_users_email (email),
     UNIQUE KEY uk_users_provider (provider, provider_id)
