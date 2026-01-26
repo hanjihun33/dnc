@@ -17,26 +17,26 @@ pipeline {
         stage('0. 알림: develop 변경 감지') {
             steps {
                 script {
-                    // 현재 브랜치 이름과 커밋 정보 가져오기
-                    def branchName = sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
+                    // 1. 젠킨스 변수에서 가져오되, 없으면 git 명령어로 백업 (삼항 연산자 사용)
+                    def rawBranch = env.GIT_BRANCH ?: sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
+                    
+                    // 2. 'origin/develop'에서 'origin/'을 떼어내고 'develop'만 남기기
+                    def branchName = rawBranch.replace('origin/', '')
+
                     def commitMsg = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
                     def commitAuthor = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
 
-                    // Mattermost 전송 메시지 구성
-                    def message = """
-                    🚀 **당낭콩** 인프라 알림
-                    - **브랜치**: `${branchName}`
-                    - **작성자**: ${commitAuthor}
-                    - **상태**: 변경 감지 (배포 프로세스 시작)
-                    - **최신 커밋**: 
-                    > ${commitMsg}
-                    """
+                    def rawMessage = """
+🚀 **당낭콩** 인프라 알림
+- **브랜치**: `${branchName}`
+- **작성자**: ${commitAuthor}
+- **상태**: 변경 감지 (배포 프로세스 시작)
+- **최신 커밋**: 
+> ${commitMsg}
+                    """.stripIndent().trim()
 
-                    sh """
-                        curl -i -X POST -H 'Content-Type: application/json' \
-                        -d '{"text": "${message.replaceAll("\n", "\\\\n")}"}' \
-                        ${env.MM_WEBHOOK_URL}
-                    """
+                    def payload = JsonOutput.toJson([text: rawMessage])
+                    sh "curl -i -X POST -H 'Content-Type: application/json' -d '${payload}' ${env.MM_WEBHOOK_URL}"
                 }
             }
         }
