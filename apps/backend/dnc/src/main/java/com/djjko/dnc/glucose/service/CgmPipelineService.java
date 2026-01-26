@@ -1,13 +1,13 @@
-package com.djjko.dnc.service;
+package com.djjko.dnc.glucose.service;
 
-import com.djjko.dnc.client.DexcomApiClient;
-import com.djjko.dnc.dto.DexcomResponse;
-import com.djjko.dnc.entity.GlucoseData;
-import com.djjko.dnc.entity.Sensor;
-import com.djjko.dnc.entity.User;
-import com.djjko.dnc.repository.GlucoseDataRepository;
-import com.djjko.dnc.repository.SensorRepository;
-import com.djjko.dnc.repository.UserRepository;
+import com.djjko.dnc.glucose.client.DexcomApiClient;
+import com.djjko.dnc.glucose.dto.DexcomResponse;
+import com.djjko.dnc.glucose.entity.GlucoseData;
+import com.djjko.dnc.glucose.entity.Sensor;
+import com.djjko.dnc.auth.entity.User;
+import com.djjko.dnc.report.repository.GlucoseDataRepository;
+import com.djjko.dnc.glucose.repository.SensorRepository;
+import com.djjko.dnc.auth.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

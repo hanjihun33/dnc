@@ -1,4 +1,4 @@
-package com.djjko.dnc.dto.report;
+package com.djjko.dnc.report.dto;
 
 import lombok.Builder;
 import lombok.Getter;

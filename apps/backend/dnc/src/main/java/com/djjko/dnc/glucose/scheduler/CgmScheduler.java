@@ -1,8 +1,8 @@
-package com.djjko.dnc.scheduler;
+package com.djjko.dnc.glucose.scheduler;
 
-import com.djjko.dnc.entity.User;
-import com.djjko.dnc.repository.UserRepository;
-import com.djjko.dnc.service.CgmPipelineService;
+import com.djjko.dnc.auth.entity.User;
+import com.djjko.dnc.auth.repository.UserRepository;
+import com.djjko.dnc.glucose.service.CgmPipelineService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

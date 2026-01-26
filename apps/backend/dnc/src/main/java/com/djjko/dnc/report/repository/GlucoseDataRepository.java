@@ -1,6 +1,6 @@
-package com.djjko.dnc.repository;
+package com.djjko.dnc.report.repository;
 
-import com.djjko.dnc.entity.GlucoseData;
+import com.djjko.dnc.glucose.entity.GlucoseData;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;

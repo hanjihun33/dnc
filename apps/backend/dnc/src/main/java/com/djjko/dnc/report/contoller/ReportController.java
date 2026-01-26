@@ -1,7 +1,7 @@
-package com.djjko.dnc.controller;
+package com.djjko.dnc.report.contoller;
 
-import com.djjko.dnc.dto.report.GlucoseReportDto;
-import com.djjko.dnc.service.ReportService;
+import com.djjko.dnc.report.dto.GlucoseReportDto;
+import com.djjko.dnc.report.service.ReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

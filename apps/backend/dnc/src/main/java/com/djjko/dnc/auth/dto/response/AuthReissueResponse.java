@@ -2,13 +2,11 @@ package com.djjko.dnc.auth.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
+@NoArgsConstructor
 @AllArgsConstructor
-public class AuthLoginResponse {
-
+public class AuthReissueResponse {
     private String accessToken;
-    private String refreshToken;
-    private String tokenType;
-    private long expiresIn;
 }

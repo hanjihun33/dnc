@@ -1,5 +1,6 @@
-package com.djjko.dnc.entity;
+package com.djjko.dnc.glucose.entity;
 
+import com.djjko.dnc.auth.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

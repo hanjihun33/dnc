@@ -1,7 +1,7 @@
-package com.djjko.dnc.repository;
+package com.djjko.dnc.glucose.repository;
 
-import com.djjko.dnc.entity.Sensor;
-import com.djjko.dnc.entity.User;
+import com.djjko.dnc.glucose.entity.Sensor;
+import com.djjko.dnc.auth.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 

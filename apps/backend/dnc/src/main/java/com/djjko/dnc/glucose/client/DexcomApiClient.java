@@ -1,6 +1,6 @@
-package com.djjko.dnc.client;
+package com.djjko.dnc.glucose.client;
 
-import com.djjko.dnc.dto.DexcomResponse;
+import com.djjko.dnc.glucose.dto.DexcomResponse;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,14 +29,15 @@ public class DexcomApiClient {
     private final ObjectMapper objectMapper;
 
     // 설정 파일(application.yml)에 URL이 없으면 샌드박스 주소 기본 사용
-    @Value("${dexcom.base-url:https://sandbox-api.dexcom.com}")
+    @Value("${oauth.providers.dexcom.api-base:https://sandbox-api.dexcom.com/v3}")
     private String baseUrl;
 
-    @Value("${dexcom.client-id}")
+    @Value("${oauth.providers.dexcom.client-id}")
     private String clientId;
 
-    @Value("${dexcom.client-secret}")
+    @Value("${oauth.providers.dexcom.client-secret}")
     private String clientSecret;
+
 
     /**
      * 혈당 데이터(EGV) 가져오기
@@ -48,7 +49,7 @@ public class DexcomApiClient {
         String formattedStartDate = startDate.minusHours(9).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
         String formattedEndDate = endDate.minusHours(9).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
         // 1. URL 생성 (쿼리 파라미터로 시간 범위 설정)
-        String url = UriComponentsBuilder.fromUriString(baseUrl + "/v3/users/self/egvs")
+        String url = UriComponentsBuilder.fromUriString(baseUrl + "/users/self/egvs")
                 .queryParam("startDate", formattedStartDate)
                 .queryParam("endDate", formattedEndDate)
                 .toUriString();
@@ -85,7 +86,7 @@ public class DexcomApiClient {
      * 리프레시 토큰으로 새 액세스 토큰 발급받기
      */
     public DexcomTokenResponse refreshAccessToken(String refreshToken) {
-        String url = baseUrl + "/v2/oauth2/token";
+        String url = baseUrl + "/oauth2/token";
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
@@ -100,7 +101,7 @@ public class DexcomApiClient {
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(map, headers);
 
         try {
-            log.info("🔄 토큰 갱신 시도 중...");
+            log.info("🔄 토큰 갱신 시도 중... URL: {}", url);
             // exchange를 사용하여 예외 발생 없이 응답을 직접 처리
             ResponseEntity<String> response = restTemplate.exchange(
                     url,

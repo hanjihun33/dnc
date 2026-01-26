@@ -1,8 +1,8 @@
-package com.djjko.dnc.dto;
+package com.djjko.dnc.glucose.dto;
 
-import com.djjko.dnc.entity.GlucoseData;
-import com.djjko.dnc.entity.Sensor;
-import com.djjko.dnc.entity.User;
+import com.djjko.dnc.glucose.entity.GlucoseData;
+import com.djjko.dnc.glucose.entity.Sensor;
+import com.djjko.dnc.auth.entity.User;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

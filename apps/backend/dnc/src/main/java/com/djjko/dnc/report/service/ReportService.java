@@ -1,8 +1,8 @@
-package com.djjko.dnc.service;
+package com.djjko.dnc.report.service;
 
-import com.djjko.dnc.dto.report.GlucoseReportDto;
-import com.djjko.dnc.entity.GlucoseData;
-import com.djjko.dnc.repository.GlucoseDataRepository;
+import com.djjko.dnc.report.dto.GlucoseReportDto;
+import com.djjko.dnc.glucose.entity.GlucoseData;
+import com.djjko.dnc.report.repository.GlucoseDataRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
