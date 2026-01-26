@@ -8,14 +8,18 @@ import com.djjko.dnc.user.dto.UserProfileUpdateRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.multipart.MultipartFile;
+import com.djjko.dnc.storage.FileStorageService;
 
 @Service
 public class UserService {
 
     private final UserRepository userRepository;
+    private final FileStorageService fileStorageService;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, FileStorageService fileStorageService) {
         this.userRepository = userRepository;
+        this.fileStorageService = fileStorageService;
     }
 
     public UserProfileResponse getProfile(Long userId) {
@@ -54,6 +58,37 @@ public class UserService {
         }
         User saved = userRepository.save(user);
         return toResponse(saved);
+    }
+
+    public UserProfileResponse updateProfileImage(Long userId, MultipartFile image) {
+        if (image == null || image.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profile image is required");
+        }
+        User user = findUser(userId);
+        String imageUrl = fileStorageService.save(image, "profile");
+        user.setProfileImageUrl(imageUrl);
+        User saved = userRepository.save(user);
+        return toResponse(saved);
+    }
+
+    public UserProfileResponse deleteProfileImage(Long userId) {
+        User user = findUser(userId);
+        String currentUrl = user.getProfileImageUrl();
+        if (currentUrl != null && !currentUrl.isBlank()) {
+            fileStorageService.deleteByUrl(currentUrl);
+        }
+        user.setProfileImageUrl(null);
+        User saved = userRepository.save(user);
+        return toResponse(saved);
+    }
+
+    public void deleteAccount(Long userId) {
+        User user = findUser(userId);
+        String currentUrl = user.getProfileImageUrl();
+        if (currentUrl != null && !currentUrl.isBlank()) {
+            fileStorageService.deleteByUrl(currentUrl);
+        }
+        userRepository.delete(user);
     }
 
 
