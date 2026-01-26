@@ -1,57 +1,57 @@
 import groovy.json.JsonOutput
 
+// 어떤 항목이 배포되었는지 기록할 리스트
+def deployedList = []
+
+// Mattermost 알림 공통 함수
+def sendMM(message) {
+    def payload = JsonOutput.toJson([text: message])
+    sh "curl -i -X POST -H 'Content-Type: application/json' -d '${payload}' ${env.MM_WEBHOOK_URL}"
+}
+
 pipeline {
     agent any
     
     environment {
-        // [1] 공통 경로 설정
+        // [1] 서버 배포 경로
         DEPLOY_ROOT_PATH = "/home/ubuntu/dang-nang-kong"
         
-        // [2] 이미지 이름 앞에 붙을 접두사 (도커 허브 ID/프로젝트명)
-        // 이 값은 팀장님의 .env 내 이미지 이름과 일치해야 합니다.
+        // [2] 도커 이미지 접두사
         IMAGE_PREFIX = "jeonggwanwoo/djjko" 
 
-        // Jenkins Credentials에 저장된 Mattermost Webhook URL
+        // [3] 젠킨스 Credentials ID
         MM_WEBHOOK_URL = credentials('MM_WEBHOOK')
     }
 
     stages {
-        stage('0. 알림: develop 변경 감지') {
+        stage('0. 알림: 변경 감지') {
             steps {
                 script {
-                    // 1. 젠킨스 변수에서 가져오되, 없으면 git 명령어로 백업 (삼항 연산자 사용)
+                    // 브랜치 이름 추출 및 origin/ 제거
                     def rawBranch = env.GIT_BRANCH ?: sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
-                    
-                    // 2. 'origin/develop'에서 'origin/'을 떼어내고 'develop'만 남기기
                     def branchName = rawBranch.replace('origin/', '')
-
+                    
                     def commitMsg = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
                     def commitAuthor = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
 
-                    def rawMessage = """
-🚀 **당낭콩** 인프라 알림
-- **브랜치**: `${branchName}`
-- **작성자**: ${commitAuthor}
-- **상태**: 변경 감지 (배포 프로세스 시작)
-- **최신 커밋**: 
-> ${commitMsg}
+                    def startMessage = """
+                    🛰️ **당낭콩** 인프라 가동
+                    - **브랜치**: `${branchName}`
+                    - **작성자**: ${commitAuthor}
+                    - **로그**: ${commitMsg}
                     """.stripIndent().trim()
-
-                    def payload = JsonOutput.toJson([text: rawMessage])
-                    sh "curl -i -X POST -H 'Content-Type: application/json' -d '${payload}' ${env.MM_WEBHOOK_URL}"
+                    
+                    sendMM(startMessage)
                 }
             }
         }
         
-        stage('1. 코드 체크아웃 및 소스 동기화') {
+        stage('1. 소스 동기화') {
             steps {
                 checkout scm
                 script {
-                    // 서버의 배포 폴더 구조를 만듭니다.
+                    // 수동 관리하는 .env, .yml, nginx 폴더는 건드리지 않고 apps 폴더만 동기화
                     sh "mkdir -p ${env.DEPLOY_ROOT_PATH}/apps"
-                    
-                    // 깃랩에 있는 apps 폴더만 서버로 복사합니다.
-                    // .env, .yml, nginx 폴더는 서버에 있는 것을 그대로 유지합니다.
                     sh "cp -ruT apps/ ${env.DEPLOY_ROOT_PATH}/apps/"
                 }
             }
@@ -61,15 +61,16 @@ pipeline {
             when { changeset "apps/backend/**" }
             steps {
                 script {
-                    input message: "백엔드 변경이 감지되었습니다. 배포할까요?", ok: "🚀 배포 시작"
-                    echo "🐳 백엔드 빌드 및 이력 태깅(build-${env.BUILD_NUMBER})..."
+                    sendMM("🚧 **[Backend]** 코드 변경 감지. 배포 승인을 기다리는 중...")
+                    input message: "백엔드 배포를 승인하시겠습니까?", ok: "승인"
+                    
                     sh """
                         cd ${env.DEPLOY_ROOT_PATH}
                         docker-compose build backend
-                        # latest 이미지에 빌드 번호 이름표를 하나 더 붙임
                         docker tag ${env.IMAGE_PREFIX}-backend:latest ${env.IMAGE_PREFIX}-backend:build-${env.BUILD_NUMBER}
                         docker-compose up -d backend
                     """
+                    deployedList.add("Backend")
                 }
             }
         }
@@ -78,14 +79,16 @@ pipeline {
             when { changeset "apps/ai/**" }
             steps {
                 script {
-                    input message: "AI 서버 변경이 감지되었습니다. 배포할까요?", ok: "🚀 배포 시작"
-                    echo "🐳 AI 서버 빌드 및 이력 태깅(build-${env.BUILD_NUMBER})..."
+                    sendMM("🚧 **[AI Server]** 모델 및 로직 변경 감지. 승인 대기 중...")
+                    input message: "AI 서버 배포를 승인하시겠습니까?", ok: "승인"
+                    
                     sh """
                         cd ${env.DEPLOY_ROOT_PATH}
                         docker-compose build ai
                         docker tag ${env.IMAGE_PREFIX}-ai:latest ${env.IMAGE_PREFIX}-ai:build-${env.BUILD_NUMBER}
                         docker-compose up -d ai
                     """
+                    deployedList.add("AI Server")
                 }
             }
         }
@@ -94,26 +97,27 @@ pipeline {
             when { changeset "apps/frontend/**" }
             steps {
                 script {
-                    input message: "프론트엔드 변경이 감지되었습니다. 배포할까요?", ok: "🚀 배포 시작"
-                    echo "🐳 프론트엔드 빌드 및 이력 태깅(build-${env.BUILD_NUMBER})..."
+                    sendMM("🚧 **[Frontend]** UI/UX 변경 감지. 승인 대기 중...")
+                    input message: "프론트엔드 배포를 승인하시겠습니까?", ok: "승인"
+                    
                     sh """
                         cd ${env.DEPLOY_ROOT_PATH}
                         docker-compose build frontend
                         docker tag ${env.IMAGE_PREFIX}-frontend:latest ${env.IMAGE_PREFIX}-frontend:build-${env.BUILD_NUMBER}
                         docker-compose up -d frontend
                     """
+                    deployedList.add("Frontend")
                 }
             }
         }
 
-        stage('5. [승인] Nginx 설정 반영') {
-            // nginx 폴더 내 파일(conf.d 등)이 바뀌었을 때만 실행
+        stage('5. Nginx 설정 반영') {
+            // 서버에 수동으로 넣은 nginx 설정이 있을 때 새로고침
             when { changeset "nginx/**" }
             steps {
                 script {
-                    echo "🔒 Nginx 설정을 새로고침합니다..."
-                    // 컨테이너 재시작 없이 설정만 반영 (Zero Downtime)
                     sh "cd ${env.DEPLOY_ROOT_PATH} && docker-compose exec -T nginx nginx -s reload"
+                    deployedList.add("Nginx Config")
                 }
             }
         }
@@ -121,10 +125,22 @@ pipeline {
 
     post {
         success { 
-            echo "✅ '두쫀코' #${env.BUILD_NUMBER} 빌드 및 배포 성공!" 
+            script {
+                def summary = deployedList.join(", ") ?: "변경 사항 없음"
+                sendMM("🚀 **당낭콩** 배포 완료! (#${env.BUILD_NUMBER})\n- **반영 항목**: ${summary}")
+            }
         }
         failure { 
-            echo "❌ 배포 실패. 젠킨스 로그를 확인해 주세요." 
+            script {
+                def logUrl = "${env.BUILD_URL}console"
+                def failureMessage = """
+                🚨 **당낭콩** 배포 실패 (#${env.BUILD_NUMBER})
+                - 빌드 중 문제가 발생했어. 아래 링크에서 로그를 확인해봐.
+                - **로그 확인**: [Jenkins Console Log](${logUrl})
+                """.stripIndent().trim()
+                
+                sendMM(failureMessage)
+            }
         }
     }
 }
