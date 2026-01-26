@@ -2,37 +2,80 @@ pipeline {
     agent any
     
     environment {
-        // 모든 서비스의 공통 루트 경로
+        // [1] 공통 경로 설정
         DEPLOY_ROOT_PATH = "/home/ubuntu/dang-nang-kong"
+        
+        // [2] 이미지 이름 앞에 붙을 접두사 (도커 허브 ID/프로젝트명)
+        // 이 값은 팀장님의 .env 내 이미지 이름과 일치해야 합니다.
+        IMAGE_PREFIX = "jeonggwanwoo/djjko" 
+
+        // Jenkins Credentials에 저장된 Mattermost Webhook URL
+        MM_WEBHOOK_URL = credentials('MM_WEBHOOK')
     }
 
     stages {
+        stage('0. 알림: develop 변경 감지') {
+            steps {
+                script {
+                    // 현재 브랜치 이름과 커밋 정보 가져오기
+                    def branchName = sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
+                    def commitMsg = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
+                    def commitAuthor = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
+
+                    // Mattermost 전송 메시지 구성
+                    def message = """
+                    🚀 **당낭콩** 인프라 알림
+                    - **브랜치**: `${branchName}`
+                    - **작성자**: ${commitAuthor}
+                    - **상태**: 변경 감지 (배포 프로세스 시작)
+                    - **최신 커밋**: 
+                    > ${commitMsg}
+                    """
+
+                    sh """
+                        curl -i -X POST -H 'Content-Type: application/json' \
+                        -d '{"text": "${message.replaceAll("\n", "\\\\n")}"}' \
+                        ${env.MM_WEBHOOK_URL}
+                    """
+                }
+            }
+        }
+        
         stage('1. 코드 체크아웃 및 전체 동기화') {
             steps {
                 checkout scm
                 script {
-                    echo "🔄 모든 소스 코드를 서버로 동기화합니다..."
-                    // 프로젝트 전체를 한꺼번에 서버로 복사 (이후 서비스별 빌드에서 참조)
+                    echo "🔄 소스 코드 및 설정 파일을 서버로 동기화합니다..."
                     sh """
                         mkdir -p ${env.DEPLOY_ROOT_PATH}
+                        # 루트의 설정 파일들 복사
                         cp -u ${WORKSPACE}/*.yml ${env.DEPLOY_ROOT_PATH}/ || true
                         cp -u ${WORKSPACE}/.env ${env.DEPLOY_ROOT_PATH}/ || true
                         
+                        # 서비스 소스(apps)와 Nginx 설정(nginx) 폴더 전체 동기화
                         mkdir -p ${env.DEPLOY_ROOT_PATH}/apps
                         cp -ruT apps/ ${env.DEPLOY_ROOT_PATH}/apps/
+                        
+                        mkdir -p ${env.DEPLOY_ROOT_PATH}/nginx
+                        cp -ruT nginx/ ${env.DEPLOY_ROOT_PATH}/nginx/
                     """
                 }
             }
         }
 
         stage('2. [승인] 백엔드 배포') {
-            // 팀장님이 주신 "apps/backend/dnc" 경로를 감시합니다.
             when { changeset "apps/backend/**" }
             steps {
                 script {
                     input message: "백엔드 변경이 감지되었습니다. 배포할까요?", ok: "🚀 배포 시작"
-                    echo "🐳 백엔드 Docker 이미지 빌드 및 컨테이너 재시작..."
-                    sh "cd ${env.DEPLOY_ROOT_PATH} && docker-compose up -d --build backend"
+                    echo "🐳 백엔드 빌드 및 이력 태깅(build-${env.BUILD_NUMBER})..."
+                    sh """
+                        cd ${env.DEPLOY_ROOT_PATH}
+                        docker-compose build backend
+                        # latest 이미지에 빌드 번호 이름표를 하나 더 붙임
+                        docker tag ${env.IMAGE_PREFIX}-backend:latest ${env.IMAGE_PREFIX}-backend:build-${env.BUILD_NUMBER}
+                        docker-compose up -d backend
+                    """
                 }
             }
         }
@@ -42,7 +85,13 @@ pipeline {
             steps {
                 script {
                     input message: "AI 서버 변경이 감지되었습니다. 배포할까요?", ok: "🚀 배포 시작"
-                    sh "cd ${env.DEPLOY_ROOT_PATH} && docker-compose up -d --build ai"
+                    echo "🐳 AI 서버 빌드 및 이력 태깅(build-${env.BUILD_NUMBER})..."
+                    sh """
+                        cd ${env.DEPLOY_ROOT_PATH}
+                        docker-compose build ai
+                        docker tag ${env.IMAGE_PREFIX}-ai:latest ${env.IMAGE_PREFIX}-ai:build-${env.BUILD_NUMBER}
+                        docker-compose up -d ai
+                    """
                 }
             }
         }
@@ -52,14 +101,36 @@ pipeline {
             steps {
                 script {
                     input message: "프론트엔드 변경이 감지되었습니다. 배포할까요?", ok: "🚀 배포 시작"
-                    sh "cd ${env.DEPLOY_ROOT_PATH} && docker-compose up -d --build frontend"
+                    echo "🐳 프론트엔드 빌드 및 이력 태깅(build-${env.BUILD_NUMBER})..."
+                    sh """
+                        cd ${env.DEPLOY_ROOT_PATH}
+                        docker-compose build frontend
+                        docker tag ${env.IMAGE_PREFIX}-frontend:latest ${env.IMAGE_PREFIX}-frontend:build-${env.BUILD_NUMBER}
+                        docker-compose up -d frontend
+                    """
+                }
+            }
+        }
+
+        stage('5. [승인] Nginx 설정 반영') {
+            // nginx 폴더 내 파일(conf.d 등)이 바뀌었을 때만 실행
+            when { changeset "nginx/**" }
+            steps {
+                script {
+                    echo "🔒 Nginx 설정을 새로고침합니다..."
+                    // 컨테이너 재시작 없이 설정만 반영 (Zero Downtime)
+                    sh "cd ${env.DEPLOY_ROOT_PATH} && docker-compose exec -T nginx nginx -s reload"
                 }
             }
         }
     }
 
     post {
-        success { echo "✅ '두쫀코' 서비스 선택적 배포 성공!" }
-        failure { echo "❌ 배포 실패. 로그를 확인해 주세요." }
+        success { 
+            echo "✅ '두쫀코' #${env.BUILD_NUMBER} 빌드 및 배포 성공!" 
+        }
+        failure { 
+            echo "❌ 배포 실패. 젠킨스 로그를 확인해 주세요." 
+        }
     }
 }
