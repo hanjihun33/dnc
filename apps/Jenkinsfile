@@ -135,7 +135,6 @@ pipeline {
                 def logUrl = "${env.BUILD_URL}console"
                 def failureMessage = """
                 🚨 **당낭콩** 배포 실패 (#${env.BUILD_NUMBER})
-                - 빌드 중 문제가 발생했어. 아래 링크에서 로그를 확인해봐.
                 - **로그 확인**: [Jenkins Console Log](${logUrl})
                 """.stripIndent().trim()
                 
