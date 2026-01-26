@@ -48,6 +48,12 @@ public class User {
     @Column(name = "diabetes_type", length = 20)
     private DiabetesType diabetesType;
 
+    @Column(name = "diagnosis_year")
+    private Integer diagnosisYear;
+
+    @Column(name = "diagnosis_month")
+    private Integer diagnosisMonth;
+
     @Column(length = 20)
     private String gender;
 

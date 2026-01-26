@@ -47,6 +47,12 @@ public class UserService {
         if (request.getDiabetesType() != null) {
             user.setDiabetesType(request.getDiabetesType());
         }
+        if (request.getDiagnosisYear() != null) {
+            user.setDiagnosisYear(request.getDiagnosisYear());
+        }
+        if (request.getDiagnosisMonth() != null) {
+            user.setDiagnosisMonth(request.getDiagnosisMonth());
+        }
         if (request.getGender() != null) {
             user.setGender(request.getGender());
         }
@@ -105,6 +111,8 @@ public class UserService {
             user.getName(),
             user.getBirthDate(),
             user.getDiabetesType(),
+            user.getDiagnosisYear(),
+            user.getDiagnosisMonth(),
             user.getGender(),
             user.getHeightCm(),
             user.getWeightKg(),

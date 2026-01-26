@@ -23,6 +23,10 @@ public class UserProfileResponse {
     private LocalDate birthDate;
     @Schema(example = "TYPE1")
     private DiabetesType diabetesType;
+    @Schema(example = "2012")
+    private Integer diagnosisYear;
+    @Schema(example = "3")
+    private Integer diagnosisMonth;
     @Schema(example = "FEMALE")
     private String gender;
     @Schema(example = "165.2")
