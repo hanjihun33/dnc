@@ -24,6 +24,14 @@ pipeline {
     }
 
     stages {
+        stage('⚠️ 실패 테스트') {
+            steps {
+                script {
+                    // 이 명령어가 실행되는 순간 빌드가 실패 상태로 전환
+                    error "알림 테스트를 위한 인위적 실패 발생!"
+                }
+            }
+        }
         stage('0. 알림: 변경 감지') {
             steps {
                 script {
