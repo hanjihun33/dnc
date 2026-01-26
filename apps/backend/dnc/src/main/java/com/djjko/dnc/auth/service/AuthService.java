@@ -40,6 +40,8 @@ public class AuthService {
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNickname(request.getNickname());
+        user.setName(request.getName());
+        user.setBirthDate(request.getBirthDate());
         user.setProvider("local");
         user.setProviderId(null);
 
