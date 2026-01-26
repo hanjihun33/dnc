@@ -102,7 +102,7 @@ pipeline {
         }
 
         stage('4. [승인] 프론트엔드 배포') {
-            when { changeset "apps/frontend/**" }
+            when { changeset "apps/mobile/**" }
             steps {
                 script {
                     sendMM("🚧 **[Frontend]** UI/UX 변경 감지. 승인 대기 중...")
