@@ -111,7 +111,7 @@ pipeline {
                     sh """
                         cd ${env.DEPLOY_ROOT_PATH}
                         docker-compose build frontend
-                        docker tag ${env.IMAGE_PREFIX}-frontend:latest ${env.IMAGE_PREFIX}-frontend:build-${env.BUILD_NUMBER}
+                        docker tag ${env.IMAGE_PREFIX}-mobile:latest ${env.IMAGE_PREFIX}-mobile:build-${env.BUILD_NUMBER}
                         docker-compose up -d frontend
                     """
                     deployedList.add("Frontend")
