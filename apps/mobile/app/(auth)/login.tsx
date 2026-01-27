@@ -94,12 +94,12 @@ export default function LoginScreen() {
           <View style={styles.backSpacer} />
         </View>
         <Text style={styles.subtitle}>
-          등록한 이메일과 비밀번호로 로그인하세요.
+          등록한 이메일(아이디)과 비밀번호로 로그인하세요.
         </Text>
 
         <View style={styles.formCard}>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>이메일</Text>
+            <Text style={styles.inputLabel}>이메일(아이디)</Text>
             <TextInput
               style={styles.input}
               placeholder="you@example.com"

@@ -31,10 +31,15 @@ export default function SignupScreen() {
 
   const handleNext = () => {
     const trimmedEmail = draft.email.trim();
+    const trimmedNickname = draft.nickname.trim();
     setErrorMessage(null);
 
     if (!trimmedEmail) {
-      setErrorMessage("이메일을 입력해주세요.");
+      setErrorMessage("이메일(아이디)을 입력해주세요.");
+      return;
+    }
+    if (!trimmedNickname) {
+      setErrorMessage("닉네임을 입력해주세요.");
       return;
     }
     if (draft.password.length < 8) {
@@ -78,7 +83,17 @@ export default function SignupScreen() {
             />
           </View>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>이메일</Text>
+            <Text style={styles.inputLabel}>닉네임</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="닉네임 입력"
+              placeholderTextColor={palette.textMuted}
+              value={draft.nickname}
+              onChangeText={(value) => updateDraft({ nickname: value })}
+            />
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>이메일(아이디)</Text>
             <TextInput
               style={styles.input}
               placeholder="you@example.com"

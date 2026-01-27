@@ -137,9 +137,16 @@ export default function SignupProfileScreen() {
 
     const trimmedEmail = draft.email.trim();
     const trimmedName = draft.name.trim();
+    const trimmedNickname = draft.nickname.trim();
     const birthDate = draft.birthDate;
 
-    if (!trimmedEmail || !draft.password || !trimmedName || !birthDate) {
+    if (
+      !trimmedEmail ||
+      !draft.password ||
+      !trimmedName ||
+      !trimmedNickname ||
+      !birthDate
+    ) {
       setErrorMessage("회원가입 정보를 모두 입력해 주세요.");
       return;
     }
@@ -154,7 +161,7 @@ export default function SignupProfileScreen() {
         body: JSON.stringify({
           email: trimmedEmail,
           password: draft.password,
-          nickname: trimmedName,
+          nickname: trimmedNickname,
           name: trimmedName,
           birthDate: formatDate(birthDate),
         }),

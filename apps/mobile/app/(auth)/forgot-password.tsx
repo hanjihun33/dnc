@@ -42,12 +42,12 @@ export default function ForgotPasswordScreen() {
           <View style={styles.backSpacer} />
         </View>
         <Text style={styles.subtitle}>
-          가입한 이메일로 비밀번호 재설정 링크를 보내드립니다.
+          가입한 이메일(아이디)로 비밀번호 재설정 링크를 보내드립니다.
         </Text>
 
         <View style={styles.formCard}>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>이메일</Text>
+            <Text style={styles.inputLabel}>이메일(아이디)</Text>
             <TextInput
               style={styles.input}
               placeholder="you@example.com"
