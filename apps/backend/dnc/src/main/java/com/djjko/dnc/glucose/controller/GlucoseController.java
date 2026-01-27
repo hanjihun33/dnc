@@ -3,6 +3,7 @@ package com.djjko.dnc.glucose.controller;
 import com.djjko.dnc.auth.entity.User;
 import com.djjko.dnc.auth.repository.UserRepository;
 import com.djjko.dnc.glucose.service.CgmPipelineService;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -20,6 +21,7 @@ public class GlucoseController {
 
     // 파라미터로 days를 받게 수정 (기본값 30일) -> 3년치 뽑고 싶으면 days=1095 입력
     @PostMapping("/fetch-history")
+    @Operation(summary = "혈당 이력 수집")
     public String fetchHistory(@RequestParam("userId") Long userId,
                                @RequestParam(value = "days", defaultValue = "30") int days) {
 
@@ -28,6 +30,7 @@ public class GlucoseController {
 
     // 임시 테스트용 최신 데이터 가져오기 엔드포인트
     @GetMapping("/fetch-latest-data/{userId}")
+    @Operation(summary = "최신 혈당 데이터 수집")
     public String fetchLatestData(@PathVariable Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + userId));
