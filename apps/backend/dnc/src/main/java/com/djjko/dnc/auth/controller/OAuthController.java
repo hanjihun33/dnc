@@ -73,12 +73,12 @@ public class OAuthController {
 
     @GetMapping("/{provider}/callback")
     @Operation(summary = "OAuth 콜백 처리")
-    public OAuthTokenResponse callback(
+    public ResponseEntity<?> callback(
         @PathVariable String provider,
         @RequestParam String code,
         @RequestParam(required = false) String state
     ) {
-        OAuthTokenResponse response = oAuthService.exchangeCodeForToken(provider, code);
+        OAuthTokenResponse response = oAuthService.exchangeCodeForToken(provider, code, state);
         java.util.Optional<com.djjko.dnc.auth.entity.User> userOpt = resolveAuthenticatedUserOrState(state);
         if (userOpt.isPresent()) {
             com.djjko.dnc.auth.entity.User user = userOpt.get();
@@ -88,7 +88,7 @@ public class OAuthController {
         } else {
             log.warn("OAuth callback could not resolve user. provider={} statePresent={}", provider, state != null && !state.isBlank());
         }
-        return response;
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{provider}/token")

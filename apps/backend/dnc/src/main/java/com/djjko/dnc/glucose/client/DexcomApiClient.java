@@ -38,6 +38,9 @@ public class DexcomApiClient {
     @Value("${oauth.providers.dexcom.client-secret}")
     private String clientSecret;
 
+    @Value("${oauth.providers.dexcom.redirect-uri}")
+    private String redirectUri;
+
 
     /**
      * 혈당 데이터(EGV) 가져오기
@@ -96,7 +99,7 @@ public class DexcomApiClient {
         map.add("client_secret", clientSecret);
         map.add("refresh_token", refreshToken);
         map.add("grant_type", "refresh_token");
-        map.add("redirect_uri", "http://localhost:8080");
+        map.add("redirect_uri", redirectUri);
 
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(map, headers);
 

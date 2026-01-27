@@ -26,6 +26,8 @@ public class SecurityConfig {
                     "/api/v1/auth/**",
                     "/api/v1/oauth/*/authorize",
                     "/api/v1/oauth/*/callback",
+                    "/api/v1/login/*/authorize",
+                    "/api/v1/login/*/callback",
                     "/api/v1/glucose/**", // 임시 테스트를 위해 glucose 엔드포인트 허용
                     "/swagger-ui/**",
                     "/v3/api-docs/**",
