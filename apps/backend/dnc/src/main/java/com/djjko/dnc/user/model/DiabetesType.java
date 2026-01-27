@@ -4,6 +4,5 @@ public enum DiabetesType {
     TYPE1,
     TYPE2,
     PREDIABETES,
-    GESTATIONAL,
     OTHER
 }
