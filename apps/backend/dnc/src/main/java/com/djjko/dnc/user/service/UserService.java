@@ -3,9 +3,11 @@ package com.djjko.dnc.user.service;
 import com.djjko.dnc.auth.entity.User;
 import com.djjko.dnc.auth.repository.UserRepository;
 import com.djjko.dnc.user.dto.UserHealthUpdateRequest;
+import com.djjko.dnc.user.dto.UserPasswordChangeRequest;
 import com.djjko.dnc.user.dto.UserProfileResponse;
 import com.djjko.dnc.user.dto.UserProfileUpdateRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.multipart.MultipartFile;
@@ -16,10 +18,16 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository, FileStorageService fileStorageService) {
+    public UserService(
+        UserRepository userRepository,
+        FileStorageService fileStorageService,
+        PasswordEncoder passwordEncoder
+    ) {
         this.userRepository = userRepository;
         this.fileStorageService = fileStorageService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public UserProfileResponse getProfile(Long userId) {
@@ -95,6 +103,25 @@ public class UserService {
             fileStorageService.deleteByUrl(currentUrl);
         }
         userRepository.delete(user);
+    }
+
+    public void changePassword(Long userId, UserPasswordChangeRequest request) {
+        User user = findUser(userId);
+
+        if (!"local".equalsIgnoreCase(user.getProvider())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password change is only available for local accounts");
+        }
+
+        if (user.getPassword() == null || !passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Current password is incorrect");
+        }
+
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New password must be different from the current password");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
     }
 
 
