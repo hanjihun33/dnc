@@ -104,3 +104,62 @@ class SlopeCalculator:
 
 # 인스턴스 생성 (외부에서 import해서 사용)
 slope_calculator = SlopeCalculator(alpha=0.3)
+
+
+# 디버깅 모드!
+if __name__ == "__main__":
+
+
+    class MockData:
+        def __init__(self, **kwargs):
+            self.data = kwargs
+        def model_dump(self):
+            return self.data
+
+    # 12:00 식사 -> 12:30 피크(160) -> 13:00 하강(130) -> 13:30 종료(100)
+    
+    # 식사 이벤트 (12:00)
+    mock_events = [
+        MockData(measured_at="2026-01-26 12:00:00", event_type="carbs", value=50)
+    ]
+
+    # 혈당 흐름
+    mock_glucose = [
+        MockData(measured_at="2026-01-26 12:00:00", value=100), # 식사 시작 (Start)
+        MockData(measured_at="2026-01-26 12:10:00", value=120),
+        MockData(measured_at="2026-01-26 12:20:00", value=140),
+        MockData(measured_at="2026-01-26 12:30:00", value=160), # 피크 (Peak)
+        MockData(measured_at="2026-01-26 12:40:00", value=150),
+        MockData(measured_at="2026-01-26 13:00:00", value=130),
+        MockData(measured_at="2026-01-26 13:30:00", value=100), # 하강 끝 (End)
+    ]
+
+
+    calc = SlopeCalculator(alpha=0.5) 
+
+    print("\n[1] 데이터 전처리 (DataFrame 변환)")
+    bg_df, events_df = calc.preprocess_from_list(mock_glucose, mock_events)
+    print(f"   - 혈당 데이터 개수: {len(bg_df)}")
+    print(f"   - 식사 이벤트 개수: {len(events_df)}")
+
+    print("\n[2] 기울기 계산 (Calculate Slopes)")
+    rise, decay = calc.calculate_daily_measured_slopes(bg_df, events_df)
+    
+    # Rise: (160 - 100) / 30분 = 2.0
+    # Decay: (160 - 100) / 60분 = 1.0
+    print(f"   - 측정된 상승 기울기: {rise} (예상값: 2.0)")
+    print(f"   - 측정된 하강 기울기: {decay} (예상값: 1.0)")
+
+    print("\n[3] 이동 평균 업데이트 (Update Params)")
+    # 기존 파라미터가 Rise=1.0, Decay=2.0 이었다고 가정
+    old_rise_param = 1.0
+    old_decay_param = 2.0
+    
+    new_rise = calc.apply_moving_average(old_rise_param, rise)
+    new_decay = calc.apply_moving_average(old_decay_param, decay)
+
+    # 검증:
+    # New Rise = (0.5 * 2.0) + (0.5 * 1.0) = 1.5
+    # New Decay = (0.5 * 1.0) + (0.5 * 2.0) = 1.5
+    print(f"   - 기존 Rise({old_rise_param}) -> 신규 Rise: {new_rise}")
+    print(f"   - 기존 Decay({old_decay_param}) -> 신규 Decay: {new_decay}")
