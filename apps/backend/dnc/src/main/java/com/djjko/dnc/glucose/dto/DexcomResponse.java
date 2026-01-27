@@ -35,7 +35,7 @@ public class DexcomResponse {
         private Double trendRate;
         private String transmitterId;
 
-        // DTO -> Entity 변환 편의 메서드
+        // DTO -> 엔티티 변환 편의 메서드
         public GlucoseData toEntity(User user, Sensor sensor) {
             return GlucoseData.builder()
                     .user(user)

@@ -53,9 +53,7 @@ CREATE TABLE users (
     provider_id        VARCHAR(255)  NULL,
     created_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    dexcom_access_token VARCHAR(2000) NULL,
-    dexcom_refresh_token VARCHAR(2000) NULL,
-    token_expires_at   TIMESTAMP     NULL,
+    dexcom_user_id     VARCHAR(255) NULL,
     PRIMARY KEY (user_id),
     UNIQUE KEY uk_users_email (email),
     UNIQUE KEY uk_users_provider (provider, provider_id)

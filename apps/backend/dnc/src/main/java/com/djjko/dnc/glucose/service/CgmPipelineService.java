@@ -1,13 +1,17 @@
 package com.djjko.dnc.glucose.service;
 
+import com.djjko.dnc.auth.dto.response.OAuthTokenResponse;
+import com.djjko.dnc.auth.entity.OAuthToken;
+import com.djjko.dnc.auth.entity.User;
+import com.djjko.dnc.auth.repository.UserRepository;
+import com.djjko.dnc.auth.service.oauth.OAuthService;
+import com.djjko.dnc.auth.service.oauth.OAuthTokenService;
 import com.djjko.dnc.glucose.client.DexcomApiClient;
 import com.djjko.dnc.glucose.dto.DexcomResponse;
 import com.djjko.dnc.glucose.entity.GlucoseData;
 import com.djjko.dnc.glucose.entity.Sensor;
-import com.djjko.dnc.auth.entity.User;
-import com.djjko.dnc.report.repository.GlucoseDataRepository;
 import com.djjko.dnc.glucose.repository.SensorRepository;
-import com.djjko.dnc.auth.repository.UserRepository;
+import com.djjko.dnc.report.repository.GlucoseDataRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +34,8 @@ public class CgmPipelineService {
     private final GlucoseDataRepository glucoseDataRepository;
     private final ObjectMapper objectMapper;
     private final DexcomApiClient dexcomApiClient;
+    private final OAuthTokenService oAuthTokenService;
+    private final OAuthService oAuthService;
 
     // API 호출을 위한 함수형 인터페이스 정의
     @FunctionalInterface
@@ -44,16 +50,16 @@ public class CgmPipelineService {
      * @return API 호출 결과
      */
     private <T> T executeWithTokenRefresh(User user, DexcomApiCall<T> apiCall) {
+        OAuthToken token = oAuthTokenService.getToken(user, "dexcom");
         try {
             // 1. 첫 번째 시도
-            return apiCall.execute(user.getDexcomAccessToken());
+            return apiCall.execute(token.getAccessToken());
         } catch (HttpClientErrorException.Unauthorized e) {
             log.warn("토큰 만료 (User: {}). 갱신 시도...", user.getNickname());
             try {
                 // 2. 토큰 갱신
-                DexcomApiClient.DexcomTokenResponse newTokens = dexcomApiClient.refreshAccessToken(user.getDexcomRefreshToken());
-                user.updateDexcomTokens(newTokens.getAccessToken(), newTokens.getRefreshToken(), newTokens.getExpiresIn());
-                userRepository.save(user); // DB에 갱신된 토큰 저장
+                OAuthTokenResponse newTokens = oAuthService.refreshToken("dexcom", token.getRefreshToken());
+                oAuthTokenService.saveToken(user, "dexcom", newTokens);
                 log.info("토큰 갱신 완료. API 호출 재시도...");
 
                 // 3. 갱신된 토큰으로 재시도
@@ -70,7 +76,7 @@ public class CgmPipelineService {
      * 스케줄러가 호출할 실시간 데이터 수집 메서드
      */
     public void fetchLatestDataForUser(User user) {
-        if (user.getDexcomAccessToken() == null) {
+        if (user.getDexcomUserId() == null || user.getDexcomUserId().isBlank()) {
             return; // 연동 안 된 유저는 건너뜀
         }
 
@@ -87,7 +93,7 @@ public class CgmPipelineService {
             if (egvResponse != null && egvResponse.getRecords() != null && !egvResponse.getRecords().isEmpty()) {
                 log.info("   -> [혈당] {}건 실시간 저장 시작 (User: {})", egvResponse.getRecords().size(), user.getNickname());
                 this.bufferCgmData(egvResponse);
-                this.syncBufferToDb(user.getProviderId());
+                this.syncBufferToDb(user.getDexcomUserId());
             }
         } catch (Exception e) {
             log.error("실시간 데이터 수집 중 사용자 {} 처리 실패: {}", user.getUserId(), e.getMessage());
@@ -101,7 +107,8 @@ public class CgmPipelineService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("에러: 유저 없음 " + userId));
 
-        if (user.getDexcomRefreshToken() == null) {
+        OAuthToken oauthToken = oAuthTokenService.getToken(user, "dexcom");
+        if (oauthToken.getRefreshToken() == null) {
             return "에러: Dexcom 계정이 연동되지 않았습니다.";
         }
 
@@ -127,7 +134,7 @@ public class CgmPipelineService {
 
                 if (egvResponse != null && egvResponse.getRecords() != null) {
                     this.bufferCgmData(egvResponse);
-                    this.syncBufferToDb(user.getProviderId());
+                    this.syncBufferToDb(user.getDexcomUserId());
                     totalEgvCount += egvResponse.getRecords().size();
                 }
 
@@ -192,7 +199,7 @@ public class CgmPipelineService {
         }
 
         // 실제 가입 유저 확인 (미가입 유저 데이터는 무시)
-        User user = userRepository.findByProviderId(dexcomUserId)
+        User user = userRepository.findByDexcomUserId(dexcomUserId)
                 .orElseThrow(() -> new RuntimeException("가입되지 않은 유저의 데이터입니다: " + dexcomUserId));
 
         // 활성 센서 찾기 또는 교체 로직
