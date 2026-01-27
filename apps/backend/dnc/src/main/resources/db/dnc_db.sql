@@ -236,6 +236,7 @@ CREATE TABLE weekly_reports (
     high_percent       FLOAT  NULL,
     very_high_percent  FLOAT  NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- [추가됨]
     PRIMARY KEY (report_id),
     UNIQUE KEY uk_weekly_reports (user_id, week_start_date),
     CONSTRAINT fk_weekly_reports_user
