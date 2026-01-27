@@ -4,6 +4,7 @@ import com.djjko.dnc.ai.food.dto.AiFoodAnalyzeResponse;
 import com.djjko.dnc.ai.food.dto.AiFoodNutrition;
 import com.djjko.dnc.meal.domain.FoodMetadata;
 import com.djjko.dnc.meal.repository.FoodMetadataRepository;
+import io.swagger.v3.oas.annotations.Operation;
 import java.util.List;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,6 +25,7 @@ public class AiFoodController {
     }
 
     @PostMapping(value = "/analyze", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "음식 사진 분석")
     public AiFoodAnalyzeResponse analyze(
         @RequestPart("image") MultipartFile image,
         @RequestParam(value = "estimatedWeight", required = false) Double estimatedWeight
