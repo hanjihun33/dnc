@@ -52,6 +52,18 @@ public class AuthService {
         return new AuthSignupResponse(saved.getUserId(), saved.getEmail(), saved.getNickname());
     }
 
+    public void checkEmailAvailable(String email) {
+        if (userRepository.existsByEmail(email)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already in use");
+        }
+    }
+
+    public void checkNicknameAvailable(String nickname) {
+        if (userRepository.existsByNickname(nickname)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Nickname already in use");
+        }
+    }
+
     public AuthLoginResponse login(AuthLoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));

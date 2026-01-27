@@ -1,18 +1,23 @@
-﻿import React, { useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
+  Alert,
   Modal,
+  Pressable,
   SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { setAuthSession } from "../session";
-
-import { useSignupDraft } from "./signup-context";
+import { useFocusEffect } from "@react-navigation/native";
+import {
+  bumpProfileRevision,
+  getAuthHeaders,
+  loadAuthSession,
+} from "../session";
 
 const palette = {
   background: "#F8FAFC",
@@ -42,28 +47,8 @@ const formatDate = (date: Date) => {
 const getDaysInMonth = (year: number, month: number) =>
   new Date(year, month, 0).getDate();
 
-const parseErrorMessage = async (response: Response) => {
-  try {
-    const data = (await response.json()) as { message?: string; error?: string };
-    return data.message ?? data.error ?? null;
-  } catch {
-    return null;
-  }
-};
-
-const mapSignupError = (message: string | null) => {
-  if (!message) {
-    return null;
-  }
-  if (message.toLowerCase().includes("email already in use")) {
-    return "이미 사용 중인 이메일입니다.";
-  }
-  return message;
-};
-
-export default function SignupProfileScreen() {
+export default function BodyInfoScreen() {
   const router = useRouter();
-  const { draft, updateDraft, resetDraft } = useSignupDraft();
   const now = new Date();
   const currentYear = now.getFullYear();
   const defaultYear = currentYear - 30;
@@ -73,12 +58,15 @@ export default function SignupProfileScreen() {
   );
   const monthOptions = Array.from({ length: 12 }, (_, index) => index + 1);
 
+  const [birthDate, setBirthDate] = useState<Date | null>(null);
+  const [gender, setGender] = useState<"남성" | "여성">("남성");
+  const [height, setHeight] = useState("");
+  const [weight, setWeight] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [tempYear, setTempYear] = useState(defaultYear);
   const [tempMonth, setTempMonth] = useState(1);
   const [tempDay, setTempDay] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const yearScrollRef = useRef<ScrollView | null>(null);
   const monthScrollRef = useRef<ScrollView | null>(null);
   const dayScrollRef = useRef<ScrollView | null>(null);
@@ -88,10 +76,7 @@ export default function SignupProfileScreen() {
     (_, index) => index + 1
   );
 
-  const scrollToIndex = (
-    ref: React.RefObject<ScrollView>,
-    index: number
-  ) => {
+  const scrollToIndex = (ref: React.RefObject<ScrollView>, index: number) => {
     if (!ref.current) {
       return;
     }
@@ -99,7 +84,7 @@ export default function SignupProfileScreen() {
   };
 
   const openPicker = () => {
-    const baseDate = draft.birthDate ?? new Date(defaultYear, 0, 1);
+    const baseDate = birthDate ?? new Date(defaultYear, 0, 1);
     setTempYear(baseDate.getFullYear());
     setTempMonth(baseDate.getMonth() + 1);
     setTempDay(baseDate.getDate());
@@ -116,7 +101,7 @@ export default function SignupProfileScreen() {
   };
 
   const confirmPicker = () => {
-    updateDraft({ birthDate: new Date(tempYear, tempMonth - 1, tempDay) });
+    setBirthDate(new Date(tempYear, tempMonth - 1, tempDay));
     setPickerOpen(false);
   };
 
@@ -140,184 +125,142 @@ export default function SignupProfileScreen() {
     }, 0);
   };
 
-  const handleSignup = async () => {
-    if (isSubmitting) {
-      return;
-    }
-    setErrorMessage(null);
+  const birthDateLabel = birthDate ? formatDate(birthDate) : "YYYY-MM-DD";
 
-    const trimmedEmail = draft.email.trim();
-    const trimmedName = draft.name.trim();
-    const trimmedNickname = draft.nickname.trim();
-    const birthDate = draft.birthDate;
+  const mapGenderToRequest = (value: "남성" | "여성") =>
+    value === "남성" ? "MALE" : "FEMALE";
+  const mapGenderFromResponse = (value?: string | null) =>
+    value === "FEMALE" ? "여성" : "남성";
 
-    if (
-      !trimmedEmail ||
-      !draft.password ||
-      !trimmedName ||
-      !trimmedNickname ||
-      !birthDate
-    ) {
-      setErrorMessage("회원가입 정보를 모두 입력해 주세요.");
-      return;
-    }
-
-    setIsSubmitting(true);
+  const loadProfile = React.useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/signup`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: trimmedEmail,
-          password: draft.password,
-          nickname: trimmedNickname,
-          name: trimmedName,
-          birthDate: formatDate(birthDate),
-        }),
+      await loadAuthSession();
+      const response = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
+        headers: getAuthHeaders(),
       });
-
       if (!response.ok) {
-        const message = mapSignupError(await parseErrorMessage(response));
-        throw new Error(message ?? "회원가입에 실패했습니다.");
+        return;
       }
-
-      const signupData = (await response.json()) as { userId?: number };
-
-      const loginResponse = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: trimmedEmail,
-          password: draft.password,
-        }),
-      });
-
-      if (!loginResponse.ok) {
-        const message = await parseErrorMessage(loginResponse);
-        throw new Error(message ?? "로그인에 실패했습니다.");
-      }
-
-      const loginData = (await loginResponse.json()) as {
-        accessToken?: string;
-        tokenType?: string;
+      const profile = (await response.json()) as {
+        birthDate?: string | null;
+        gender?: string | null;
+        heightCm?: number | null;
+        weightKg?: number | null;
       };
-      const accessToken = loginData.accessToken;
-      if (!accessToken) {
-        throw new Error("로그인 토큰을 받지 못했습니다.");
+      if (profile.birthDate) {
+        setBirthDate(new Date(profile.birthDate));
       }
-      const tokenType = loginData.tokenType ?? "Bearer";
-      const authorization = `${tokenType} ${accessToken}`;
-      await setAuthSession({
-        accessToken,
-        tokenType,
-        userId: signupData.userId ?? null,
-      });
+      if (profile.gender) {
+        setGender(mapGenderFromResponse(profile.gender));
+      }
+      if (typeof profile.heightCm === "number") {
+        setHeight(String(profile.heightCm));
+      }
+      if (typeof profile.weightKg === "number") {
+        setWeight(String(profile.weightKg));
+      }
+    } catch {
+      // Ignore load errors.
+    }
+  }, []);
 
-      const diabetesType =
-        draft.diabetesStatus === "type1"
-          ? "TYPE1"
-          : draft.diabetesStatus === "type2"
-            ? "TYPE2"
-            : draft.diabetesStatus === "prediabetes"
-              ? "OTHER"
-              : undefined;
-      const hasDiagnosis =
-        draft.diabetesStatus === "type1" || draft.diabetesStatus === "type2";
-      const diagnosisYear = hasDiagnosis ? draft.diagnosisYear : undefined;
-      const diagnosisMonth = hasDiagnosis ? draft.diagnosisMonth : undefined;
-      const gender =
-        draft.gender === "male"
-          ? "MALE"
-          : draft.gender === "female"
-            ? "FEMALE"
-            : undefined;
-      const heightValue = Number.parseFloat(draft.height);
-      const weightValue = Number.parseFloat(draft.weight);
-      const heightCm = Number.isFinite(heightValue) ? heightValue : undefined;
-      const weightKg = Number.isFinite(weightValue) ? weightValue : undefined;
+  useFocusEffect(
+    React.useCallback(() => {
+      void loadProfile();
+    }, [loadProfile])
+  );
 
-      const healthPayload = {
-        diabetesType,
-        diagnosisYear,
-        diagnosisMonth,
-        gender,
+  const handleSave = async () => {
+    if (isSaving) {
+      return;
+    }
+    const heightValue = Number.parseFloat(height);
+    const weightValue = Number.parseFloat(weight);
+    const heightCm = Number.isFinite(heightValue) ? heightValue : undefined;
+    const weightKg = Number.isFinite(weightValue) ? weightValue : undefined;
+
+    setIsSaving(true);
+    try {
+      await loadAuthSession();
+      const healthPayload: Record<string, unknown> = {
+        gender: mapGenderToRequest(gender),
         heightCm,
         weightKg,
       };
-      const shouldUpdateHealth = Object.values(healthPayload).some(
-        (value) => value !== undefined
-      );
-
-      if (shouldUpdateHealth && signupData.userId) {
-        const healthResponse = await fetch(`${API_BASE_URL}/api/v1/users/me/health`, {
+      const healthUrl = `${API_BASE_URL}/api/v1/users/me/health`;
+      console.log("PATCH", healthUrl, healthPayload);
+      const response = await fetch(healthUrl, {
+        method: "PATCH",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(healthPayload),
+      });
+      console.log("PATCH /users/me/health status:", response.status);
+      if (!response.ok) {
+        try {
+          const errorText = await response.text();
+          console.log("PATCH /users/me/health error:", errorText);
+        } catch {
+          console.log("PATCH /users/me/health error: <no body>");
+        }
+        throw new Error("신체 정보 저장에 실패했습니다.");
+      }
+      if (birthDate) {
+        const profilePayload = { birthDate: formatDate(birthDate) };
+        const profileUrl = `${API_BASE_URL}/api/v1/users/me/profile`;
+        console.log("PATCH", profileUrl, profilePayload);
+        const profileResponse = await fetch(profileUrl, {
           method: "PATCH",
           headers: {
+            ...getAuthHeaders(),
             "Content-Type": "application/json",
-            Authorization: authorization,
-            "X-User-Id": String(signupData.userId),
           },
-          body: JSON.stringify(healthPayload),
+          body: JSON.stringify(profilePayload),
         });
-
-        if (!healthResponse.ok) {
-          const message = await parseErrorMessage(healthResponse);
-          throw new Error(message ?? "건강 정보 저장에 실패했습니다.");
+        console.log("PATCH /users/me/profile status:", profileResponse.status);
+        if (!profileResponse.ok) {
+          try {
+            const errorText = await profileResponse.text();
+            console.log("PATCH /users/me/profile error:", errorText);
+          } catch {
+            console.log("PATCH /users/me/profile error: <no body>");
+          }
+          throw new Error("생년월일 저장에 실패했습니다.");
         }
       }
-
-      resetDraft();
-      router.replace("/(tabs)");
+      bumpProfileRevision();
+      Alert.alert("저장 완료", "신체 정보가 저장되었습니다.");
+      router.back();
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "회원가입에 실패했습니다.";
-      setErrorMessage(message);
+        error instanceof Error ? error.message : "저장에 실패했습니다.";
+      Alert.alert("저장 실패", message);
     } finally {
-      setIsSubmitting(false);
+      setIsSaving(false);
     }
   };
 
-  const birthDateLabel = draft.birthDate ? formatDate(draft.birthDate) : "YYYY-MM-DD";
-
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" />
       <ScrollView
         contentContainerStyle={styles.page}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.headerRow}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
             <Text style={styles.backText}>{"<"}</Text>
-          </TouchableOpacity>
-          <Text style={styles.pageTitle}>신체 정보</Text>
+          </Pressable>
+          <Text style={styles.pageTitle}>신체 정보 설정</Text>
           <View style={styles.backSpacer} />
         </View>
-
-        <View style={styles.progressRow}>
-          <View style={[styles.progressBar, styles.progressBarActive]} />
-          <View style={[styles.progressBar, styles.progressBarActive]} />
-          <View
-            style={[
-              styles.progressBar,
-              styles.progressBarActive,
-              styles.progressBarLast,
-            ]}
-          />
-        </View>
-        <Text style={styles.progressLabel}>단계 3/3</Text>
+        <Text style={styles.subtitle}>
+          생년월일, 성별, 키, 체중을 다시 입력하세요.
+        </Text>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>신체 정보를 입력해 주세요</Text>
-          <Text style={styles.cardDesc}>
-            목표 칼로리에 맞춘 식단 추천에 사용됩니다.
-          </Text>
-
           <View style={styles.fieldBlock}>
             <Text style={styles.inputLabel}>키(cm)</Text>
             <TextInput
@@ -325,8 +268,8 @@ export default function SignupProfileScreen() {
               placeholder="170"
               placeholderTextColor={palette.textMuted}
               keyboardType="number-pad"
-              value={draft.height}
-              onChangeText={(value) => updateDraft({ height: value })}
+              value={height}
+              onChangeText={setHeight}
             />
           </View>
 
@@ -337,87 +280,66 @@ export default function SignupProfileScreen() {
               placeholder="65"
               placeholderTextColor={palette.textMuted}
               keyboardType="number-pad"
-              value={draft.weight}
-              onChangeText={(value) => updateDraft({ weight: value })}
+              value={weight}
+              onChangeText={setWeight}
             />
           </View>
 
           <View style={styles.fieldBlock}>
             <Text style={styles.inputLabel}>성별</Text>
             <View style={styles.choiceRow}>
-              <TouchableOpacity
-                style={[
-                  styles.choiceButton,
-                  draft.gender === "male" && styles.choiceButtonActive,
-                ]}
-                onPress={() => updateDraft({ gender: "male" })}
-              >
-                <Text
+              {["남성", "여성"].map((option) => (
+                <Pressable
+                  key={option}
                   style={[
-                    styles.choiceText,
-                    draft.gender === "male" && styles.choiceTextActive,
+                    styles.choiceButton,
+                    gender === option && styles.choiceButtonActive,
                   ]}
+                  onPress={() => setGender(option as typeof gender)}
                 >
-                  남성
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.choiceButton,
-                  draft.gender === "female" && styles.choiceButtonActive,
-                  styles.choiceButtonLast,
-                ]}
-                onPress={() => updateDraft({ gender: "female" })}
-              >
-                <Text
-                  style={[
-                    styles.choiceText,
-                    draft.gender === "female" && styles.choiceTextActive,
-                  ]}
-                >
-                  여성
-                </Text>
-              </TouchableOpacity>
+                  <Text
+                    style={[
+                      styles.choiceText,
+                      gender === option && styles.choiceTextActive,
+                    ]}
+                  >
+                    {option}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
           </View>
 
           <View style={styles.fieldBlock}>
             <Text style={styles.inputLabel}>생년월일</Text>
-            <TouchableOpacity style={styles.inputButton} onPress={openPicker}>
+            <Pressable style={styles.inputButton} onPress={openPicker}>
               <Text
                 style={[
                   styles.inputButtonText,
-                  !draft.birthDate && styles.inputPlaceholder,
+                  !birthDate && styles.inputPlaceholder,
                 ]}
               >
                 {birthDateLabel}
               </Text>
               <Text style={styles.inputButtonChevron}>v</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
-
-          {errorMessage && (
-            <Text style={styles.errorText}>{errorMessage}</Text>
-          )}
         </View>
 
-        <TouchableOpacity
-          style={[
-            styles.primaryButton,
-            isSubmitting && styles.primaryButtonDisabled,
-          ]}
-          onPress={handleSignup}
-          disabled={isSubmitting}
+        <Pressable
+          style={[styles.primaryButton, isSaving && styles.primaryButtonDisabled]}
+          onPress={handleSave}
+          disabled={isSaving}
         >
           <Text
             style={[
               styles.primaryButtonText,
-              isSubmitting && styles.primaryButtonTextDisabled,
+              isSaving && styles.primaryButtonTextDisabled,
             ]}
           >
-            가입 완료
+            {isSaving ? "저장 중..." : "저장하기"}
           </Text>
-        </TouchableOpacity>
+        </Pressable>
       </ScrollView>
 
       {pickerOpen && (
@@ -430,19 +352,13 @@ export default function SignupProfileScreen() {
           <View style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
-                <TouchableOpacity
-                  style={styles.modalHeaderAction}
-                  onPress={closePicker}
-                >
+                <Pressable style={styles.modalHeaderAction} onPress={closePicker}>
                   <Text style={styles.modalHeaderCancel}>취소</Text>
-                </TouchableOpacity>
+                </Pressable>
                 <Text style={styles.modalTitle}>생년월일 선택</Text>
-                <TouchableOpacity
-                  style={styles.modalHeaderAction}
-                  onPress={confirmPicker}
-                >
+                <Pressable style={styles.modalHeaderAction} onPress={confirmPicker}>
                   <Text style={styles.modalHeaderConfirm}>확인</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
 
               <View style={styles.pickerContainer}>
@@ -467,7 +383,7 @@ export default function SignupProfileScreen() {
                     }}
                   >
                     {yearOptions.map((year, index) => (
-                      <TouchableOpacity
+                      <Pressable
                         key={year}
                         style={styles.pickerItem}
                         onPress={() => {
@@ -483,7 +399,7 @@ export default function SignupProfileScreen() {
                         >
                           {year}년
                         </Text>
-                      </TouchableOpacity>
+                      </Pressable>
                     ))}
                   </ScrollView>
 
@@ -506,7 +422,7 @@ export default function SignupProfileScreen() {
                     }}
                   >
                     {monthOptions.map((month, index) => (
-                      <TouchableOpacity
+                      <Pressable
                         key={month}
                         style={styles.pickerItem}
                         onPress={() => {
@@ -522,7 +438,7 @@ export default function SignupProfileScreen() {
                         >
                           {month}월
                         </Text>
-                      </TouchableOpacity>
+                      </Pressable>
                     ))}
                   </ScrollView>
 
@@ -545,7 +461,7 @@ export default function SignupProfileScreen() {
                     }}
                   >
                     {dayOptions.map((day, index) => (
-                      <TouchableOpacity
+                      <Pressable
                         key={day}
                         style={styles.pickerItem}
                         onPress={() => {
@@ -561,7 +477,7 @@ export default function SignupProfileScreen() {
                         >
                           {day}일
                         </Text>
-                      </TouchableOpacity>
+                      </Pressable>
                     ))}
                   </ScrollView>
                 </View>
@@ -594,27 +510,14 @@ const styles = StyleSheet.create({
   backText: { fontSize: 16, color: palette.text },
   backSpacer: { width: 36 },
   pageTitle: { fontSize: 22, fontWeight: "800", color: palette.text },
-  progressRow: { flexDirection: "row" },
-  progressBar: {
-    flex: 1,
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: palette.border,
-    marginRight: 6,
-  },
-  progressBarActive: { backgroundColor: palette.accent },
-  progressBarLast: { marginRight: 0 },
-  progressLabel: { marginTop: 8, color: palette.textMuted, fontSize: 12 },
+  subtitle: { color: palette.textMuted, marginBottom: 18 },
   card: {
-    marginTop: 18,
     backgroundColor: palette.card,
     borderRadius: 22,
     padding: 18,
     borderWidth: 1,
     borderColor: palette.border,
   },
-  cardTitle: { fontSize: 16, fontWeight: "700", color: palette.text },
-  cardDesc: { fontSize: 12, color: palette.textMuted, marginTop: 6 },
   fieldBlock: { marginTop: 16 },
   inputLabel: {
     color: palette.textMuted,
@@ -648,6 +551,7 @@ const styles = StyleSheet.create({
   choiceRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    gap: 10,
   },
   choiceButton: {
     flex: 1,
@@ -656,10 +560,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: "center",
-    marginRight: 10,
     backgroundColor: "#F8FAFC",
   },
-  choiceButtonLast: { marginRight: 0 },
   choiceButtonActive: {
     backgroundColor: palette.accent,
     borderColor: "#FDE68A",
@@ -685,7 +587,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: { color: palette.ink, fontWeight: "800", fontSize: 16 },
   primaryButtonTextDisabled: { color: "#94A3B8" },
-  errorText: { color: "#DC2626", fontSize: 12, marginTop: 12 },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(15, 23, 42, 0.5)",
@@ -754,4 +655,3 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
-
