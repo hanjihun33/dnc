@@ -33,8 +33,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
             try {
-                if (jwtUtil.isTokenValid(token)
-                    && SecurityContextHolder.getContext().getAuthentication() == null) {
+                // 1. 'access' 타입 토큰 검증
+                jwtUtil.validateAccessToken(token);
+
+                // 2. 인증 정보가 없다면, 유저 정보를 SecurityContext에 설정
+                if (SecurityContextHolder.getContext().getAuthentication() == null) {
                     String email = jwtUtil.getEmail(token);
                     UserDetails userDetails = userDetailsService.loadUserByUsername(email);
                     UsernamePasswordAuthenticationToken authentication =
@@ -45,7 +48,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                         );
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                // 토큰이 유효하지 않을 경우, SecurityContext를 클리어하고, 다음 필터로 넘어감
+                // 클라이언트는 401 Unauthorized 또는 관련 에러 응답을 받게 됨
                 SecurityContextHolder.clearContext();
             }
         }

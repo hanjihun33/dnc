@@ -44,20 +44,38 @@ public class FileStorageService {
     }
 
     public String save(MultipartFile file) {
+        return save(file, null);
+    }
+
+    public String save(MultipartFile file, String prefix) {
         if (file == null || file.isEmpty()) {
             return null;
         }
 
         if ("s3".equalsIgnoreCase(storageType)) {
-            return saveToS3(file);
+            return saveToS3(file, prefix);
         }
 
-        return saveToLocal(file);
+        return saveToLocal(file, prefix);
     }
 
-    private String saveToLocal(MultipartFile file) {
+    public void deleteByUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return;
+        }
+        if ("s3".equalsIgnoreCase(storageType)) {
+            deleteFromS3(url);
+            return;
+        }
+        deleteFromLocal(url);
+    }
+
+    private String saveToLocal(MultipartFile file, String prefix) {
         try {
             Path directory = Paths.get(uploadDir).toAbsolutePath();
+            if (prefix != null && !prefix.isBlank()) {
+                directory = directory.resolve(normalizePrefix(prefix));
+            }
             Files.createDirectories(directory);
 
             String fileName = UUID.randomUUID() + resolveExtension(file);
@@ -65,13 +83,16 @@ public class FileStorageService {
             file.transferTo(target);
 
             String normalizedUrlPath = urlPath.endsWith("/") ? urlPath : urlPath + "/";
-            return normalizedUrlPath + fileName;
+            if (prefix == null || prefix.isBlank()) {
+                return normalizedUrlPath + fileName;
+            }
+            return normalizedUrlPath + normalizePrefix(prefix) + "/" + fileName;
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to store file.", ex);
         }
     }
 
-    private String saveToS3(MultipartFile file) {
+    private String saveToS3(MultipartFile file, String prefix) {
         if (s3Client == null) {
             throw new IllegalStateException("S3 client is not configured.");
         }
@@ -79,7 +100,11 @@ public class FileStorageService {
             throw new IllegalStateException("S3 bucket is not configured.");
         }
 
-        String key = "uploads/" + UUID.randomUUID() + resolveExtension(file);
+        String keyPrefix = "uploads/";
+        if (prefix != null && !prefix.isBlank()) {
+            keyPrefix = keyPrefix + normalizePrefix(prefix) + "/";
+        }
+        String key = keyPrefix + UUID.randomUUID() + resolveExtension(file);
         PutObjectRequest request = PutObjectRequest.builder()
             .bucket(bucket)
             .key(key)
@@ -93,6 +118,44 @@ public class FileStorageService {
         }
 
         return buildPublicUrl(key);
+    }
+
+    private void deleteFromLocal(String url) {
+        String normalizedUrlPath = urlPath.endsWith("/") ? urlPath : urlPath + "/";
+        if (!url.startsWith(normalizedUrlPath)) {
+            return;
+        }
+        String relativePath = url.substring(normalizedUrlPath.length());
+        Path target = Paths.get(uploadDir).toAbsolutePath().resolve(relativePath);
+        try {
+            Files.deleteIfExists(target.normalize());
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to delete file.", ex);
+        }
+    }
+
+    private void deleteFromS3(String url) {
+        if (s3Client == null) {
+            throw new IllegalStateException("S3 client is not configured.");
+        }
+        if (bucket == null || bucket.isBlank()) {
+            throw new IllegalStateException("S3 bucket is not configured.");
+        }
+        String keyPrefix = publicUrl;
+        if (keyPrefix == null || keyPrefix.isBlank()) {
+            if (region == null || region.isBlank()) {
+                throw new IllegalStateException("S3 region is not configured.");
+            }
+            keyPrefix = String.format("https://%s.s3.%s.amazonaws.com/", bucket, region);
+        }
+        if (!keyPrefix.endsWith("/")) {
+            keyPrefix = keyPrefix + "/";
+        }
+        if (!url.startsWith(keyPrefix)) {
+            return;
+        }
+        String key = url.substring(keyPrefix.length());
+        s3Client.deleteObject(builder -> builder.bucket(bucket).key(key));
     }
 
     private String buildPublicUrl(String key) {
@@ -120,5 +183,16 @@ public class FileStorageService {
             return "";
         }
         return safeName.substring(dotIndex);
+    }
+
+    private String normalizePrefix(String prefix) {
+        String normalized = prefix.trim();
+        while (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
     }
 }
