@@ -7,6 +7,7 @@ import com.djjko.dnc.auth.dto.response.AuthLogoutResponse;
 import com.djjko.dnc.auth.dto.response.AuthReissueResponse;
 import com.djjko.dnc.auth.dto.response.AuthSignupResponse;
 import com.djjko.dnc.auth.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,22 +28,26 @@ public class AuthController {
     }
 
     @PostMapping("/signup")
+    @Operation(summary = "회원가입")
     public ResponseEntity<AuthSignupResponse> signup(@Valid @RequestBody AuthSignupRequest request) {
         AuthSignupResponse response = authService.signup(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PostMapping("/login")
+    @Operation(summary = "로그인")
     public AuthLoginResponse login(@Valid @RequestBody AuthLoginRequest request) {
         return authService.login(request);
     }
 
     @PostMapping("/logout")
+    @Operation(summary = "로그아웃")
     public AuthLogoutResponse logout() {
         return new AuthLogoutResponse("Logged out");
     }
 
     @PostMapping("/reissue")
+    @Operation(summary = "토큰 재발급")
     public ResponseEntity<AuthReissueResponse> reissue(@RequestHeader("Authorization") String refreshToken) {
         AuthReissueResponse response = authService.reissue(refreshToken);
         return ResponseEntity.ok(response);
