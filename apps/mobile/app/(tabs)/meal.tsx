@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { LineChart } from "react-native-chart-kit";
 
@@ -24,6 +25,14 @@ const timeItemHeight = 44;
 const timePickerHeight = timeItemHeight * 5;
 const timePickerPadding = (timePickerHeight - timeItemHeight) / 2;
 const weekLabels = ["일", "월", "화", "수", "목", "금", "토"];
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+const mealTypeMap: Record<string, string> = {
+  아침: "BREAKFAST",
+  점심: "LUNCH",
+  저녁: "DINNER",
+  간식: "SNACK",
+};
 
 const palette = {
   background: "#F8FAFC",
@@ -43,7 +52,6 @@ interface NutritionData {
   protein: number;
   fat: number;
   sugar: number;
-  fiber: number;
   sodium: number;
 }
 
@@ -56,6 +64,31 @@ interface PredictionData {
   foodName: string;
   nutrition: NutritionData;
 }
+
+const fallbackNutrition: NutritionData = {
+  calories: 460,
+  servingSize: "1인분 (230g)",
+  carbs: 52,
+  protein: 28,
+  fat: 18,
+  sugar: 8,
+  sodium: 840,
+};
+
+const buildFallbackPrediction = (): PredictionData => ({
+  graphData: {
+    labels: ["0분", "30분", "60분", "90분", "120분"],
+    datasets: [
+      {
+        data: [108, 126, 142, 131, 118],
+      },
+    ],
+  },
+  guide:
+    "사진 기준으로 혈당 상승 폭이 크지 않은 편이에요. 단백질과 채소를 함께 섭취하고, 식사 후 20분 정도 가볍게 움직이면 더 안정적이에요.",
+  foodName: "닭갈비",
+  nutrition: fallbackNutrition,
+});
 
 const formatDate = (date: Date) => {
   const year = date.getFullYear();
@@ -163,7 +196,10 @@ const getExifDate = (exif?: Record<string, unknown>) => {
 };
 
 export default function MealScreen() {
+  const router = useRouter();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedAsset, setSelectedAsset] =
+    useState<ImagePicker.ImagePickerAsset | null>(null);
   const [predictionData, setPredictionData] = useState<PredictionData | null>(
     null
   );
@@ -174,6 +210,8 @@ export default function MealScreen() {
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
   const [autoAdvanceTime, setAutoAdvanceTime] = useState(false);
   const [pickerMode, setPickerMode] = useState<"date" | "time" | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const initialTimeParts = getTimeParts(mealTime);
   const [tempDate, setTempDate] = useState(mealDate);
   const [calendarMonth, setCalendarMonth] = useState(
@@ -250,15 +288,118 @@ export default function MealScreen() {
 
   const clearImage = () => {
     setSelectedImage(null);
+    setSelectedAsset(null);
     setPredictionData(null);
     setNoticeMessage(null);
   };
 
-  const handleSubmit = () => {};
+  const handleSubmit = async () => {
+    if (!selectedAsset || isSubmitting) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const parts = getTimeParts(mealTime);
+      const eatenAt = buildTimeDate(
+        mealDate,
+        parts.period,
+        parts.hour,
+        parts.minute
+      );
+      const formData = new FormData();
+      formData.append("image", {
+        uri: selectedAsset.uri,
+        name:
+          selectedAsset.fileName ??
+          `meal-${Date.now()}.${selectedAsset.uri.split(".").pop() ?? "jpg"}`,
+        type: selectedAsset.mimeType ?? "image/jpeg",
+      } as unknown as Blob);
+      formData.append("mealType", mealTypeMap[mealType] ?? "SNACK");
+      formData.append("eatenAt", eatenAt.toISOString());
+      if (memo.trim()) {
+        formData.append("memo", memo.trim());
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/meals`, {
+        method: "POST",
+        headers: {
+          "X-User-Id": "1",
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("식사 기록 저장에 실패했어요.");
+      }
+
+      router.replace("/(tabs)/index");
+    } catch (error) {
+      console.warn(error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleDirectEdit = () => {
     setAutoAdvanceTime(true);
     openPicker("date");
+  };
+
+  const analyzeImage = async (asset: ImagePicker.ImagePickerAsset) => {
+    setIsAnalyzing(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", {
+        uri: asset.uri,
+        name:
+          asset.fileName ??
+          `analyze-${Date.now()}.${asset.uri.split(".").pop() ?? "jpg"}`,
+        type: asset.mimeType ?? "image/jpeg",
+      } as unknown as Blob);
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/ai/food/analyze`, {
+        method: "POST",
+        headers: {
+          "X-User-Id": "1",
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("AI 분석 요청에 실패했어요.");
+      }
+
+      const data = (await response.json()) as {
+        labels?: string[];
+        values?: number[];
+        guide?: string;
+        foodName?: string;
+        nutrition?: NutritionData;
+      };
+      const labels =
+        data.labels?.map((label) =>
+          label.endsWith("분") ? label : `${label}분`
+        ) ?? [];
+
+      setPredictionData({
+        graphData: {
+          labels: labels.length > 0 ? labels : ["0분", "30분", "60분", "90분", "120분"],
+          datasets: [
+            {
+              data: data.values?.length ? data.values : [108, 126, 142, 131, 118],
+            },
+          ],
+        },
+        guide: data.guide ?? buildFallbackPrediction().guide,
+        foodName: data.foodName ?? buildFallbackPrediction().foodName,
+        nutrition: data.nutrition ?? fallbackNutrition,
+      });
+    } catch (error) {
+      console.warn(error);
+      setPredictionData(buildFallbackPrediction());
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const pickImage = async () => {
@@ -281,37 +422,19 @@ export default function MealScreen() {
       setNoticeMessage(
         exifDate
           ? "사진이 촬영된 시간으로 변경되었어요!"
-          : "현재 시간으로 입력되었어요."
+          : "메타데이터가 없을 때 현재 시간으로 입력되었어요."
       );
+      setSelectedAsset(asset);
       setSelectedImage(asset.uri);
-      setPredictionData({
-        graphData: {
-          labels: ["0분", "30분", "60분", "90분", "120분"],
-          datasets: [
-            {
-              data: [108, 126, 142, 131, 118],
-            },
-          ],
-        },
-        guide:
-          "사진 기준으로 혈당 상승 폭이 크지 않은 편이에요. 단백질과 채소를 함께 섭취하고, 식사 후 20분 정도 가볍게 움직이면 더 안정적이에요.",
-        foodName: "치즈닭갈비구이",
-        nutrition: {
-          calories: 460,
-          servingSize: "1인분 (230g)",
-          carbs: 52,
-          protein: 28,
-          fat: 18,
-          sugar: 8,
-          fiber: 6,
-          sodium: 840,
-        },
-      });
+      setPredictionData(null);
+      analyzeImage(asset);
     }
   };
 
   const calendarCells = getMonthMatrix(calendarMonth);
   const isTimePicker = pickerMode === "time";
+  const isSubmitDisabled = !selectedAsset || isSubmitting;
+  const footerButtonLabel = isSubmitting ? "저장 중..." : "기록 완료";
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -414,6 +537,9 @@ export default function MealScreen() {
             ) : null}
           </View>
         )}
+        {selectedImage && isAnalyzing && (
+          <Text style={styles.analyzingText}>AI 분석 중...</Text>
+        )}
 
         {selectedImage && predictionData && (
           <View style={styles.resultsContainer}>
@@ -466,12 +592,6 @@ export default function MealScreen() {
                     {predictionData.nutrition.fat}g
                   </Text>
                 </View>
-                <View style={styles.nutritionItem}>
-                  <Text style={styles.nutritionLabel}>식이섬유</Text>
-                  <Text style={styles.nutritionValue}>
-                    {predictionData.nutrition.fiber}g
-                  </Text>
-                </View>
               </View>
               <View style={styles.nutritionDivider} />
               <View style={styles.nutritionRow}>
@@ -509,8 +629,22 @@ export default function MealScreen() {
         )}
       </ScrollView>
       <View style={styles.footerBar}>
-        <TouchableOpacity style={styles.footerButton} onPress={handleSubmit}>
-          <Text style={styles.footerButtonText}>기록 완료</Text>
+        <TouchableOpacity
+          style={[
+            styles.footerButton,
+            isSubmitDisabled && styles.footerButtonDisabled,
+          ]}
+          onPress={handleSubmit}
+          disabled={isSubmitDisabled}
+        >
+          <Text
+            style={[
+              styles.footerButtonText,
+              isSubmitDisabled && styles.footerButtonTextDisabled,
+            ]}
+          >
+            {footerButtonLabel}
+          </Text>
         </TouchableOpacity>
       </View>
       {pickerMode && (
@@ -937,6 +1071,12 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   imageTagText: { color: "#FFFFFF", fontWeight: "600", fontSize: 12 },
+  analyzingText: {
+    marginTop: 10,
+    color: palette.textMuted,
+    fontSize: 13,
+    textAlign: "center",
+  },
   resultsContainer: {
     marginTop: 14,
   },
@@ -1063,10 +1203,18 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
+  footerButtonDisabled: {
+    backgroundColor: "#E2E8F0",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   footerButtonText: {
     color: palette.ink,
     fontWeight: "800",
     fontSize: 16,
+  },
+  footerButtonTextDisabled: {
+    color: "#94A3B8",
   },
   modalBackdrop: {
     flex: 1,

@@ -18,6 +18,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 DROP TABLE IF EXISTS meal_reactions;
 DROP TABLE IF EXISTS weekly_reports;
+DROP TABLE IF EXISTS monthly_reports;
 DROP TABLE IF EXISTS glucose_predictions;
 DROP TABLE IF EXISTS food_analyses;
 DROP TABLE IF EXISTS food_metadata;
@@ -25,6 +26,7 @@ DROP TABLE IF EXISTS food_records;
 DROP TABLE IF EXISTS glucose_data;
 DROP TABLE IF EXISTS sensors;
 DROP TABLE IF EXISTS user_settings;
+DROP TABLE IF EXISTS oauth_tokens;
 DROP TABLE IF EXISTS users;
 
 SET FOREIGN_KEY_CHECKS = 1;
@@ -38,13 +40,21 @@ CREATE TABLE users (
     user_id            BIGINT       NOT NULL AUTO_INCREMENT,
     email              VARCHAR(255)  NOT NULL,
     password           VARCHAR(255)  NULL,
-    nickname           VARCHAR(50)   NULL,
+    nickname           VARCHAR(50)   NOT NULL,
+    name               VARCHAR(100)  NOT NULL,
+    birth_date         DATE          NOT NULL,
+    diabetes_type      ENUM('TYPE1','TYPE2','PREDIABETES','OTHER') NULL,
+    diagnosis_year     INT     NULL,
+    diagnosis_month    INT      NULL,
+    gender             VARCHAR(20)   NULL,
+    height_cm          DECIMAL(5,2)  NULL,
+    weight_kg          DECIMAL(5,2)  NULL,
     profile_image_url  VARCHAR(500)  NULL,
     provider           VARCHAR(20)   NOT NULL DEFAULT 'local',
     provider_id        VARCHAR(255)  NULL,
     created_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
-                                         ON UPDATE CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    dexcom_user_id     VARCHAR(255) NULL,
     PRIMARY KEY (user_id),
     UNIQUE KEY uk_users_email (email),
     UNIQUE KEY uk_users_provider (provider, provider_id)
@@ -61,6 +71,26 @@ CREATE TABLE user_settings (
                                           ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id),
     CONSTRAINT fk_user_settings_user
+        FOREIGN KEY (user_id) REFERENCES users (user_id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- 2-2. oauth_tokens (1:N)
+CREATE TABLE oauth_tokens (
+    token_id      BIGINT      NOT NULL AUTO_INCREMENT,
+    user_id       BIGINT      NOT NULL,
+    provider      VARCHAR(50) NOT NULL,
+    access_token  VARCHAR(2048) NOT NULL,
+    refresh_token VARCHAR(2048) NULL,
+    token_type    VARCHAR(50) NULL,
+    scope         VARCHAR(255) NULL,
+    expires_at    TIMESTAMP NULL,
+    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                  ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (token_id),
+    UNIQUE KEY uk_oauth_tokens_user_provider (user_id, provider),
+    CONSTRAINT fk_oauth_tokens_user
         FOREIGN KEY (user_id) REFERENCES users (user_id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
@@ -85,8 +115,7 @@ CREATE TABLE sensors (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 유저당 ACTIVE 센서 1개 제한 (MySQL 8+)
--- ※ MySQL 5.7 사용 시 이 줄은 주석 처리
+-- 유저당 ACTIVE 센서 1개 제한
 CREATE UNIQUE INDEX uk_sensors_one_active_per_user
 ON sensors ((CASE WHEN status = 'ACTIVE' THEN user_id ELSE NULL END));
 
@@ -95,12 +124,11 @@ CREATE TABLE glucose_data (
     glucose_id        BIGINT NOT NULL AUTO_INCREMENT,
     user_id           BIGINT NOT NULL,
     sensor_id         BIGINT NULL,
-    -- [기존] 값
     value             INT    NOT NULL,
-    -- [추가됨 1] 알림용 추세 정보
+    -- 알림용 추세 정보
     trend             VARCHAR(20) NULL COMMENT 'flat, singleUp, doubleUp etc',
     trend_rate        FLOAT       NULL COMMENT '분당 변화율',
-    -- [추가됨 2] 중복 방지용 덱스콤 ID (유니크 인덱스 필수!)
+    -- 중복 방지용 덱스콤 ID (유니크 인덱스 필수!)
     dexcom_record_id  VARCHAR(100) NULL, 
     source            ENUM('AUTO','MANUAL') NOT NULL DEFAULT 'AUTO',
     measured_at       TIMESTAMP NOT NULL,
@@ -197,12 +225,47 @@ CREATE TABLE weekly_reports (
     report_id       BIGINT NOT NULL AUTO_INCREMENT,
     user_id         BIGINT NOT NULL,
     week_start_date DATE   NOT NULL,
-    avg_glucose     FLOAT NULL,
-    in_range_ratio  FLOAT NULL,
+    record_count       INT    NULL,
+    average_glucose    INT    NULL,
+    max_glucose        INT    NULL,
+    min_glucose        INT    NULL,
+    standard_deviation FLOAT  NULL,
+    very_low_percent   FLOAT  NULL,
+    low_percent        FLOAT  NULL,
+    in_range_percent   FLOAT  NULL,
+    high_percent       FLOAT  NULL,
+    very_high_percent  FLOAT  NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- [추가됨]
     PRIMARY KEY (report_id),
     UNIQUE KEY uk_weekly_reports (user_id, week_start_date),
     CONSTRAINT fk_weekly_reports_user
+        FOREIGN KEY (user_id) REFERENCES users (user_id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- 2-9-1. monthly_reports
+CREATE TABLE monthly_reports (
+    report_id          BIGINT NOT NULL AUTO_INCREMENT,
+    user_id            BIGINT NOT NULL,
+    year               INT    NOT NULL,
+    month              INT    NOT NULL,
+    record_count       INT    NULL,
+    average_glucose    INT    NULL,
+    max_glucose        INT    NULL,
+    min_glucose        INT    NULL,
+    standard_deviation FLOAT  NULL,
+    very_low_percent   FLOAT  NULL,
+    low_percent        FLOAT  NULL,
+    in_range_percent   FLOAT  NULL,
+    high_percent       FLOAT  NULL,
+    very_high_percent  FLOAT  NULL,
+    created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                   ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (report_id),
+    UNIQUE KEY uk_monthly_reports_user_month (user_id, year, month),
+    CONSTRAINT fk_monthly_reports_user
         FOREIGN KEY (user_id) REFERENCES users (user_id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
