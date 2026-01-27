@@ -7,7 +7,6 @@ import com.djjko.dnc.auth.entity.OAuthToken;
 import com.djjko.dnc.auth.entity.User;
 import com.djjko.dnc.auth.dto.response.OAuthTokenResponse;
 import com.djjko.dnc.auth.repository.OAuthTokenRepository;
-import com.djjko.dnc.auth.repository.UserRepository; // Added import
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
@@ -16,11 +15,9 @@ import org.springframework.http.HttpStatus;
 public class OAuthTokenService {
 
     private final OAuthTokenRepository oauthTokenRepository;
-    private final UserRepository userRepository; // Added UserRepository
 
-    public OAuthTokenService(OAuthTokenRepository oauthTokenRepository, UserRepository userRepository) { // Modified constructor
+    public OAuthTokenService(OAuthTokenRepository oauthTokenRepository) {
         this.oauthTokenRepository = oauthTokenRepository;
-        this.userRepository = userRepository; // Initialize UserRepository
     }
 
     public OAuthToken saveToken(User user, String provider, OAuthTokenResponse response) {
@@ -36,15 +33,7 @@ public class OAuthTokenService {
         token.setScope(response.getScope());
         token.setExpiresAt(resolveExpiresAt(response.getExpiresIn()));
 
-        OAuthToken savedOAuthToken = oauthTokenRepository.save(token);
-
-        // Update User entity with Dexcom tokens if provider is Dexcom
-        if ("dexcom".equalsIgnoreCase(provider)) {
-            user.updateDexcomTokens(response.getAccessToken(), response.getRefreshToken(), response.getExpiresIn().intValue());
-            userRepository.save(user); // Save the updated User entity
-        }
-
-        return savedOAuthToken;
+        return oauthTokenRepository.save(token);
     }
 
     public OAuthToken getToken(User user, String provider) {

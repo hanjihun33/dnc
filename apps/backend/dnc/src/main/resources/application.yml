@@ -20,7 +20,7 @@ spring:
     name: dnc
   servlet:
     multipart:
-      # Optional: override temp upload location.
+      # 선택: 임시 업로드 위치 재정의
       # location: ${user.home}/uploads
       file-size-threshold: 10MB
       max-file-size: 10MB
@@ -28,8 +28,8 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${DB_URL:jdbc:mysql://localhost:3306/dnc_db?serverTimezone=Asia/Seoul}
-    username: ${DB_USERNAME:ssafy}
-    password: ${DB_PASSWORD:ssafy}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:0522}
     hikari:
       idle-timeout: 300000
       minimum-idle: 3
@@ -54,17 +54,18 @@ logging:
     org.hibernate.type: ERROR       # 파라미터 값 로그 숨기기
     com.zaxxer.hikari: ERROR        # DB 연결 로그 숨기기
     org.springframework.security: DEBUG
+    com.djjko.dnc.glucose: WARN     # 로그 숨기기
 
 jwt:
   secret: ${JWT_SECRET:9c2f4d1a7b8e3c6f5a0d2b7e9f1c4a8d9b6e3a0c5f2d0y5s}
-  expiration_time: ${JWT_EXPIRATION_TIME:3600000} # 1 hour
-  refresh_expiration_time: ${JWT_REFRESH_EXPIRATION_TIME:604800000} # 7 days
+  expiration_time: ${JWT_EXPIRATION_TIME:3600000} # 1시간
+  refresh_expiration_time: ${JWT_REFRESH_EXPIRATION_TIME:604800000} # 7일
 
 oauth:
   providers:
     dexcom:
-      client-id: ${DEXCOM_CLIENT_ID:7KaRpwoqMFGyYsLFcmH0DSiiiGkLhsdX}
-      client-secret: ${DEXCOM_CLIENT_SECRET:bPQO4Ul2XDEqGKY9}
+      client-id: ${DEXCOM_CLIENT_ID:}
+      client-secret: ${DEXCOM_CLIENT_SECRET:}
       redirect-uri: ${DEXCOM_REDIRECT_URI:http://localhost:8080/api/v1/oauth/dexcom/callback}
       auth-uri: ${DEXCOM_AUTH_URI:https://sandbox-api.dexcom.com/v3/oauth2/login}
       token-uri: ${DEXCOM_TOKEN_URI:https://sandbox-api.dexcom.com/v3/oauth2/token}

@@ -41,10 +41,10 @@ public class AuthService {
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .nickname(request.getNickname())
-                .name(request.getName()) // Added from incoming branch
-                .birthDate(request.getBirthDate()) // Added from incoming branch
+                .name(request.getName()) // 병합 브랜치에서 추가됨
+                .birthDate(request.getBirthDate()) // 병합 브랜치에서 추가됨
                 .provider("local")
-                .providerId(null) // Added from incoming branch
+                .providerId(null) // 병합 브랜치에서 추가됨
                 .build();
 
         User saved = userRepository.save(user);
@@ -78,26 +78,26 @@ public class AuthService {
     }
 
     public AuthReissueResponse reissue(String refreshToken) {
-        // 1. Extract token from "Bearer " prefix
+        // 1. "Bearer " 접두사에서 토큰 추출
         if (refreshToken == null || !refreshToken.startsWith("Bearer ")) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token");
         }
         String token = refreshToken.substring(7);
 
-        // 2. Validate the refresh token
+        // 2. 리프레시 토큰 검증
         jwtUtil.validateRefreshToken(token);
 
-        // 3. Get user ID from the token
+        // 3. 토큰에서 사용자 ID 추출
         Long userId = jwtUtil.getUserId(token);
 
-        // 4. Find the user by ID
+        // 4. 사용자 조회
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
 
-        // 5. Generate a new access token
+        // 5. 새 액세스 토큰 생성
         String newAccessToken = jwtUtil.generateAccessToken(user.getUserId(), user.getEmail());
 
-        // 6. Return the new access token
+        // 6. 새 액세스 토큰 반환
         return new AuthReissueResponse(newAccessToken);
     }
 }
