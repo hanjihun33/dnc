@@ -54,14 +54,14 @@ public class ReportService {
                 .mapToDouble(d -> Math.pow(d.getValue() - average, 2))
                 .sum() / count);
 
-        // Time in Range 카운트
+        // 목표 범위 내 시간(TIR) 카운트
         long veryLowCount = data.stream().filter(d -> d.getValue() < 54).count();
         long lowCount = data.stream().filter(d -> d.getValue() >= 54 && d.getValue() <= 69).count();
         long inRangeCount = data.stream().filter(d -> d.getValue() >= 70 && d.getValue() <= 180).count();
         long highCount = data.stream().filter(d -> d.getValue() > 180 && d.getValue() <= 250).count();
         long veryHighCount = data.stream().filter(d -> d.getValue() > 250).count();
 
-        // Time in Range DTO 빌드
+        // 목표 범위 내 시간(TIR) DTO 빌드
         GlucoseReportDto.TimeInRangeDto tirDto = GlucoseReportDto.TimeInRangeDto.builder()
                 .veryLowPercent(calculatePercent(veryLowCount, count))
                 .lowPercent(calculatePercent(lowCount, count))

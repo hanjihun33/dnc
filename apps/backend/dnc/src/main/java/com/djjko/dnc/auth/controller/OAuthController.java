@@ -4,11 +4,14 @@ import java.net.URI;
 import java.util.UUID;
 
 import com.djjko.dnc.auth.dto.response.OAuthTokenResponse;
+import com.djjko.dnc.auth.entity.User;
 import com.djjko.dnc.auth.service.oauth.OAuthService;
 import com.djjko.dnc.auth.service.oauth.OAuthStateService;
 import com.djjko.dnc.auth.service.oauth.OAuthTokenService;
 import com.djjko.dnc.auth.repository.UserRepository;
 import com.djjko.dnc.auth.security.JwtUtil;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -36,19 +39,22 @@ public class OAuthController {
     private final OAuthTokenService oAuthTokenService;
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
+    private final ObjectMapper objectMapper;
 
     public OAuthController(
         OAuthService oAuthService,
         OAuthStateService oAuthStateService,
         OAuthTokenService oAuthTokenService,
         UserRepository userRepository,
-        JwtUtil jwtUtil
+        JwtUtil jwtUtil,
+        ObjectMapper objectMapper
     ) {
         this.oAuthService = oAuthService;
         this.oAuthStateService = oAuthStateService;
         this.oAuthTokenService = oAuthTokenService;
         this.userRepository = userRepository;
         this.jwtUtil = jwtUtil;
+        this.objectMapper = objectMapper;
     }
 
     @GetMapping("/{provider}/authorize")
@@ -83,6 +89,7 @@ public class OAuthController {
         if (userOpt.isPresent()) {
             com.djjko.dnc.auth.entity.User user = userOpt.get();
             log.info("OAuth callback resolved userId={} provider={}", user.getUserId(), provider);
+            updateProviderIdIfDexcom(user, provider, response);
             oAuthTokenService.saveToken(user, provider, response);
             log.info("OAuth token saved for userId={} provider={}", user.getUserId(), provider);
         } else {
@@ -98,7 +105,9 @@ public class OAuthController {
         @RequestParam String code
     ) {
         OAuthTokenResponse response = oAuthService.exchangeCodeForToken(provider, code);
-        oAuthTokenService.saveToken(resolveRequiredUser(), provider, response);
+        User user = resolveRequiredUser();
+        updateProviderIdIfDexcom(user, provider, response);
+        oAuthTokenService.saveToken(user, provider, response);
         return response;
     }
 
@@ -179,6 +188,35 @@ public class OAuthController {
         }
         return oAuthStateService.resolveUserId(state)
             .flatMap(userRepository::findById);
+    }
+
+    private void updateProviderIdIfDexcom(User user, String provider, OAuthTokenResponse response) {
+        if (!"dexcom".equalsIgnoreCase(provider)) {
+            return;
+        }
+        if (response == null || response.getAccessToken() == null || response.getAccessToken().isBlank()) {
+            return;
+        }
+        try {
+            String body = oAuthService.fetchDataRange(provider, response.getAccessToken(), null);
+            if (body == null || body.isBlank()) {
+                return;
+            }
+            JsonNode root = objectMapper.readTree(body);
+            JsonNode userIdNode = root.findValue("userId");
+            if (userIdNode == null || userIdNode.isNull()) {
+                return;
+            }
+            String dexcomUserId = userIdNode.asText(null);
+            if (dexcomUserId == null || dexcomUserId.isBlank()) {
+                return;
+            }
+            user.setDexcomUserId(dexcomUserId);
+            userRepository.save(user);
+            log.info("Dexcom userId synced for user {} -> {}", user.getUserId(), dexcomUserId);
+        } catch (Exception ex) {
+            log.warn("Failed to resolve Dexcom userId for user {}: {}", user.getUserId(), ex.getMessage());
+        }
     }
 
     private com.djjko.dnc.auth.entity.User resolveRequiredUser() {
