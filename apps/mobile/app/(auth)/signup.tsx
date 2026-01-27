@@ -23,23 +23,32 @@ const palette = {
   ink: "#111827",
 };
 
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+
 export default function SignupScreen() {
   const router = useRouter();
   const { draft, updateDraft } = useSignupDraft();
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [nicknameError, setNicknameError] = useState<string | null>(null);
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [isCheckingNickname, setIsCheckingNickname] = useState(false);
 
-  const handleNext = () => {
+  const handleNext = async () => {
     const trimmedEmail = draft.email.trim();
     const trimmedNickname = draft.nickname.trim();
     setErrorMessage(null);
+    setEmailError(null);
+    setNicknameError(null);
 
     if (!trimmedEmail) {
-      setErrorMessage("이메일(아이디)을 입력해주세요.");
+      setEmailError("이메일(아이디)을 입력해주세요.");
       return;
     }
     if (!trimmedNickname) {
-      setErrorMessage("닉네임을 입력해주세요.");
+      setNicknameError("닉네임을 입력해주세요.");
       return;
     }
     if (draft.password.length < 8) {
@@ -49,6 +58,50 @@ export default function SignupScreen() {
     if (draft.password !== confirmPassword) {
       setErrorMessage("비밀번호가 일치하지 않습니다.");
       return;
+    }
+
+    setIsCheckingEmail(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/auth/check-email?email=${encodeURIComponent(
+          trimmedEmail
+        )}`
+      );
+      if (response.status === 409) {
+        setEmailError("이미 사용 중인 이메일입니다.");
+        return;
+      }
+      if (!response.ok) {
+        setErrorMessage("이메일 확인에 실패했습니다.");
+        return;
+      }
+    } catch {
+      setErrorMessage("이메일 확인에 실패했습니다.");
+      return;
+    } finally {
+      setIsCheckingEmail(false);
+    }
+
+    setIsCheckingNickname(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/auth/check-nickname?nickname=${encodeURIComponent(
+          trimmedNickname
+        )}`
+      );
+      if (response.status === 409) {
+        setNicknameError("이미 사용 중인 닉네임입니다.");
+        return;
+      }
+      if (!response.ok) {
+        setErrorMessage("닉네임 확인에 실패했습니다.");
+        return;
+      }
+    } catch {
+      setErrorMessage("닉네임 확인에 실패했습니다.");
+      return;
+    } finally {
+      setIsCheckingNickname(false);
     }
     router.push("/signup-diabetes");
   };
@@ -91,6 +144,7 @@ export default function SignupScreen() {
               value={draft.nickname}
               onChangeText={(value) => updateDraft({ nickname: value })}
             />
+            {nicknameError && <Text style={styles.errorText}>{nicknameError}</Text>}
           </View>
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>이메일(아이디)</Text>
@@ -103,6 +157,7 @@ export default function SignupScreen() {
               value={draft.email}
               onChangeText={(value) => updateDraft({ email: value })}
             />
+            {emailError && <Text style={styles.errorText}>{emailError}</Text>}
           </View>
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>비밀번호</Text>
@@ -131,8 +186,24 @@ export default function SignupScreen() {
             <Text style={styles.errorText}>{errorMessage}</Text>
           )}
 
-          <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
-            <Text style={styles.primaryButtonText}>다음</Text>
+          <TouchableOpacity
+            style={[
+              styles.primaryButton,
+              (isCheckingEmail || isCheckingNickname) &&
+                styles.primaryButtonDisabled,
+            ]}
+            onPress={handleNext}
+            disabled={isCheckingEmail || isCheckingNickname}
+          >
+            <Text
+              style={[
+                styles.primaryButtonText,
+                (isCheckingEmail || isCheckingNickname) &&
+                  styles.primaryButtonTextDisabled,
+              ]}
+            >
+              {isCheckingEmail || isCheckingNickname ? "확인 중..." : "다음"}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -203,7 +274,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 4,
   },
+  primaryButtonDisabled: {
+    backgroundColor: "#E2E8F0",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   primaryButtonText: { color: palette.ink, fontWeight: "800", fontSize: 16 },
+  primaryButtonTextDisabled: { color: "#94A3B8" },
   helperRow: {
     flexDirection: "row",
     justifyContent: "center",

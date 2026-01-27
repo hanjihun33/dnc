@@ -9,6 +9,13 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Image } from "expo-image";
+import { useFocusEffect } from "@react-navigation/native";
+import {
+  getAuthHeaders,
+  loadAuthSession,
+  subscribeProfileRevision,
+} from "../session";
 
 const palette = {
   background: "#F8FAFC",
@@ -20,8 +27,63 @@ const palette = {
   accentInk: "#111827",
 };
 
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+
 export default function SettingsScreen() {
   const router = useRouter();
+  const [profileName, setProfileName] = React.useState("차지훈");
+  const [profileEmail, setProfileEmail] = React.useState("konichan7@kakao.com");
+  const [profileImageUrl, setProfileImageUrl] = React.useState<string | null>(
+    null
+  );
+
+  const initials =
+    profileName.trim().length > 0 ? profileName.trim()[0] : "U";
+
+  const loadProfile = React.useCallback(async () => {
+    try {
+      await loadAuthSession();
+      const response = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
+        headers: getAuthHeaders(),
+      });
+      console.log("GET /api/v1/users/me status:", response.status);
+      if (!response.ok) {
+        try {
+          const errorText = await response.text();
+          console.log("GET /api/v1/users/me error:", errorText);
+        } catch {
+          console.log("GET /api/v1/users/me error: <no body>");
+        }
+        return;
+      }
+      const profile = (await response.json()) as {
+        nickname?: string;
+        name?: string;
+        email?: string;
+        profileImageUrl?: string | null;
+      };
+      const nextName = profile.nickname || profile.name || profile.email || "";
+      setProfileName(nextName);
+      setProfileEmail(profile.email ?? "");
+      setProfileImageUrl(profile.profileImageUrl ?? null);
+    } catch {
+      // Ignore profile load errors.
+    }
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      void loadProfile();
+    }, [loadProfile])
+  );
+
+  React.useEffect(() => {
+    const unsubscribe = subscribeProfileRevision(() => {
+      void loadProfile();
+    });
+    return unsubscribe;
+  }, [loadProfile]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -39,11 +101,19 @@ export default function SettingsScreen() {
             onPress={() => router.push("/(settings)/account")}
           >
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>CJ</Text>
+              {profileImageUrl ? (
+                <Image
+                  source={{ uri: profileImageUrl }}
+                  style={styles.avatarImage}
+                  contentFit="cover"
+                />
+              ) : (
+                <Text style={styles.avatarText}>{initials}</Text>
+              )}
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>차지훈</Text>
-              <Text style={styles.profileEmail}>konichan7@kakao.com</Text>
+              <Text style={styles.profileName}>{profileName}</Text>
+              <Text style={styles.profileEmail}>{profileEmail}</Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </Pressable>
@@ -118,6 +188,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#E2E8F0",
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
   },
   avatarText: {
     color: "#475569",

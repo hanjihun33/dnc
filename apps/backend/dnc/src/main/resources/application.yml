@@ -28,8 +28,8 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${DB_URL:jdbc:mysql://localhost:3306/dnc_db?serverTimezone=Asia/Seoul}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:0522}
+    username: ${DB_USERNAME:ssafy}
+    password: ${DB_PASSWORD:ssafy}
     hikari:
       idle-timeout: 300000
       minimum-idle: 3

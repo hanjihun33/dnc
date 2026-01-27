@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { setAuthSession } from "../session";
 
 import { useSignupDraft } from "./signup-context";
 
@@ -48,6 +49,16 @@ const parseErrorMessage = async (response: Response) => {
   } catch {
     return null;
   }
+};
+
+const mapSignupError = (message: string | null) => {
+  if (!message) {
+    return null;
+  }
+  if (message.toLowerCase().includes("email already in use")) {
+    return "이미 사용 중인 이메일입니다.";
+  }
+  return message;
 };
 
 export default function SignupProfileScreen() {
@@ -168,7 +179,7 @@ export default function SignupProfileScreen() {
       });
 
       if (!response.ok) {
-        const message = await parseErrorMessage(response);
+        const message = mapSignupError(await parseErrorMessage(response));
         throw new Error(message ?? "회원가입에 실패했습니다.");
       }
 
@@ -200,6 +211,11 @@ export default function SignupProfileScreen() {
       }
       const tokenType = loginData.tokenType ?? "Bearer";
       const authorization = `${tokenType} ${accessToken}`;
+      await setAuthSession({
+        accessToken,
+        tokenType,
+        userId: signupData.userId ?? null,
+      });
 
       const diabetesType =
         draft.diabetesStatus === "type1"

@@ -10,6 +10,14 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Image } from "expo-image";
+import { useFocusEffect } from "@react-navigation/native";
+import {
+  clearAuthSession,
+  getAuthHeaders,
+  loadAuthSession,
+  subscribeProfileRevision,
+} from "../session";
 
 const palette = {
   background: "#F8FAFC",
@@ -26,6 +34,90 @@ const API_BASE_URL =
 export default function AccountScreen() {
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [profileName, setProfileName] = React.useState("차지훈");
+  const [profileEmail, setProfileEmail] = React.useState("konichan7@kakao.com");
+  const [profileImageUrl, setProfileImageUrl] = React.useState<string | null>(
+    null
+  );
+  const [diabetesType, setDiabetesType] = React.useState<string | null>(null);
+  const [diagnosisYear, setDiagnosisYear] = React.useState<number | null>(null);
+  const [diagnosisMonth, setDiagnosisMonth] = React.useState<number | null>(null);
+
+  const initials =
+    profileName.trim().length > 0 ? profileName.trim()[0] : "U";
+
+  const loadProfile = React.useCallback(async () => {
+    try {
+      await loadAuthSession();
+      const response = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
+        headers: getAuthHeaders(),
+      });
+      console.log("GET /api/v1/users/me status:", response.status);
+      if (!response.ok) {
+        try {
+          const errorText = await response.text();
+          console.log("GET /api/v1/users/me error:", errorText);
+        } catch {
+          console.log("GET /api/v1/users/me error: <no body>");
+        }
+        return;
+      }
+      const profile = (await response.json()) as {
+        nickname?: string;
+        name?: string;
+        email?: string;
+        profileImageUrl?: string | null;
+        diabetesType?: string | null;
+        diagnosisYear?: number | null;
+        diagnosisMonth?: number | null;
+      };
+      const nextName = profile.nickname || profile.name || profile.email || "";
+      setProfileName(nextName);
+      setProfileEmail(profile.email ?? "");
+      setProfileImageUrl(profile.profileImageUrl ?? null);
+      setDiabetesType(profile.diabetesType ?? null);
+      setDiagnosisYear(profile.diagnosisYear ?? null);
+      setDiagnosisMonth(profile.diagnosisMonth ?? null);
+    } catch {
+      // Ignore profile load errors.
+    }
+  }, []);
+
+  const diagnosisLabel = React.useMemo(() => {
+    if (!diabetesType) {
+      return "해당 없음";
+    }
+    if (diabetesType === "TYPE1") {
+      return "1형 당뇨";
+    }
+    if (diabetesType === "TYPE2") {
+      return "2형 당뇨";
+    }
+    if (diabetesType === "PREDIABETES") {
+      return "당뇨 전단계";
+    }
+    if (diabetesType === "OTHER") {
+      return "해당 없음";
+    }
+    if (diagnosisYear && diagnosisMonth) {
+      return `${diagnosisYear}년 ${diagnosisMonth}월`;
+    }
+    return "해당 없음";
+  }, [diabetesType, diagnosisMonth, diagnosisYear]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      void loadProfile();
+    }, [loadProfile])
+  );
+
+  React.useEffect(() => {
+    const unsubscribe = subscribeProfileRevision(() => {
+      void loadProfile();
+    });
+    return unsubscribe;
+  }, [loadProfile]);
 
   const handleLogout = async () => {
     if (isLoggingOut) {
@@ -33,11 +125,16 @@ export default function AccountScreen() {
     }
     setIsLoggingOut(true);
     try {
-      await fetch(`${API_BASE_URL}/api/v1/auth/logout`, { method: "POST" });
+      await loadAuthSession();
+      await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+      });
     } catch {
       // Ignore logout errors and proceed with local sign-out.
     } finally {
       setIsLoggingOut(false);
+      await clearAuthSession();
       router.replace("/login");
     }
   };
@@ -47,6 +144,41 @@ export default function AccountScreen() {
       { text: "취소", style: "cancel" },
       { text: "로그아웃", style: "destructive", onPress: handleLogout },
     ]);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (isDeleting) {
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await loadAuthSession();
+      const response = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error("탈퇴에 실패했습니다. 다시 시도해주세요.");
+      }
+    } catch {
+      Alert.alert("탈퇴 실패", "인증 정보가 없어 탈퇴할 수 없습니다.");
+      return;
+    } finally {
+      setIsDeleting(false);
+    }
+    await clearAuthSession();
+    router.replace("/login");
+  };
+
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      "회원 탈퇴",
+      "탈퇴하면 계정 정보가 삭제되고 복구할 수 없습니다. 진행할까요?",
+      [
+        { text: "취소", style: "cancel" },
+        { text: "탈퇴하기", style: "destructive", onPress: handleDeleteAccount },
+      ]
+    );
   };
 
   return (
@@ -63,11 +195,19 @@ export default function AccountScreen() {
           onPress={() => router.push("/(settings)/profile-edit")}
         >
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>CJ</Text>
+            {profileImageUrl ? (
+              <Image
+                source={{ uri: profileImageUrl }}
+                style={styles.avatarImage}
+                contentFit="cover"
+              />
+            ) : (
+              <Text style={styles.avatarText}>{initials}</Text>
+            )}
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>차지훈</Text>
-            <Text style={styles.profileEmail}>konichan7@kakao.com</Text>
+            <Text style={styles.profileName}>{profileName}</Text>
+            <Text style={styles.profileEmail}>{profileEmail}</Text>
           </View>
           <Text style={styles.chevron}>›</Text>
         </Pressable>
@@ -78,7 +218,7 @@ export default function AccountScreen() {
             onPress={() => router.push("/(settings)/diagnosis")}
           >
             <Text style={styles.itemTitle}>진단 유형 설정</Text>
-            <Text style={styles.itemMeta}>해당 없음</Text>
+            <Text style={styles.itemMeta}>{diagnosisLabel}</Text>
           </Pressable>
           <View style={styles.divider} />
           <Pressable
@@ -96,9 +236,9 @@ export default function AccountScreen() {
               {isLoggingOut ? "로그아웃 중..." : "로그아웃"}
             </Text>
           </Pressable>
-          <Pressable style={styles.textButton}>
+          <Pressable style={styles.textButton} onPress={confirmDeleteAccount}>
             <Text style={[styles.textButtonLabel, styles.textButtonDanger]}>
-              탈퇴하기
+              {isDeleting ? "탈퇴 중..." : "탈퇴하기"}
             </Text>
           </Pressable>
         </View>
@@ -138,6 +278,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#E2E8F0",
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
   },
   avatarText: {
     color: "#475569",

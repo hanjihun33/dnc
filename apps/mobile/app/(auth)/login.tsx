@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { loadAuthSession, setAuthSession } from "../session";
 
 const palette = {
   background: "#F8FAFC",
@@ -64,7 +65,32 @@ export default function LoginScreen() {
         throw new Error(message ?? "로그인에 실패했습니다.");
       }
 
-      await response.json();
+      const loginData = (await response.json()) as {
+        accessToken?: string;
+        tokenType?: string;
+      };
+      const accessToken = loginData.accessToken;
+      if (!accessToken) {
+        throw new Error("로그인 토큰을 받지 못했습니다.");
+      }
+      const tokenType = loginData.tokenType ?? "Bearer";
+      await setAuthSession({ accessToken, tokenType });
+
+      try {
+        await loadAuthSession();
+        const profileResponse = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
+          headers: { Authorization: `${tokenType} ${accessToken}` },
+        });
+        if (profileResponse.ok) {
+          const profile = (await profileResponse.json()) as { userId?: number };
+          if (profile.userId) {
+            await setAuthSession({ userId: profile.userId });
+          }
+        }
+      } catch {
+        // Ignore profile fetch errors for now.
+      }
+
       router.replace("/(tabs)");
     } catch (error) {
       const message =
