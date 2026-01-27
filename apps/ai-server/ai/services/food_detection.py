@@ -7,7 +7,7 @@ class FoodDetection:
 
     # 모델 초기화
     def __init__ (self):
-        self.model = YOLO('../models/best1to40.pt') 
+        self.model = YOLO('/app/ai-server/ai/models/best1to40.pt') 
 
     # 이름, 정확도, 박스 위치를 반환한다.
     def food_detect(self, image_bytes):
