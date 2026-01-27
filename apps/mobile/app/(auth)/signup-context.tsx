@@ -2,6 +2,7 @@ import React, { createContext, useContext, useMemo, useState } from "react";
 
 export type SignupDraft = {
   name: string;
+  nickname: string;
   email: string;
   password: string;
   diabetesStatus: "none" | "prediabetes" | "type1" | "type2";
@@ -23,6 +24,7 @@ const createDefaultDraft = (): SignupDraft => {
   const now = new Date();
   return {
     name: "",
+    nickname: "",
     email: "",
     password: "",
     diabetesStatus: "none",

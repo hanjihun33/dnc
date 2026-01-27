@@ -43,10 +43,10 @@ pipeline {
                     def commitAuthor = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
 
                     def startMessage = """
-                    🛰️ **당낭콩** 인프라 가동
-                    - **브랜치**: `${branchName}`
-                    - **작성자**: ${commitAuthor}
-                    - **로그**: ${commitMsg}
+🛰️ **당낭콩** 인프라 가동
+- **브랜치**: `${branchName}`
+- **작성자**: ${commitAuthor}
+- **로그**: ${commitMsg}
                     """.stripIndent().trim()
                     
                     sendMM(startMessage)
