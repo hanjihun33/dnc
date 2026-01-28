@@ -39,7 +39,7 @@ public class GeminiService {
 
         try {
             // baseUrl + /v1beta/models/{model}:generateContent
-            String url = UriComponentsBuilder.fromHttpUrl(baseUrl)
+            String url = UriComponentsBuilder.fromUriString(baseUrl)
                     .path("/v1beta/models/{model}:generateContent")
                     .queryParam("key", apiKey)
                     .buildAndExpand(modelName)
