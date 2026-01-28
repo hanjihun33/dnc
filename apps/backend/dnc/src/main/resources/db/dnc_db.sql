@@ -1,12 +1,11 @@
 -- =========================================================
--- DNK DB Schema (FINAL)
+-- DNK DB Schema (FINAL - Optimized for Daily/Weekly/Monthly Reports)
 -- - MySQL 8.x recommended
--- - No health_events
 -- - One ACTIVE sensor per user (functional unique index)
 -- =========================================================
 
 -- ---------------------------------------------------------
--- 0. Database
+-- 0. Database Setup
 -- ---------------------------------------------------------
 CREATE DATABASE IF NOT EXISTS dnc_db;
 USE dnc_db;
@@ -19,6 +18,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS meal_reactions;
 DROP TABLE IF EXISTS weekly_reports;
 DROP TABLE IF EXISTS monthly_reports;
+DROP TABLE IF EXISTS daily_reports;
 DROP TABLE IF EXISTS glucose_predictions;
 DROP TABLE IF EXISTS food_analyses;
 DROP TABLE IF EXISTS food_metadata;
@@ -26,7 +26,6 @@ DROP TABLE IF EXISTS food_records;
 DROP TABLE IF EXISTS glucose_data;
 DROP TABLE IF EXISTS sensors;
 DROP TABLE IF EXISTS user_settings;
-DROP TABLE IF EXISTS social_accounts;
 DROP TABLE IF EXISTS oauth_tokens;
 DROP TABLE IF EXISTS users;
 
@@ -36,75 +35,76 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- 2. Tables
 -- ---------------------------------------------------------
 
--- 2-1. users
+-- 2-1. users (사용자 기본 정보)
 CREATE TABLE users (
-    user_id            BIGINT       NOT NULL AUTO_INCREMENT,
-    email              VARCHAR(255)  NOT NULL,
-    password           VARCHAR(255)  NULL,
-    nickname           VARCHAR(50)   NOT NULL,
-    name               VARCHAR(100)  NOT NULL,
-    birth_date         DATE          NOT NULL,
-    diabetes_type      ENUM('TYPE1','TYPE2','PREDIABETES','OTHER') NULL,
-    diagnosis_year     INT     NULL,
-    diagnosis_month    INT      NULL,
-    gender             VARCHAR(20)   NULL,
-    height_cm          DECIMAL(5,2)  NULL,
-    weight_kg          DECIMAL(5,2)  NULL,
-    profile_image_url  VARCHAR(500)  NULL,
-    provider           VARCHAR(20)   NOT NULL DEFAULT 'local',
-    provider_id        VARCHAR(255)  NULL,
-    created_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    dexcom_user_id     VARCHAR(255) NULL,
+    user_id           BIGINT        NOT NULL AUTO_INCREMENT,
+    email             VARCHAR(255)  NOT NULL,
+    password          VARCHAR(255)  NULL,
+    nickname          VARCHAR(50)   NOT NULL,
+    name              VARCHAR(100)  NOT NULL,
+    birth_date        DATE          NOT NULL,
+    diabetes_type     ENUM('TYPE1','TYPE2','PREDIABETES','OTHER') NULL,
+    diagnosis_year    INT           NULL,
+    diagnosis_month   INT           NULL,
+    gender            VARCHAR(20)   NULL,
+    height_cm         DECIMAL(5,2)  NULL,
+    weight_kg         DECIMAL(5,2)  NULL,
+    profile_image_url VARCHAR(500)  NULL,
+    provider          VARCHAR(20)   NOT NULL DEFAULT 'local',
+    provider_id       VARCHAR(255)  NULL,
+    created_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    dexcom_user_id    VARCHAR(255)  NULL,
     PRIMARY KEY (user_id),
     UNIQUE KEY uk_users_email (email),
     UNIQUE KEY uk_users_provider (provider, provider_id)
 ) ENGINE=InnoDB;
 
--- 2-2. user_settings (1:1)
-CREATE TABLE user_settings (
-    user_id             BIGINT   NOT NULL,
-    target_min_glucose  INT      NULL DEFAULT 70,
-    target_max_glucose  INT      NULL DEFAULT 140,
-    is_alarm_on         BOOLEAN  NOT NULL DEFAULT TRUE,
+-- 2-x. social_accounts (소셜 로그인 계정 관리 - 1:N)
+CREATE TABLE social_accounts (
+    social_account_id   BIGINT NOT NULL AUTO_INCREMENT,
+    user_id             BIGINT NOT NULL,
+    provider            VARCHAR(20) NOT NULL COMMENT 'google, kakao, naver, apple 등',
+    provider_user_id    VARCHAR(255) NOT NULL COMMENT '소셜 서비스의 유저 고유 ID',
+    email               VARCHAR(255) NULL,
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-                                          ON UPDATE CURRENT_TIMESTAMP,
+                                         ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (social_account_id),
+    UNIQUE KEY uk_social_accounts_provider_user (provider, provider_user_id),
+    KEY idx_social_accounts_user (user_id),
+    CONSTRAINT fk_social_accounts_user
+        FOREIGN KEY (user_id) REFERENCES users (user_id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+
+-- 2-2. user_settings (사용자 설정 - 1:1 관계)
+CREATE TABLE user_settings (
+    user_id             BIGINT    NOT NULL,
+    target_min_glucose  INT       NULL DEFAULT 70,
+    target_max_glucose  INT       NULL DEFAULT 140,
+    is_alarm_on         BOOLEAN   NOT NULL DEFAULT TRUE,
+    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id),
     CONSTRAINT fk_user_settings_user
         FOREIGN KEY (user_id) REFERENCES users (user_id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 2-3. social_accounts (1:N)
-CREATE TABLE social_accounts (
-    social_account_id BIGINT NOT NULL AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
-    provider VARCHAR(20) NOT NULL,
-    provider_user_id VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT pk_social_accounts PRIMARY KEY (social_account_id),
-    CONSTRAINT fk_social_accounts_user FOREIGN KEY (user_id) REFERENCES users (user_id),
-    CONSTRAINT uk_social_accounts_provider_user UNIQUE (provider, provider_user_id)
-) ENGINE=InnoDB;
-
-CREATE INDEX idx_social_accounts_user_provider ON social_accounts (user_id, provider);
-
--- 2-4. oauth_tokens (1:N)
+-- 2-3. oauth_tokens (OAuth 인증 토큰 관리)
 CREATE TABLE oauth_tokens (
-    token_id      BIGINT      NOT NULL AUTO_INCREMENT,
-    user_id       BIGINT      NOT NULL,
-    provider      VARCHAR(50) NOT NULL,
+    token_id      BIGINT       NOT NULL AUTO_INCREMENT,
+    user_id       BIGINT       NOT NULL,
+    provider      VARCHAR(50)  NOT NULL,
     access_token  VARCHAR(2048) NOT NULL,
     refresh_token VARCHAR(2048) NULL,
-    token_type    VARCHAR(50) NULL,
+    token_type    VARCHAR(50)  NULL,
     scope         VARCHAR(255) NULL,
-    expires_at    TIMESTAMP NULL,
-    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-                                  ON UPDATE CURRENT_TIMESTAMP,
+    expires_at    TIMESTAMP    NULL,
+    created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (token_id),
     UNIQUE KEY uk_oauth_tokens_user_provider (user_id, provider),
     CONSTRAINT fk_oauth_tokens_user
@@ -112,19 +112,17 @@ CREATE TABLE oauth_tokens (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 2-5. sensors (history table)
+-- 2-4. sensors (센서 이력 관리)
 CREATE TABLE sensors (
     sensor_id    BIGINT NOT NULL AUTO_INCREMENT,
     user_id      BIGINT NOT NULL,
     device_id    VARCHAR(100) NULL,
     provider     VARCHAR(50)  NULL,
-    status       ENUM('ACTIVE','INACTIVE','EXPIRED')
-                 NOT NULL DEFAULT 'INACTIVE',
+    status       ENUM('ACTIVE','INACTIVE','EXPIRED') NOT NULL DEFAULT 'INACTIVE',
     started_at   TIMESTAMP NULL,
     ended_at     TIMESTAMP NULL,
     created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-                                   ON UPDATE CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (sensor_id),
     KEY idx_sensors_user_status (user_id, status),
     CONSTRAINT fk_sensors_user
@@ -132,31 +130,25 @@ CREATE TABLE sensors (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 유저당 ACTIVE 센서 1개 제한
+-- [제약사항] 유저당 ACTIVE 센서는 단 1개만 존재 가능 (MySQL 8.0 functional index)
 CREATE UNIQUE INDEX uk_sensors_one_active_per_user
 ON sensors ((CASE WHEN status = 'ACTIVE' THEN user_id ELSE NULL END));
 
--- 2-6. glucose_data
+-- 2-5. glucose_data (혈당 원본 데이터 - 메인화면 일일 그래프용)
 CREATE TABLE glucose_data (
     glucose_id        BIGINT NOT NULL AUTO_INCREMENT,
     user_id           BIGINT NOT NULL,
     sensor_id         BIGINT NULL,
-    -- [기존] 값
     value             INT    NOT NULL,
-    -- 알림용 추세 정보
-    trend             VARCHAR(20) NULL COMMENT 'flat, singleUp, doubleUp etc',
-    trend_rate        FLOAT       NULL COMMENT '분당 변화율',
-    -- 중복 방지용 덱스콤 ID (유니크 인덱스 필수!)
+    trend             VARCHAR(20)  NULL COMMENT 'flat, singleUp, doubleUp etc',
+    trend_rate        FLOAT        NULL COMMENT '분당 변화율',
     dexcom_record_id  VARCHAR(100) NULL, 
     source            ENUM('AUTO','MANUAL') NOT NULL DEFAULT 'AUTO',
     measured_at       TIMESTAMP NOT NULL,
     created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (glucose_id),
-    -- [중요] 중복 데이터 방지 (같은 덱스콤 ID는 두 번 저장 안 됨)
     UNIQUE KEY uk_glucose_dexcom_id (dexcom_record_id),
-    
     KEY idx_glucose_user_time (user_id, measured_at),
-    
     CONSTRAINT fk_glucose_user
         FOREIGN KEY (user_id) REFERENCES users (user_id)
         ON DELETE CASCADE,
@@ -165,7 +157,7 @@ CREATE TABLE glucose_data (
         ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- 2-7. food_records
+-- 2-6. food_records (식사 기록)
 CREATE TABLE food_records (
     food_id      BIGINT NOT NULL AUTO_INCREMENT,
     user_id      BIGINT NOT NULL,
@@ -174,8 +166,7 @@ CREATE TABLE food_records (
     meal_type    ENUM('BREAKFAST','LUNCH','DINNER','SNACK') NULL,
     eaten_at     TIMESTAMP NULL,
     recorded_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-                                   ON UPDATE CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (food_id),
     KEY idx_food_user_time (user_id, recorded_at),
     CONSTRAINT fk_food_records_user
@@ -183,28 +174,27 @@ CREATE TABLE food_records (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 2-8. food_metadata
+-- 2-7. food_metadata (음식 영양성분 마스터 데이터)
 CREATE TABLE food_metadata (
-    food_code        VARCHAR(20)  NOT NULL,
+    food_code        BIGINT NOT NULL AUTO_INCREMENT,
     food_name        VARCHAR(100) NOT NULL,
     base_weight      FLOAT NULL,
-    cal_per_base     FLOAT NULL,
-    carbs_per_base   FLOAT NULL,
-    sugars_per_base  FLOAT NULL,
-    fat_per_base     FLOAT NULL,
-    protein_per_base FLOAT NULL,
-    sodium_per_base  FLOAT NULL,
-    created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-                                   ON UPDATE CURRENT_TIMESTAMP,
+    cal_per_base      FLOAT NULL,
+    carbs_per_base    FLOAT NULL,
+    sugars_per_base   FLOAT NULL,
+    fat_per_base      FLOAT NULL,
+    protein_per_base  FLOAT NULL,
+    sodium_per_base   FLOAT NULL,
+    created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (food_code)
 ) ENGINE=InnoDB;
 
--- 2-9. food_analyses (AI 분석 결과)
+-- 2-8. food_analyses (AI 음식 분석 결과)
 CREATE TABLE food_analyses (
     analysis_id      BIGINT NOT NULL AUTO_INCREMENT,
     food_id          BIGINT NOT NULL,
-    food_code        VARCHAR(20) NULL,
+    food_code        BIGINT NULL,
     estimated_weight FLOAT NULL,
     ai_confidence    FLOAT NULL,
     ai_comment       TEXT NULL,
@@ -222,9 +212,10 @@ CREATE TABLE food_analyses (
         ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- 2-10. glucose_predictions
+-- 2-9. glucose_predictions (AI 혈당 예측 결과)
 CREATE TABLE glucose_predictions (
     pred_id          BIGINT NOT NULL AUTO_INCREMENT,
+    food_id          BIGINT NOT NULL,
     user_id          BIGINT NOT NULL,
     predicted_value  INT NULL,
     target_time      TIMESTAMP NOT NULL,
@@ -233,16 +224,45 @@ CREATE TABLE glucose_predictions (
     created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (pred_id),
     KEY idx_predictions_user_time (user_id, target_time),
+    KEY idx_predictions_food (food_id),
     CONSTRAINT fk_predictions_user
+        FOREIGN KEY (user_id) REFERENCES users (user_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_predictions_food
+        FOREIGN KEY (food_id) REFERENCES food_records (food_id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------
+-- 3. Reports Tables (리포트/그래프용 통계 데이터)
+-- ---------------------------------------------------------
+
+-- 3-1. daily_reports (주간/월간 꺾은선 그래프의 기본 소스)
+CREATE TABLE daily_reports (
+    report_id          BIGINT NOT NULL AUTO_INCREMENT,
+    user_id            BIGINT NOT NULL,
+    report_date        DATE   NOT NULL,
+    record_count       INT    NULL,
+    average_glucose    INT    NULL,
+    max_glucose        INT    NULL,
+    min_glucose        INT    NULL,
+    standard_deviation FLOAT  NULL,
+    in_range_percent   FLOAT  NULL, 
+    created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- 이 부분에 CURRENT_TIMESTAMP가 추가되었습니다.
+    updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (report_id),
+    UNIQUE KEY uk_daily_reports (user_id, report_date),
+    CONSTRAINT fk_daily_reports_user
         FOREIGN KEY (user_id) REFERENCES users (user_id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 2-11. weekly_reports
+-- 3-2. weekly_reports (주 단위 요약 리포트)
 CREATE TABLE weekly_reports (
-    report_id       BIGINT NOT NULL AUTO_INCREMENT,
-    user_id         BIGINT NOT NULL,
-    week_start_date DATE   NOT NULL,
+    report_id          BIGINT NOT NULL AUTO_INCREMENT,
+    user_id            BIGINT NOT NULL,
+    week_start_date    DATE   NOT NULL,
     record_count       INT    NULL,
     average_glucose    INT    NULL,
     max_glucose        INT    NULL,
@@ -253,9 +273,8 @@ CREATE TABLE weekly_reports (
     in_range_percent   FLOAT  NULL,
     high_percent       FLOAT  NULL,
     very_high_percent  FLOAT  NULL,
-    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-                                   ON UPDATE CURRENT_TIMESTAMP,
+    created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (report_id),
     UNIQUE KEY uk_weekly_reports (user_id, week_start_date),
     CONSTRAINT fk_weekly_reports_user
@@ -263,7 +282,7 @@ CREATE TABLE weekly_reports (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 2-12. monthly_reports
+-- 3-3. monthly_reports (월 단위 요약 리포트)
 CREATE TABLE monthly_reports (
     report_id          BIGINT NOT NULL AUTO_INCREMENT,
     user_id            BIGINT NOT NULL,
@@ -280,8 +299,7 @@ CREATE TABLE monthly_reports (
     high_percent       FLOAT  NULL,
     very_high_percent  FLOAT  NULL,
     created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-                                   ON UPDATE CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (report_id),
     UNIQUE KEY uk_monthly_reports_user_month (user_id, year, month),
     CONSTRAINT fk_monthly_reports_user
@@ -289,7 +307,7 @@ CREATE TABLE monthly_reports (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 2-13. meal_reactions (식사 반응 학습)
+-- 3-4. meal_reactions (특정 식사 후 혈당 반응 분석)
 CREATE TABLE meal_reactions (
     reaction_id    BIGINT NOT NULL AUTO_INCREMENT,
     user_id        BIGINT NOT NULL,
