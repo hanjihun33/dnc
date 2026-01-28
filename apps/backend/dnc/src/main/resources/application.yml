@@ -15,7 +15,7 @@ spring:
     import: "optional:file:./.env"
   task:
     scheduling:
-      enabled: true # 스케줄링 기능
+      enabled: true # 스케줄링 기능인
   application:
     name: dnc
   servlet:
@@ -29,7 +29,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${DB_URL:jdbc:mysql://localhost:3306/dnc_db?serverTimezone=Asia/Seoul}
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:}
+    password: ${DB_PASSWORD:0522}
     hikari:
       idle-timeout: 300000
       minimum-idle: 3
@@ -111,3 +111,6 @@ oauth:
         - email
         - name
         - profile
+
+firebase:
+  service-account: ${FIREBASE_SERVICE_ACCOUNT:}
