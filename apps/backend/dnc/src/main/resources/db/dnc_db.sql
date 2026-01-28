@@ -26,6 +26,7 @@ DROP TABLE IF EXISTS food_records;
 DROP TABLE IF EXISTS glucose_data;
 DROP TABLE IF EXISTS sensors;
 DROP TABLE IF EXISTS user_settings;
+DROP TABLE IF EXISTS social_accounts;
 DROP TABLE IF EXISTS oauth_tokens;
 DROP TABLE IF EXISTS users;
 
@@ -75,7 +76,23 @@ CREATE TABLE user_settings (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 2-2. oauth_tokens (1:N)
+-- 2-3. social_accounts (1:N)
+CREATE TABLE social_accounts (
+    social_account_id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    provider VARCHAR(20) NOT NULL,
+    provider_user_id VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT pk_social_accounts PRIMARY KEY (social_account_id),
+    CONSTRAINT fk_social_accounts_user FOREIGN KEY (user_id) REFERENCES users (user_id),
+    CONSTRAINT uk_social_accounts_provider_user UNIQUE (provider, provider_user_id)
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_social_accounts_user_provider ON social_accounts (user_id, provider);
+
+-- 2-4. oauth_tokens (1:N)
 CREATE TABLE oauth_tokens (
     token_id      BIGINT      NOT NULL AUTO_INCREMENT,
     user_id       BIGINT      NOT NULL,
@@ -95,7 +112,7 @@ CREATE TABLE oauth_tokens (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 2-3. sensors (history table)
+-- 2-5. sensors (history table)
 CREATE TABLE sensors (
     sensor_id    BIGINT NOT NULL AUTO_INCREMENT,
     user_id      BIGINT NOT NULL,
@@ -119,11 +136,12 @@ CREATE TABLE sensors (
 CREATE UNIQUE INDEX uk_sensors_one_active_per_user
 ON sensors ((CASE WHEN status = 'ACTIVE' THEN user_id ELSE NULL END));
 
--- 2-4. glucose_data
+-- 2-6. glucose_data
 CREATE TABLE glucose_data (
     glucose_id        BIGINT NOT NULL AUTO_INCREMENT,
     user_id           BIGINT NOT NULL,
     sensor_id         BIGINT NULL,
+    -- [기존] 값
     value             INT    NOT NULL,
     -- 알림용 추세 정보
     trend             VARCHAR(20) NULL COMMENT 'flat, singleUp, doubleUp etc',
@@ -147,7 +165,7 @@ CREATE TABLE glucose_data (
         ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- 2-5. food_records
+-- 2-7. food_records
 CREATE TABLE food_records (
     food_id      BIGINT NOT NULL AUTO_INCREMENT,
     user_id      BIGINT NOT NULL,
@@ -165,7 +183,7 @@ CREATE TABLE food_records (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 2-6. food_metadata
+-- 2-8. food_metadata
 CREATE TABLE food_metadata (
     food_code        VARCHAR(20)  NOT NULL,
     food_name        VARCHAR(100) NOT NULL,
@@ -182,7 +200,7 @@ CREATE TABLE food_metadata (
     PRIMARY KEY (food_code)
 ) ENGINE=InnoDB;
 
--- 2-7. food_analyses (AI 분석 결과)
+-- 2-9. food_analyses (AI 분석 결과)
 CREATE TABLE food_analyses (
     analysis_id      BIGINT NOT NULL AUTO_INCREMENT,
     food_id          BIGINT NOT NULL,
@@ -204,7 +222,7 @@ CREATE TABLE food_analyses (
         ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- 2-8. glucose_predictions
+-- 2-10. glucose_predictions
 CREATE TABLE glucose_predictions (
     pred_id          BIGINT NOT NULL AUTO_INCREMENT,
     user_id          BIGINT NOT NULL,
@@ -220,7 +238,7 @@ CREATE TABLE glucose_predictions (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 2-9. weekly_reports
+-- 2-11. weekly_reports
 CREATE TABLE weekly_reports (
     report_id       BIGINT NOT NULL AUTO_INCREMENT,
     user_id         BIGINT NOT NULL,
@@ -236,7 +254,8 @@ CREATE TABLE weekly_reports (
     high_percent       FLOAT  NULL,
     very_high_percent  FLOAT  NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- [추가됨]
+    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                   ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (report_id),
     UNIQUE KEY uk_weekly_reports (user_id, week_start_date),
     CONSTRAINT fk_weekly_reports_user
@@ -244,7 +263,7 @@ CREATE TABLE weekly_reports (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 2-9-1. monthly_reports
+-- 2-12. monthly_reports
 CREATE TABLE monthly_reports (
     report_id          BIGINT NOT NULL AUTO_INCREMENT,
     user_id            BIGINT NOT NULL,
@@ -270,7 +289,7 @@ CREATE TABLE monthly_reports (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 2-10. meal_reactions (식사 반응 학습)
+-- 2-13. meal_reactions (식사 반응 학습)
 CREATE TABLE meal_reactions (
     reaction_id    BIGINT NOT NULL AUTO_INCREMENT,
     user_id        BIGINT NOT NULL,

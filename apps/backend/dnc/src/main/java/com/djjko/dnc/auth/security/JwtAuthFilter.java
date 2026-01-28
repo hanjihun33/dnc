@@ -5,10 +5,11 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import com.djjko.dnc.auth.repository.UserRepository;
+import java.util.List;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -16,11 +17,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
-    private final UserDetailsService userDetailsService;
+    private final UserRepository userRepository;
 
-    public JwtAuthFilter(JwtUtil jwtUtil, UserDetailsService userDetailsService) {
+    public JwtAuthFilter(JwtUtil jwtUtil, UserRepository userRepository) {
         this.jwtUtil = jwtUtil;
-        this.userDetailsService = userDetailsService;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -39,14 +40,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 // 2. 인증 정보가 없다면, 유저 정보를 SecurityContext에 설정
                 if (SecurityContextHolder.getContext().getAuthentication() == null) {
                     String email = jwtUtil.getEmail(token);
-                    UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-                    UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                        );
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    userRepository.findByEmail(email).ifPresentOrElse(user -> {
+                        UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                user.getEmail(),
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                            );
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    }, SecurityContextHolder::clearContext);
                 }
             } catch (Exception e) {
                 // 토큰이 유효하지 않을 경우, SecurityContext를 클리어하고, 다음 필터로 넘어감

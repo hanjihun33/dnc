@@ -28,7 +28,6 @@ public class SocialLoginService {
     private static final LocalDate DEFAULT_BIRTH_DATE = LocalDate.of(1970, 1, 1);
 
     private final OAuthService oAuthService;
-    private final OAuthTokenService oAuthTokenService;
     private final SocialAccountRepository socialAccountRepository;
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
@@ -36,14 +35,12 @@ public class SocialLoginService {
 
     public SocialLoginService(
         OAuthService oAuthService,
-        OAuthTokenService oAuthTokenService,
         SocialAccountRepository socialAccountRepository,
         UserRepository userRepository,
         JwtUtil jwtUtil,
         @Value("${jwt.expiration_time}") long accessTokenExpirationMs
     ) {
         this.oAuthService = oAuthService;
-        this.oAuthTokenService = oAuthTokenService;
         this.socialAccountRepository = socialAccountRepository;
         this.userRepository = userRepository;
         this.jwtUtil = jwtUtil;
@@ -68,9 +65,6 @@ public class SocialLoginService {
         UserResolution resolution = resolveUser(normalizedProvider, socialUserInfo);
         User user = resolution.user();
 
-        // 소셜로그인 토큰도 저장해두면 디버깅과 추후 확장에 유리합니다.
-        oAuthTokenService.saveToken(user, normalizedProvider, tokenResponse);
-
         String accessToken = jwtUtil.generateAccessToken(user.getUserId(), user.getEmail());
         String refreshToken = jwtUtil.generateRefreshToken(user.getUserId(), user.getEmail());
 
@@ -93,7 +87,18 @@ public class SocialLoginService {
 
     private UserResolution resolveUser(String provider, SocialUserInfo info) {
         return socialAccountRepository.findByProviderAndProviderUserId(provider, info.providerId())
-            .map(account -> new UserResolution(account.getUser(), false))
+            .map(account -> {
+                User user = account.getUser();
+                boolean userUpdated = updateExistingUser(user, info, provider);
+                if (userUpdated) {
+                    user = userRepository.save(user);
+                }
+                boolean accountUpdated = updateExistingSocialAccount(account, info);
+                if (accountUpdated) {
+                    socialAccountRepository.save(account);
+                }
+                return new UserResolution(user, false);
+            })
             .orElseGet(() -> findByEmailOrCreateAndLink(provider, info));
     }
 
@@ -144,6 +149,69 @@ public class SocialLoginService {
         socialAccount.setEmail(info.email());
 
         socialAccountRepository.save(socialAccount);
+    }
+
+    private boolean updateExistingUser(User user, SocialUserInfo info, String provider) {
+        boolean updated = false;
+        if (shouldUpdateEmail(user.getEmail(), info.email())) {
+            user.setEmail(info.email());
+            updated = true;
+        }
+        if (shouldUpdateNickname(user.getNickname(), info.nickname(), provider)) {
+            user.setNickname(info.nickname());
+            updated = true;
+        }
+        if (shouldUpdateName(user.getName(), info.name(), user.getNickname())) {
+            user.setName(info.name());
+            updated = true;
+        }
+        if (shouldUpdateProfileImage(user.getProfileImageUrl(), info.profileImageUrl())) {
+            user.setProfileImageUrl(info.profileImageUrl());
+            updated = true;
+        }
+        return updated;
+    }
+
+    private boolean updateExistingSocialAccount(SocialAccount account, SocialUserInfo info) {
+        if (shouldUpdateEmail(account.getEmail(), info.email())) {
+            account.setEmail(info.email());
+            return true;
+        }
+        return false;
+    }
+
+    private boolean shouldUpdateEmail(String current, String incoming) {
+        if (incoming == null || incoming.isBlank() || incoming.endsWith(".local")) {
+            return false;
+        }
+        return current == null || current.isBlank() || current.endsWith(".local");
+    }
+
+    private boolean shouldUpdateNickname(String current, String incoming, String provider) {
+        if (incoming == null || incoming.isBlank()) {
+            return false;
+        }
+        if (current == null || current.isBlank()) {
+            return true;
+        }
+        return current.startsWith(provider + "_");
+    }
+
+    private boolean shouldUpdateName(String current, String incoming, String currentNickname) {
+        if (incoming == null || incoming.isBlank()) {
+            return false;
+        }
+        if (current == null || current.isBlank()) {
+            return true;
+        }
+        return currentNickname != null && current.equals(currentNickname);
+    }
+
+    private boolean shouldUpdateProfileImage(String current, String incoming) {
+        if (incoming == null || incoming.isBlank()) {
+            return false;
+        }
+        return current == null || current.isBlank();
     }
 
     private SocialUserInfo parseUserInfo(String provider, JsonNode root) {

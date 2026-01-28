@@ -3,6 +3,7 @@ package com.djjko.dnc.auth.controller;
 import com.djjko.dnc.auth.dto.response.SocialLoginResponse;
 import com.djjko.dnc.auth.service.oauth.OAuthService;
 import com.djjko.dnc.auth.service.oauth.SocialLoginService;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,7 @@ public class SocialLoginController {
     }
 
     @GetMapping("/{provider}/authorize")
+    @Operation(summary = "소셜 로그인 인가 URL 요청")
     public ResponseEntity<Void> authorize(
         @PathVariable String provider,
         @RequestParam(required = false) String state
@@ -41,6 +43,7 @@ public class SocialLoginController {
     }
 
     @GetMapping("/{provider}/callback")
+    @Operation(summary = "소셜 로그인 콜백 처리")
     public SocialLoginResponse callback(
         @PathVariable String provider,
         @RequestParam String code,

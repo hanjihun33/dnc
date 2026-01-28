@@ -13,6 +13,7 @@ import com.djjko.dnc.auth.security.JwtUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -128,7 +129,9 @@ public class OAuthController {
     @Operation(summary = "CGM 혈당 데이터 조회")
     public ResponseEntity<String> fetchEgvs(
         @PathVariable String provider,
+        @Parameter(description = "Start date (YYYY-MM-DDTHH:mm:ss)", example = "2026-01-27T00:00:00")
         @RequestParam String startDate,
+        @Parameter(description = "End date (YYYY-MM-DDTHH:mm:ss)", example = "2026-01-27T23:59:59")
         @RequestParam String endDate
     ) {
         com.djjko.dnc.auth.entity.User user = resolveRequiredUser();
