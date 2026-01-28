@@ -18,14 +18,15 @@ public class GlucoseReportDto {
     private int minGlucose;
     private double standardDeviation;
     private TimeInRangeDto timeInRange;
+    private String aiAnalysis;
 
     @Getter
     @Builder
     public static class TimeInRangeDto {
-        private double veryLowPercent;    // 54 미만
-        private double lowPercent;        // 54-69
-        private double inRangePercent;    // 70-180
-        private double highPercent;       // 181-250
-        private double veryHighPercent;   // 250 초과
+        private double veryLowPercent; // 54 미만
+        private double lowPercent; // 54-69
+        private double inRangePercent; // 70-180
+        private double highPercent; // 181-250
+        private double veryHighPercent; // 250 초과
     }
 }
