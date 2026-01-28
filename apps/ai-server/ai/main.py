@@ -1,4 +1,5 @@
 from fastapi import FastAPI, File, UploadFile
+from typing import Optional
 from settings.schema import InfoRequest, LearningRequest
 from services.food_detection import food
 from services.glucose_prediction import glucose_pred
@@ -13,8 +14,14 @@ def read_root():
 
 # 1. 음식 탐지
 @app.post("/api/v1/ai/food/analyze")
-async def analyze(file: UploadFile = File(...)) -> dict:
-    image_bytes = await file.read()
+async def analyze(
+    file: Optional[UploadFile] = File(None),
+    image: Optional[UploadFile] = File(None),
+) -> dict:
+    upload = file or image
+    if upload is None:
+        return {"result": []}
+    image_bytes = await upload.read()
     result = food.food_detect(image_bytes)
     return {"result": result}
 

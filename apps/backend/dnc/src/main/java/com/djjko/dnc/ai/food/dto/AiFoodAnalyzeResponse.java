@@ -7,6 +7,8 @@ public record AiFoodAnalyzeResponse(
     List<Integer> values,
     String guide,
     String foodName,
+    AiFoodDetectBox foodBox,
+    String imageUrl,
     AiFoodNutrition nutrition,
     Double estimatedWeight
 ) {
