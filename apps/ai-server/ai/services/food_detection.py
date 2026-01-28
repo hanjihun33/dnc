@@ -7,9 +7,15 @@ import io
 import os
 
 # ======================================================
+# 인프라 경로로 수정, 기본값: 기존 로컬 경로
+#
 # [설정] ResNet 가중치 파일 경로 (본인 경로로 수정 필수!)
 # ======================================================
-RESNET_MODEL_PATH = r"C:\Users\SSAFY\Desktop\pjt\S14P11C105\apps\ai-server\ai\models\new_opencv_ckpt_b84_e200.pth"
+# RESNET_MODEL_PATH = r"C:\Users\SSAFY\Desktop\S14P11C105\ai\models\new_opencv_ckpt_b84_e200.pth"
+
+# ==============================================================================
+DEFAULT_YOLO_PATH = r"C:\Users\SSAFY\Desktop\S14P11C105\ai\models\best1to40.pt"
+DEFAULT_RESNET_PATH = r"C:\Users\SSAFY\Desktop\S14P11C105\ai\models\new_opencv_ckpt_b84_e200.pth"
 
 class FoodDetection:
 
@@ -18,12 +24,27 @@ class FoodDetection:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"🚀 사용 장치: {self.device}")
 
-        # 1. YOLO 모델 로드
-        self.yolo_model = YOLO(r'C:\Users\SSAFY\Desktop\pjt\S14P11C105\apps\ai-server\ai\models\best1to40.pt')
+        # ======================================================
+        # 인프라 경로로 수정, 기본값: 기존 로컬 경로
+        # ======================================================
+        # # 1. YOLO 모델 로드
+        # self.yolo_model = YOLO(r'C:\Users\SSAFY\Desktop\S14P11C105\ai\models\best1to40.pt')
 
-        # 2. ResNet 모델 로드 (양 추정용)
-        self.resnet_model = self._load_resnet_model(RESNET_MODEL_PATH)
+        # # 2. ResNet 모델 로드 (양 추정용)
+        # self.resnet_model = self._load_resnet_model(RESNET_MODEL_PATH)
+        # ======================================================
         
+        # 1. YOLO 모델 로드 로직
+        # os.getenv('키', '기본값') -> 키가 없으면 기본값을 씁니다.
+        yolo_path = os.getenv('YOLO_MODEL_PATH', DEFAULT_YOLO_PATH)
+        # print(f"📦 YOLO 모델 경로: {yolo_path}")
+        self.yolo_model = YOLO(yolo_path)
+
+        # 2. ResNet 모델 로드 로직
+        resnet_path = os.getenv('RESNET_MODEL_PATH', DEFAULT_RESNET_PATH)
+        # print(f"📦 ResNet 모델 경로: {resnet_path}")
+        self.resnet_model = self._load_resnet_model(resnet_path)
+
         # 3. ResNet용 이미지 전처리기 (224x224 리사이즈 등)
         self.transforms = transforms.Compose([
             transforms.Resize((224, 224)),

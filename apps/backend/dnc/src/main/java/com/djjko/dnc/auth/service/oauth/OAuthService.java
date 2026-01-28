@@ -6,6 +6,8 @@ import java.nio.charset.StandardCharsets;
 import com.djjko.dnc.config.oauth.OAuthProviderProperties;
 import com.djjko.dnc.config.oauth.OAuthProvidersProperties;
 import com.djjko.dnc.auth.dto.response.OAuthTokenResponse;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
@@ -26,10 +28,16 @@ public class OAuthService {
     private static final Logger log = LoggerFactory.getLogger(OAuthService.class);
     private final OAuthProvidersProperties providersProperties;
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
-    public OAuthService(OAuthProvidersProperties providersProperties, RestTemplateBuilder restTemplateBuilder) {
+    public OAuthService(
+        OAuthProvidersProperties providersProperties,
+        RestTemplateBuilder restTemplateBuilder,
+        ObjectMapper objectMapper
+    ) {
         this.providersProperties = providersProperties;
         this.restTemplate = restTemplateBuilder.build();
+        this.objectMapper = objectMapper;
     }
 
     public String buildAuthorizeUrl(String providerName, String state) {
@@ -57,6 +65,10 @@ public class OAuthService {
     }
 
     public OAuthTokenResponse exchangeCodeForToken(String providerName, String code) {
+        return exchangeCodeForToken(providerName, code, null);
+    }
+
+    public OAuthTokenResponse exchangeCodeForToken(String providerName, String code, String state) {
         OAuthProviderProperties provider = providersProperties.getProvider(providerName);
 
         HttpHeaders headers = new HttpHeaders();
@@ -68,6 +80,9 @@ public class OAuthService {
         body.add("redirect_uri", provider.getRedirectUri());
         body.add("client_id", provider.getClientId());
         body.add("client_secret", provider.getClientSecret());
+        if (state != null && !state.isBlank()) {
+            body.add("state", state);
+        }
 
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
 
@@ -89,6 +104,25 @@ public class OAuthService {
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
 
         return restTemplate.postForObject(URI.create(provider.getTokenUri()), request, OAuthTokenResponse.class);
+    }
+
+    public JsonNode fetchUserInfo(String providerName, String accessToken) {
+        OAuthProviderProperties provider = providersProperties.getProvider(providerName);
+        String userInfoUri = provider.getUserInfoUri();
+        if (userInfoUri == null || userInfoUri.isBlank()) {
+            throw new IllegalStateException("User info URL is not configured for " + providerName);
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        HttpEntity<Void> request = new HttpEntity<>(headers);
+
+        ResponseEntity<String> response = restTemplate.exchange(userInfoUri, HttpMethod.GET, request, String.class);
+        try {
+            return objectMapper.readTree(response.getBody());
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to parse user info response for " + providerName, e);
+        }
     }
 
     public String fetchEgvData(String providerName, String accessToken, String startDate, String endDate) {
