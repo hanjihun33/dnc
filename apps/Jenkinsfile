@@ -84,7 +84,7 @@ pipeline {
         }
 
         stage('3. [승인] AI 서버 배포') {
-            when { changeset "apps/ai/**" }
+            when { changeset "apps/ai-server/**" }
             steps {
                 script {
                     sendMM("🚧 **[AI Server]** 모델 및 로직 변경 감지. 승인 대기 중...")
