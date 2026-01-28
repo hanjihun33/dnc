@@ -115,3 +115,9 @@ oauth:
         - email
         - name
         - profile
+
+gms:
+  api-key: ${GMS_API_KEY:}
+  ai:
+    model: ${GMS_AI_MODEL:gemini-2.5-flash}
+    base-url: ${GMS_AI_BASE_URL:https://gms.ssafy.io/gmsapi}

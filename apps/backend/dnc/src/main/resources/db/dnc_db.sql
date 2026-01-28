@@ -165,6 +165,7 @@ CREATE TABLE food_records (
     memo         TEXT NULL,
     meal_type    ENUM('BREAKFAST','LUNCH','DINNER','SNACK') NULL,
     eaten_at     TIMESTAMP NULL,
+    ai_guide     TEXT NULL,
     recorded_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (food_id),
