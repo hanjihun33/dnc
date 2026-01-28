@@ -13,6 +13,7 @@ import com.djjko.dnc.auth.security.JwtUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -79,12 +80,12 @@ public class OAuthController {
 
     @GetMapping("/{provider}/callback")
     @Operation(summary = "OAuth 콜백 처리")
-    public OAuthTokenResponse callback(
+    public ResponseEntity<?> callback(
         @PathVariable String provider,
         @RequestParam String code,
         @RequestParam(required = false) String state
     ) {
-        OAuthTokenResponse response = oAuthService.exchangeCodeForToken(provider, code);
+        OAuthTokenResponse response = oAuthService.exchangeCodeForToken(provider, code, state);
         java.util.Optional<com.djjko.dnc.auth.entity.User> userOpt = resolveAuthenticatedUserOrState(state);
         if (userOpt.isPresent()) {
             com.djjko.dnc.auth.entity.User user = userOpt.get();
@@ -95,7 +96,7 @@ public class OAuthController {
         } else {
             log.warn("OAuth callback could not resolve user. provider={} statePresent={}", provider, state != null && !state.isBlank());
         }
-        return response;
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{provider}/token")
@@ -128,7 +129,9 @@ public class OAuthController {
     @Operation(summary = "CGM 혈당 데이터 조회")
     public ResponseEntity<String> fetchEgvs(
         @PathVariable String provider,
+        @Parameter(description = "Start date (YYYY-MM-DDTHH:mm:ss)", example = "2026-01-27T00:00:00")
         @RequestParam String startDate,
+        @Parameter(description = "End date (YYYY-MM-DDTHH:mm:ss)", example = "2026-01-27T23:59:59")
         @RequestParam String endDate
     ) {
         com.djjko.dnc.auth.entity.User user = resolveRequiredUser();
