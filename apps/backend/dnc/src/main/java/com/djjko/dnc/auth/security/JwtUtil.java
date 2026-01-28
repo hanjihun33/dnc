@@ -44,7 +44,7 @@ public class JwtUtil {
         return Jwts.builder()
             .subject(String.valueOf(userId))
             .claim("email", email)
-            .claim("type", type) // Add token type claim
+            .claim("type", type) // 토큰 타입 클레임 추가
             .issuedAt(now)
             .expiration(expiry)
             .signWith(secretKey)

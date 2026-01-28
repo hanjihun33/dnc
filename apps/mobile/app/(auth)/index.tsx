@@ -42,7 +42,7 @@ export default function AuthEntryScreen() {
             onPress={() => router.push("/signup")}
           >
             <View style={[styles.iconDot, styles.emailDot]} />
-            <Text style={styles.emailText}>이메일로 가입하기</Text>
+            <Text style={styles.emailText}>이메일(아이디)로 가입하기</Text>
           </TouchableOpacity>
         </View>
 

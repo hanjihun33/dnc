@@ -3,6 +3,6 @@ package com.djjko.dnc.user.model;
 public enum DiabetesType {
     TYPE1,
     TYPE2,
-    GESTATIONAL,
+    PREDIABETES,
     OTHER
 }

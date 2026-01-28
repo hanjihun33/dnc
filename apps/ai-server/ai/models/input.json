@@ -1,0 +1,21 @@
+{
+    "patient": {
+        "weight_kg": 85,
+        "height_cm": 170,
+        "sys_bg": 130,
+        "sys_bp": 145,
+        "fasting_hours": 10,
+        "trend_slope_up": 1.8,
+        "trend_slope_down": 0,
+        "is_t2d": true
+    },
+    "meal": {
+        "carbs": 70,
+        "protein": 30,
+        "fat": 15,
+        "fiber": 2,
+        "sodium": 800,
+        "meal_order": "veggie_protein_first",
+        "exercise_intensity": "low"
+    }
+}

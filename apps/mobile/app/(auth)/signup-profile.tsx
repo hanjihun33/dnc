@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { setAuthSession } from "../session";
 
 import { useSignupDraft } from "./signup-context";
 
@@ -48,6 +49,16 @@ const parseErrorMessage = async (response: Response) => {
   } catch {
     return null;
   }
+};
+
+const mapSignupError = (message: string | null) => {
+  if (!message) {
+    return null;
+  }
+  if (message.toLowerCase().includes("email already in use")) {
+    return "이미 사용 중인 이메일입니다.";
+  }
+  return message;
 };
 
 export default function SignupProfileScreen() {
@@ -137,9 +148,16 @@ export default function SignupProfileScreen() {
 
     const trimmedEmail = draft.email.trim();
     const trimmedName = draft.name.trim();
+    const trimmedNickname = draft.nickname.trim();
     const birthDate = draft.birthDate;
 
-    if (!trimmedEmail || !draft.password || !trimmedName || !birthDate) {
+    if (
+      !trimmedEmail ||
+      !draft.password ||
+      !trimmedName ||
+      !trimmedNickname ||
+      !birthDate
+    ) {
       setErrorMessage("회원가입 정보를 모두 입력해 주세요.");
       return;
     }
@@ -154,14 +172,14 @@ export default function SignupProfileScreen() {
         body: JSON.stringify({
           email: trimmedEmail,
           password: draft.password,
-          nickname: trimmedName,
+          nickname: trimmedNickname,
           name: trimmedName,
           birthDate: formatDate(birthDate),
         }),
       });
 
       if (!response.ok) {
-        const message = await parseErrorMessage(response);
+        const message = mapSignupError(await parseErrorMessage(response));
         throw new Error(message ?? "회원가입에 실패했습니다.");
       }
 
@@ -193,6 +211,11 @@ export default function SignupProfileScreen() {
       }
       const tokenType = loginData.tokenType ?? "Bearer";
       const authorization = `${tokenType} ${accessToken}`;
+      await setAuthSession({
+        accessToken,
+        tokenType,
+        userId: signupData.userId ?? null,
+      });
 
       const diabetesType =
         draft.diabetesStatus === "type1"

@@ -17,9 +17,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
- * Issues and validates a signed OAuth state token so the callback can
- * identify the user even when the provider redirect does not include
- * authentication headers/cookies.
+ * OAuth state 토큰을 서명해 발급/검증하여,
+ * 공급자 리다이렉트에 인증 헤더/쿠키가 없어도
+ * 콜백에서 사용자를 식별할 수 있도록 한다.
  */
 @Slf4j
 @Service
