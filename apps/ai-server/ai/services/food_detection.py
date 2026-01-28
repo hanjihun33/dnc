@@ -9,7 +9,7 @@ import os
 # ======================================================
 # [설정] ResNet 가중치 파일 경로 (본인 경로로 수정 필수!)
 # ======================================================
-RESNET_MODEL_PATH = r"C:\Users\SSAFY\Desktop\S14P11C105\ai\models\new_opencv_ckpt_b84_e200.pth"
+RESNET_MODEL_PATH = r"C:\Users\SSAFY\Desktop\pjt\S14P11C105\apps\ai-server\ai\models\new_opencv_ckpt_b84_e200.pth"
 
 class FoodDetection:
 
@@ -19,7 +19,7 @@ class FoodDetection:
         print(f"🚀 사용 장치: {self.device}")
 
         # 1. YOLO 모델 로드
-        self.yolo_model = YOLO(r'C:\Users\SSAFY\Desktop\S14P11C105\ai\models\best1to40.pt')
+        self.yolo_model = YOLO(r'C:\Users\SSAFY\Desktop\pjt\S14P11C105\apps\ai-server\ai\models\best1to40.pt')
 
         # 2. ResNet 모델 로드 (양 추정용)
         self.resnet_model = self._load_resnet_model(RESNET_MODEL_PATH)

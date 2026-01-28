@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import {
   Dimensions,
   Image,
+  LayoutChangeEvent,
   Modal,
   Platform,
   SafeAreaView,
@@ -11,10 +12,13 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { LineChart } from "react-native-chart-kit";
+import { useFocusEffect } from "@react-navigation/native";
+import { getAuthHeaders, loadAuthSession } from "../session";
 
 const mealTypes = ["아침", "점심", "저녁", "간식"];
 const chartWidth = Dimensions.get("window").width - 48;
@@ -58,10 +62,20 @@ interface NutritionData {
 interface PredictionData {
   graphData: {
     labels: string[];
-    datasets: { data: number[] }[];
+    datasets: {
+      data: number[];
+      color?: (opacity: number) => string;
+      strokeWidth?: number;
+    }[];
   };
   guide: string;
   foodName: string;
+  foodBox?: {
+    x_min?: number;
+    y_min?: number;
+    x_max?: number;
+    y_max?: number;
+  };
   nutrition: NutritionData;
 }
 
@@ -81,6 +95,8 @@ const buildFallbackPrediction = (): PredictionData => ({
     datasets: [
       {
         data: [108, 126, 142, 131, 118],
+        color: (opacity = 1) => `rgba(250, 204, 21, ${opacity})`,
+        strokeWidth: 3,
       },
     ],
   },
@@ -95,6 +111,13 @@ const formatDate = (date: Date) => {
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const day = `${date.getDate()}`.padStart(2, "0");
   return `${year}.${month}.${day}`;
+};
+
+const formatApiDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 
 const formatTime = (date: Date) => {
@@ -195,6 +218,29 @@ const getExifDate = (exif?: Record<string, unknown>) => {
   return null;
 };
 
+const getPredictionSummary = (type: string | null, values: number[]) => {
+  if (!values || values.length === 0) {
+    return "예상 혈당 반응을 계산 중이에요.";
+  }
+  const pre = values[0] ?? 0;
+  const peak = Math.max(...values);
+  const twoHour = values[values.length - 1] ?? 0;
+  const isPrediabetes = type === "PREDIABETES";
+  const targetMax = isPrediabetes ? 140 : 180;
+  const delta = peak - pre;
+
+  if (peak <= targetMax && twoHour <= targetMax) {
+    return "안정적인 혈당 반응이 예상돼요.";
+  }
+  if (peak <= targetMax + 30 && twoHour <= targetMax) {
+    return "일시적인 상승이 예상돼요.";
+  }
+  if (delta >= 60 || twoHour > targetMax) {
+    return "급격한 상승이 예상돼요. 식후 관리에 유의하세요.";
+  }
+  return "혈당 반응이 다소 변동될 수 있어요.";
+};
+
 export default function MealScreen() {
   const router = useRouter();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -203,6 +249,7 @@ export default function MealScreen() {
   const [predictionData, setPredictionData] = useState<PredictionData | null>(
     null
   );
+  const [imageLayout, setImageLayout] = useState({ width: 0, height: 0 });
   const [mealType, setMealType] = useState(mealTypes[0]);
   const [mealDate, setMealDate] = useState(new Date());
   const [mealTime, setMealTime] = useState(new Date());
@@ -212,6 +259,12 @@ export default function MealScreen() {
   const [pickerMode, setPickerMode] = useState<"date" | "time" | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [replacePrompt, setReplacePrompt] = useState({
+    visible: false,
+    message: "",
+  });
+  const replaceResolverRef = useRef<((value: boolean) => void) | null>(null);
+  const [diabetesType, setDiabetesType] = useState<string | null>(null);
   const initialTimeParts = getTimeParts(mealTime);
   const [tempDate, setTempDate] = useState(mealDate);
   const [calendarMonth, setCalendarMonth] = useState(
@@ -286,12 +339,83 @@ export default function MealScreen() {
     setPickerMode(null);
   };
 
-  const clearImage = () => {
+  const clearImage = React.useCallback(() => {
     setSelectedImage(null);
     setSelectedAsset(null);
     setPredictionData(null);
     setNoticeMessage(null);
-  };
+  }, []);
+
+  const resetForm = React.useCallback(() => {
+    const now = new Date();
+    clearImage();
+    setMealType(mealTypes[0]);
+    setMealDate(now);
+    setMealTime(now);
+    setMemo("");
+    setAutoAdvanceTime(false);
+    setPickerMode(null);
+    setIsAnalyzing(false);
+    setTempDate(now);
+    setCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+    const parts = getTimeParts(now);
+    setTimePeriod(parts.period);
+    setTimeHour(parts.hour);
+    setTimeMinute(parts.minute);
+  }, [clearImage]);
+
+  const confirmReplaceMeal = React.useCallback(
+    (targetDate: Date, targetMealLabel: string) =>
+      new Promise<boolean>((resolve) => {
+        replaceResolverRef.current = resolve;
+        setReplacePrompt({
+          visible: true,
+          message: `${formatDate(targetDate)} ${targetMealLabel} 기록이 이미 있어요. 교체할까요?`,
+        });
+      }),
+    []
+  );
+
+  const closeReplacePrompt = React.useCallback((choice: boolean) => {
+    setReplacePrompt((prev) => ({ ...prev, visible: false }));
+    const resolver = replaceResolverRef.current;
+    replaceResolverRef.current = null;
+    if (resolver) {
+      resolver(choice);
+    }
+  }, []);
+
+  const findConflictingMealIds = React.useCallback(
+    (meals: Array<{ mealId?: number; mealType?: string; eatenAt?: string }>) => {
+      const targetMealType = mealTypeMap[mealType] ?? "SNACK";
+      const targetDateKey = formatApiDate(mealDate);
+      return meals
+        .filter((meal) => {
+          if (!meal.mealId || !meal.mealType || !meal.eatenAt) {
+            return false;
+          }
+          const dateKey = meal.eatenAt.slice(0, 10);
+          return meal.mealType === targetMealType && dateKey === targetDateKey;
+        })
+        .map((meal) => meal.mealId as number);
+    },
+    [mealDate, mealType]
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (selectedAsset || selectedImage) {
+        return;
+      }
+      resetForm();
+    }, [resetForm, selectedAsset, selectedImage])
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      void loadDiabetesType();
+    }, [loadDiabetesType])
+  );
 
   const handleSubmit = async () => {
     if (!selectedAsset || isSubmitting) {
@@ -299,6 +423,43 @@ export default function MealScreen() {
     }
     setIsSubmitting(true);
     try {
+      const headers = getAuthHeaders();
+      let existingMealIds: number[] = [];
+      try {
+        const listResponse = await fetch(`${API_BASE_URL}/api/v1/meals`, {
+          headers,
+        });
+        if (listResponse.ok) {
+          const meals = (await listResponse.json()) as Array<{
+            mealId?: number;
+            mealType?: string;
+            eatenAt?: string;
+          }>;
+          existingMealIds = findConflictingMealIds(meals);
+        }
+      } catch {
+        // Ignore lookup errors and proceed without replacement prompt.
+      }
+
+      if (existingMealIds.length > 0) {
+        const shouldReplace = await confirmReplaceMeal(mealDate, mealType);
+        if (!shouldReplace) {
+          return;
+        }
+        const deleteResults = await Promise.all(
+          existingMealIds.map((mealId) =>
+            fetch(`${API_BASE_URL}/api/v1/meals/${mealId}`, {
+              method: "DELETE",
+              headers,
+            })
+          )
+        );
+        const failedDelete = deleteResults.find((result) => !result.ok);
+        if (failedDelete) {
+          throw new Error("기존 기록을 삭제하지 못했어요.");
+        }
+      }
+
       const parts = getTimeParts(mealTime);
       const eatenAt = buildTimeDate(
         mealDate,
@@ -322,9 +483,7 @@ export default function MealScreen() {
 
       const response = await fetch(`${API_BASE_URL}/api/v1/meals`, {
         method: "POST",
-        headers: {
-          "X-User-Id": "1",
-        },
+        headers,
         body: formData,
       });
 
@@ -332,13 +491,42 @@ export default function MealScreen() {
         throw new Error("식사 기록 저장에 실패했어요.");
       }
 
-      router.replace("/(tabs)/index");
+      resetForm();
+      router.replace("/(tabs)");
     } catch (error) {
       console.warn(error);
+      if (error instanceof Error) {
+        Alert.alert("저장 실패", error.message);
+      } else {
+        Alert.alert("저장 실패", "식단 기록 저장에 실패했어요.");
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const handleImageLayout = (event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    if (width > 0 && height > 0) {
+      setImageLayout({ width, height });
+    }
+  };
+
+  const loadDiabetesType = React.useCallback(async () => {
+    try {
+      await loadAuthSession();
+      const response = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
+        headers: getAuthHeaders(),
+      });
+      if (!response.ok) {
+        return;
+      }
+      const profile = (await response.json()) as { diabetesType?: string | null };
+      setDiabetesType(profile.diabetesType ?? null);
+    } catch {
+      // Ignore profile load errors.
+    }
+  }, []);
 
   const handleDirectEdit = () => {
     setAutoAdvanceTime(true);
@@ -359,9 +547,7 @@ export default function MealScreen() {
 
       const response = await fetch(`${API_BASE_URL}/api/v1/ai/food/analyze`, {
         method: "POST",
-        headers: {
-          "X-User-Id": "1",
-        },
+        headers: getAuthHeaders(),
         body: formData,
       });
 
@@ -374,6 +560,12 @@ export default function MealScreen() {
         values?: number[];
         guide?: string;
         foodName?: string;
+        foodBox?: {
+          x_min?: number;
+          y_min?: number;
+          x_max?: number;
+          y_max?: number;
+        };
         nutrition?: NutritionData;
       };
       const labels =
@@ -387,11 +579,14 @@ export default function MealScreen() {
           datasets: [
             {
               data: data.values?.length ? data.values : [108, 126, 142, 131, 118],
+              color: (opacity = 1) => `rgba(250, 204, 21, ${opacity})`,
+              strokeWidth: 3,
             },
           ],
         },
         guide: data.guide ?? buildFallbackPrediction().guide,
         foodName: data.foodName ?? buildFallbackPrediction().foodName,
+        foodBox: data.foodBox,
         nutrition: data.nutrition ?? fallbackNutrition,
       });
     } catch (error) {
@@ -520,7 +715,7 @@ export default function MealScreen() {
             </Text>
           </TouchableOpacity>
         ) : (
-          <View style={styles.imageCard}>
+          <View style={styles.imageCard} onLayout={handleImageLayout}>
             <Image source={{ uri: selectedImage }} style={styles.imagePreview} />
             <TouchableOpacity
               style={styles.imageRemoveButton}
@@ -529,7 +724,28 @@ export default function MealScreen() {
               <Text style={styles.imageRemoveText}>X</Text>
             </TouchableOpacity>
             {predictionData?.foodName ? (
-              <View style={styles.imageTag}>
+              <View
+                style={[
+                  styles.imageTag,
+                  predictionData.foodBox &&
+                    imageLayout.width > 0 &&
+                    imageLayout.height > 0 &&
+                    predictionData.foodBox.x_min != null &&
+                    predictionData.foodBox.y_min != null
+                    ? {
+                        left: Math.max(
+                          8,
+                          predictionData.foodBox.x_min * imageLayout.width
+                        ),
+                        top: Math.max(
+                          8,
+                          predictionData.foodBox.y_min * imageLayout.height
+                        ),
+                        bottom: "auto",
+                      }
+                    : null,
+                ]}
+              >
                 <Text style={styles.imageTagText}>
                   {predictionData.foodName}
                 </Text>
@@ -543,18 +759,66 @@ export default function MealScreen() {
 
         {selectedImage && predictionData && (
           <View style={styles.resultsContainer}>
-            <Text style={styles.sectionTitle}>혈당 변화</Text>
-            <View style={styles.chartCard}>
-              <LineChart
-                data={predictionData.graphData}
-                width={chartWidth}
-                height={220}
-                yAxisSuffix="mg/dL"
-                yAxisInterval={1}
-                chartConfig={chartConfig}
-                bezier
-                style={styles.graphStyle}
-              />
+            <Text style={styles.sectionTitle}>예상 혈당 변화</Text>
+            <View style={styles.predictionBlock}>
+              <Text style={styles.predictionTitle}>예상 혈당 반응</Text>
+              <Text style={styles.predictionSubtitle}>
+                {getPredictionSummary(
+                  diabetesType,
+                  predictionData.graphData.datasets[0].data
+                )}
+              </Text>
+              <View style={styles.predictionStats}>
+                <View style={styles.predictionStat}>
+                  <Text style={styles.predictionLabel}>식전</Text>
+                  <View style={styles.predictionValueRow}>
+                    <Text style={styles.predictionValue}>
+                      {Math.round(
+                        predictionData.graphData.datasets[0]?.data?.[0] ?? 0
+                      )}
+                    </Text>
+                    <Text style={styles.predictionUnit}>mg/dL</Text>
+                  </View>
+                </View>
+                <View style={styles.predictionDivider} />
+                <View style={styles.predictionStat}>
+                  <Text style={styles.predictionLabel}>예상 최고점</Text>
+                  <View style={styles.predictionValueRow}>
+                    <Text style={styles.predictionValue}>
+                      {Math.round(
+                        Math.max(...predictionData.graphData.datasets[0].data)
+                      )}
+                    </Text>
+                    <Text style={styles.predictionUnit}>mg/dL</Text>
+                  </View>
+                </View>
+                <View style={styles.predictionDivider} />
+                <View style={styles.predictionStat}>
+                  <Text style={styles.predictionLabel}>2시간 예상</Text>
+                  <View style={styles.predictionValueRow}>
+                    <Text style={styles.predictionValue}>
+                      {Math.round(
+                        predictionData.graphData.datasets[0].data[
+                          predictionData.graphData.datasets[0].data.length - 1
+                        ]
+                      )}
+                    </Text>
+                    <Text style={styles.predictionUnit}>mg/dL</Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.predictionChart}>
+                <LineChart
+                  data={predictionData.graphData}
+                  width={chartWidth - 20}
+                  height={220}
+                  yAxisSuffix="mg/dL"
+                  yAxisInterval={1}
+                  chartConfig={chartConfig}
+                  bezier
+                  style={styles.graphStyle}
+                />
+              </View>
             </View>
 
             <Text style={styles.sectionTitle}>섭취 가이드</Text>
@@ -647,6 +911,41 @@ export default function MealScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+      {replacePrompt.visible && (
+        <Modal
+          transparent
+          animationType="fade"
+          onRequestClose={() => closeReplacePrompt(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.confirmCard}>
+              <Text style={styles.confirmTitle}>기록 교체</Text>
+              <Text style={styles.confirmMessage}>{replacePrompt.message}</Text>
+              <View style={styles.confirmActions}>
+                <TouchableOpacity
+                  style={[styles.confirmButton, styles.confirmButtonCancel]}
+                  onPress={() => closeReplacePrompt(false)}
+                >
+                  <Text style={styles.confirmButtonText}>취소</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.confirmButton, styles.confirmButtonPrimary]}
+                  onPress={() => closeReplacePrompt(true)}
+                >
+                  <Text
+                    style={[
+                      styles.confirmButtonText,
+                      styles.confirmButtonTextPrimary,
+                    ]}
+                  >
+                    교체
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
       {pickerMode && (
         <Modal transparent animationType="fade" onRequestClose={closePicker}>
           <View style={styles.modalBackdrop}>
@@ -904,18 +1203,28 @@ export default function MealScreen() {
 
 const chartConfig = {
   backgroundColor: palette.ink,
-  backgroundGradientFrom: palette.ink,
-  backgroundGradientTo: "#1F2937",
+  backgroundGradientFrom: "#0B1220",
+  backgroundGradientTo: "#111827",
   decimalPlaces: 0,
-  color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-  labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+  color: (opacity = 1) => `rgba(250, 204, 21, ${opacity})`,
+  labelColor: (opacity = 1) => `rgba(226, 232, 240, ${opacity})`,
+  fillShadowGradient: "rgba(250, 204, 21, 0.25)",
+  fillShadowGradientOpacity: 0.45,
   style: {
     borderRadius: 18,
   },
+  propsForBackgroundLines: {
+    stroke: "rgba(148, 163, 184, 0.2)",
+    strokeDasharray: "4 6",
+  },
+  propsForLabels: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
   propsForDots: {
-    r: "5",
-    strokeWidth: "2",
-    stroke: palette.accent,
+    r: "4.5",
+    strokeWidth: "2.5",
+    stroke: "#0B1220",
   },
 };
 
@@ -1043,6 +1352,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: palette.border,
+    position: "relative",
   },
   imagePreview: {
     width: "100%",
@@ -1080,10 +1390,73 @@ const styles = StyleSheet.create({
   resultsContainer: {
     marginTop: 14,
   },
+  predictionBlock: {
+    backgroundColor: "#0B1220",
+    borderRadius: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.18)",
+    marginBottom: 16,
+  },
+  predictionTitle: {
+    color: "#E2E8F0",
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  predictionSubtitle: {
+    color: "rgba(226, 232, 240, 0.7)",
+    fontSize: 13,
+    marginBottom: 16,
+  },
+  predictionStats: {
+    flexDirection: "row",
+    alignItems: "stretch",
+  },
+  predictionStat: {
+    flex: 1,
+  },
+  predictionLabel: {
+    color: "rgba(226, 232, 240, 0.75)",
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  predictionValueRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+  },
+  predictionValue: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#BFDBFE",
+    marginRight: 6,
+  },
+  predictionUnit: {
+    fontSize: 12,
+    color: "rgba(226, 232, 240, 0.75)",
+    marginBottom: 2,
+  },
+  predictionDivider: {
+    width: 1,
+    backgroundColor: "rgba(148, 163, 184, 0.2)",
+    marginHorizontal: 12,
+  },
+  predictionChart: {
+    marginTop: 16,
+    paddingVertical: 6,
+  },
   chartCard: {
-    backgroundColor: palette.ink,
-    borderRadius: 18,
-    padding: 8,
+    backgroundColor: "#0B1220",
+    borderRadius: 20,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.16)",
+    shadowColor: "#0B1220",
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
   graphStyle: {
     borderRadius: 18,
@@ -1222,6 +1595,55 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
+  },
+  confirmCard: {
+    width: "100%",
+    backgroundColor: palette.card,
+    borderRadius: 22,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: palette.border,
+    shadowColor: palette.ink,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: palette.text,
+    marginBottom: 8,
+  },
+  confirmMessage: {
+    fontSize: 14,
+    color: palette.textMuted,
+    lineHeight: 20,
+    marginBottom: 18,
+  },
+  confirmActions: {
+    flexDirection: "row",
+  },
+  confirmButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+  confirmButtonCancel: {
+    backgroundColor: "#E2E8F0",
+    marginRight: 12,
+  },
+  confirmButtonPrimary: {
+    backgroundColor: palette.ink,
+  },
+  confirmButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: palette.text,
+  },
+  confirmButtonTextPrimary: {
+    color: "#FFFFFF",
   },
   modalCard: {
     width: "100%",

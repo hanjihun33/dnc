@@ -10,6 +10,10 @@ storage:
     region: ${S3_REGION:}
     public-url: ${S3_PUBLIC_URL:}
 
+ai:
+  server:
+    base-url: ${AI_SERVER_BASE_URL:http://localhost:8000}
+
 spring:
   config:
     import: "optional:file:./.env"
@@ -28,8 +32,8 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${DB_URL:jdbc:mysql://localhost:3306/dnc_db?serverTimezone=Asia/Seoul}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:}
+    username: ${DB_USERNAME:ssafy}
+    password: ${DB_PASSWORD:ssafy}
     hikari:
       idle-timeout: 300000
       minimum-idle: 3
