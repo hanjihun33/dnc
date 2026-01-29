@@ -113,13 +113,15 @@ public class AiFoodService {
                 .filter(name -> name != null && !name.isBlank())
                 .orElse(FALLBACK_FOOD_NAME);
         var detectedBox = detection.map(result -> result.box()).orElse(null);
+        String detectedQuantity = detection.map(result -> result.quantity()).orElse(null);
+
         Optional<FoodMetadata> metadata = resolveMetadata(detectedName);
         String foodName = metadata.map(FoodMetadata::getFoodName).orElse(detectedName);
         AiFoodNutrition nutrition = metadata
-                .map(result -> toNutrition(result, estimatedWeight))
+                .map(result -> toNutrition(result, estimatedWeight, detectedQuantity))
                 .orElse(null);
         Double resolvedWeight = metadata
-                .map(result -> resolveWeight(result.getBaseWeight(), estimatedWeight))
+                .map(result -> resolveWeight(result.getBaseWeight(), estimatedWeight, detectedQuantity))
                 .orElse(estimatedWeight);
 
         String guide = detection.isPresent()
@@ -179,8 +181,10 @@ public class AiFoodService {
                 .filter(name -> name != null && !name.isBlank())
                 .orElse(null);
         Optional<FoodMetadata> metadata = resolveMetadata(detectedName);
+        String detectedQuantity = detection.map(AiFoodDetectResult::quantity).orElse(null);
+
         Double resolvedWeight = metadata
-                .map(result -> resolveWeight(result.getBaseWeight(), estimatedWeight))
+                .map(result -> resolveWeight(result.getBaseWeight(), estimatedWeight, detectedQuantity))
                 .orElse(estimatedWeight);
 
         FoodAnalysis analysis = new FoodAnalysis();
@@ -196,7 +200,7 @@ public class AiFoodService {
         foodAnalysisRepository.save(analysis);
 
         AiFoodNutrition nutrition = metadata
-                .map(result -> toNutrition(result, estimatedWeight))
+                .map(result -> toNutrition(result, estimatedWeight, detectedQuantity))
                 .orElse(null);
         Optional<List<Double>> predictionValues = fetchGlucosePrediction(userId, nutrition);
         if (predictionValues.isPresent()) {
@@ -407,9 +411,9 @@ public class AiFoodService {
         return (int) Math.round(value);
     }
 
-    private AiFoodNutrition toNutrition(FoodMetadata metadata, Double estimatedWeight) {
+    private AiFoodNutrition toNutrition(FoodMetadata metadata, Double estimatedWeight, String quantity) {
         Double baseWeight = metadata.getBaseWeight();
-        Double resolvedWeight = resolveWeight(baseWeight, estimatedWeight);
+        Double resolvedWeight = resolveWeight(baseWeight, estimatedWeight, quantity);
         double ratio = resolveRatio(baseWeight, resolvedWeight);
         String servingSize = resolvedWeight == null
                 ? "1 serving"
@@ -425,11 +429,37 @@ public class AiFoodService {
                 scale(metadata.getSodiumPerBase(), ratio));
     }
 
-    private Double resolveWeight(Double baseWeight, Double estimatedWeight) {
+    private Double resolveWeight(Double baseWeight, Double estimatedWeight, String quantity) {
         if (estimatedWeight != null && estimatedWeight > 0) {
             return estimatedWeight;
         }
+        // AI Quantity Adjustment Logic
+        double multiplier = getQuantityMultiplier(quantity);
+
+        if (baseWeight != null) {
+            return baseWeight * multiplier;
+        }
         return baseWeight;
+    }
+
+    private double getQuantityMultiplier(String quantity) {
+        if (quantity == null) {
+            return 1.0;
+        }
+        switch (quantity.toUpperCase()) {
+            case "Q1":
+                return 0.25; // 25%
+            case "Q2":
+                return 0.50; // 50%
+            case "Q3":
+                return 0.75; // 75%
+            case "Q4":
+                return 1.00; // 100% (Base)
+            case "Q5":
+                return 1.25; // 125%
+            default:
+                return 1.0;
+        }
     }
 
     private double resolveRatio(Double baseWeight, Double resolvedWeight) {
