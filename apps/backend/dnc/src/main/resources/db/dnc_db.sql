@@ -26,6 +26,7 @@ DROP TABLE IF EXISTS food_records;
 DROP TABLE IF EXISTS glucose_data;
 DROP TABLE IF EXISTS sensors;
 DROP TABLE IF EXISTS user_push_tokens;
+DROP TABLE IF EXISTS user_alert_settings;
 DROP TABLE IF EXISTS user_settings;
 DROP TABLE IF EXISTS social_accounts;
 DROP TABLE IF EXISTS oauth_tokens;

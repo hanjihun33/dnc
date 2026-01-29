@@ -12,7 +12,7 @@ import {
 import { useRouter } from "expo-router";
 import { setAuthSession } from "../session";
 
-import { useSignupDraft } from "./signup-context";
+import { useSignupDraft } from "./_signup-context";
 
 const palette = {
   background: "#F8FAFC",
@@ -754,4 +754,3 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
-
