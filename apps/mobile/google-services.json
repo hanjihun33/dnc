@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "172590618251",
+    "project_id": "dnco-df590",
+    "storage_bucket": "dnco-df590.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:172590618251:android:916ba4d1bcaa043503a68e",
+        "android_client_info": {
+          "package_name": "com.djjko.dnc"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCNmNykVyxuCUN1oFdoq4PTPbOIZBS7a2M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

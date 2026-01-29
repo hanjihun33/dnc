@@ -6,6 +6,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadAuthSession } from './session';
+import { registerPushTokenWithServer } from './push';
 
 export const unstable_settings = {
   anchor: '(auth)',
@@ -15,7 +16,11 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   React.useEffect(() => {
-    void loadAuthSession();
+    const init = async () => {
+      await loadAuthSession();
+      await registerPushTokenWithServer();
+    };
+    void init();
   }, []);
 
   return (
