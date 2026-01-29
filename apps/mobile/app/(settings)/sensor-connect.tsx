@@ -9,6 +9,8 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
+import { getAuthHeaders, loadAuthSession } from "../session";
 
 const palette = {
   background: "#F8FAFC",
@@ -19,8 +21,36 @@ const palette = {
   accent: "#FACC15",
 };
 
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+
 export default function SensorConnectScreen() {
   const router = useRouter();
+  const [isConnecting, setIsConnecting] = React.useState(false);
+
+  const handleDexcomConnect = async () => {
+    if (isConnecting) return;
+    setIsConnecting(true);
+    try {
+      await loadAuthSession();
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/oauth/dexcom/authorize-url`,
+        { headers: getAuthHeaders() }
+      );
+      if (!response.ok) {
+        throw new Error("Dexcom 연동 URL을 가져오지 못했습니다.");
+      }
+      const payload = (await response.json()) as { authorizeUrl?: string };
+      if (!payload.authorizeUrl) {
+        throw new Error("Dexcom 연동 URL이 비어있습니다.");
+      }
+      await WebBrowser.openBrowserAsync(payload.authorizeUrl);
+    } catch {
+      // Ignore errors for now.
+    } finally {
+      setIsConnecting(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -36,7 +66,10 @@ export default function SensorConnectScreen() {
           연속혈당측정기(CGM)를 의미합니다.
         </Text>
 
-        <View style={styles.sensorCard}>
+        <Pressable
+          style={[styles.sensorCard, isConnecting && styles.sensorCardDisabled]}
+          onPress={handleDexcomConnect}
+        >
           <View style={styles.deviceShell}>
             <View style={styles.deviceTop} />
             <View style={styles.deviceBody}>
@@ -45,7 +78,10 @@ export default function SensorConnectScreen() {
             <View style={styles.deviceBase} />
           </View>
           <Text style={styles.sensorName}>Dexcom G7</Text>
-        </View>
+          <Text style={styles.sensorHint}>
+            {isConnecting ? "연동 준비 중..." : "탭하여 연동하기"}
+          </Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -89,6 +125,9 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 8,
   },
+  sensorCardDisabled: {
+    opacity: 0.7,
+  },
   deviceShell: {
     alignSelf: "center",
     alignItems: "center",
@@ -127,5 +166,10 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 18,
     fontWeight: "700",
+  },
+  sensorHint: {
+    color: palette.textMuted,
+    fontSize: 12,
+    marginTop: 6,
   },
 });
