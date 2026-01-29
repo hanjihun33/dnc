@@ -2,6 +2,8 @@ package com.djjko.dnc.meal.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
@@ -10,8 +12,9 @@ import jakarta.persistence.Table;
 public class FoodMetadata {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "food_code")
-    private String foodCode;
+    private Long foodCode;
 
     @Column(name = "food_name")
     private String foodName;
@@ -37,7 +40,7 @@ public class FoodMetadata {
     @Column(name = "sodium_per_base")
     private Double sodiumPerBase;
 
-    public String getFoodCode() {
+    public Long getFoodCode() {
         return foodCode;
     }
 

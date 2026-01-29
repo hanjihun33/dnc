@@ -1,5 +1,6 @@
 package com.djjko.dnc.meal.service;
 
+import com.djjko.dnc.ai.food.service.AiFoodService;
 import com.djjko.dnc.meal.domain.FoodRecord;
 import com.djjko.dnc.meal.domain.MealType;
 import com.djjko.dnc.meal.dto.MealResponse;
@@ -11,6 +12,8 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,15 +22,20 @@ import org.springframework.web.multipart.MultipartFile;
 @Transactional
 public class MealService {
 
+    private static final Logger log = LoggerFactory.getLogger(MealService.class);
+
     private final FoodRecordRepository repository;
     private final FileStorageService fileStorageService;
+    private final AiFoodService aiFoodService;
 
     public MealService(
         FoodRecordRepository repository,
-        FileStorageService fileStorageService
+        FileStorageService fileStorageService,
+        AiFoodService aiFoodService
     ) {
         this.repository = repository;
         this.fileStorageService = fileStorageService;
+        this.aiFoodService = aiFoodService;
     }
 
     public MealResponse create(
@@ -51,7 +59,22 @@ public class MealService {
         record.setRecordedAt(now);
         record.setUpdatedAt(now);
 
-        return MealResponse.from(repository.save(record));
+        FoodRecord savedRecord = repository.save(record);
+        if (image != null && !image.isEmpty()) {
+            try {
+                aiFoodService.analyzeAndPersist(
+                    userId,
+                    savedRecord.getFoodId(),
+                    savedRecord.getEatenAt(),
+                    image,
+                    null
+                );
+            } catch (Exception ex) {
+                log.warn("Failed to persist AI analysis for meal {}: {}", savedRecord.getFoodId(), ex.getMessage());
+            }
+        }
+
+        return MealResponse.from(savedRecord);
     }
 
     @Transactional(readOnly = true)

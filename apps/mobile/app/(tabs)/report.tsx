@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+﻿import React, { useMemo, useState } from "react";
 import {
   Dimensions,
   Pressable,
@@ -11,7 +11,6 @@ import {
 import { LineChart } from "react-native-chart-kit";
 
 type ReportMode = "daily" | "weekly";
-type MetricType = "weight" | "glucose";
 
 const { width } = Dimensions.get("window");
 const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
@@ -77,7 +76,6 @@ function getWeekIndexForDate(
 
 export default function ReportScreen() {
   const [mode, setMode] = useState<ReportMode>("daily");
-  const [metric, setMetric] = useState<MetricType>("glucose");
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [viewMonth, setViewMonth] = useState(() => new Date());
 
@@ -142,26 +140,19 @@ export default function ReportScreen() {
 
   const chartData = useMemo(() => {
     const glucose = [92, 114, 126, 118, 134, 122, 128];
-    const weight = [66.2, 66.0, 65.9, 66.1, 65.8, 65.6, 65.7];
     return {
       labels: ["", "", "", "", "", "", ""],
       datasets: [
         {
-          data: metric === "glucose" ? glucose : weight,
+          data: glucose,
         },
       ],
     };
-  }, [metric]);
+  }, []);
 
-  const statPrimary =
-    metric === "glucose"
-      ? { title: "혈당 변동성(GV)", value: "46%", delta: "23.1↑", scale: "적음 - 높음" }
-      : { title: "체중 변동", value: "1.2kg", delta: "0.4↓", scale: "안정 - 위험" };
+  const statPrimary = { title: "혈당 변동성(GV)", value: "46%", delta: "23.1%", scale: "안정 - 위험" };
 
-  const statSecondary =
-    metric === "glucose"
-      ? { title: "평균 혈당", value: "104", unit: "mg/dL", trend: "권장", hint: "주의" }
-      : { title: "평균 체중", value: "65.8", unit: "kg", trend: "양호", hint: "주의" };
+  const statSecondary = { title: "평균 혈당", value: "104", unit: "mg/dL", trend: "권장", hint: "주의" };
 
   const chartWidth = Math.max(width - 72, 240);
 
@@ -189,7 +180,7 @@ export default function ReportScreen() {
             <Text style={styles.modeButtonText}>
               {mode === "daily" ? "일간 리포트" : "주간 리포트"}
             </Text>
-            <Text style={styles.modeChevron}>▾</Text>
+            <Text style={styles.modeChevron}>v</Text>
           </Pressable>
 
           <View style={styles.dateRow}>
@@ -199,58 +190,18 @@ export default function ReportScreen() {
 
           <View style={styles.navRow}>
             <Pressable style={styles.navButton} onPress={() => moveDate("prev")}>
-              <Text style={styles.navText}>◀</Text>
+              <Text style={styles.navText}>{"<"}</Text>
             </Pressable>
             <Pressable style={styles.navButton} onPress={() => moveDate("next")}>
-              <Text style={styles.navText}>▶</Text>
+              <Text style={styles.navText}>{">"}</Text>
             </Pressable>
           </View>
         </View>
-
-        <View style={styles.metricTabs}>
-          <Pressable
-            onPress={() => setMetric("weight")}
-            style={[
-              styles.metricTab,
-              metric === "weight" && styles.metricTabActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.metricText,
-                metric === "weight" && styles.metricTextActive,
-              ]}
-            >
-              체중
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setMetric("glucose")}
-            style={[
-              styles.metricTab,
-              metric === "glucose" && styles.metricTabActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.metricText,
-                metric === "glucose" && styles.metricTextActive,
-              ]}
-            >
-              혈당
-            </Text>
-          </Pressable>
-        </View>
-
         <View style={styles.chartCard}>
           <View style={styles.chartHeader}>
-            <Text style={styles.chartTitle}>
-              {metric === "glucose" ? "혈당 트렌드" : "체중 트렌드"}
-            </Text>
+            <Text style={styles.chartTitle}>혈당 트렌드</Text>
             <View style={styles.chartBadge}>
-              <Text style={styles.chartBadgeText}>
-                {metric === "glucose" ? "안정" : "유지"}
-              </Text>
+              <Text style={styles.chartBadgeText}>안정</Text>
             </View>
           </View>
 
@@ -266,8 +217,8 @@ export default function ReportScreen() {
             chartConfig={{
               backgroundGradientFrom: "#0B1220",
               backgroundGradientTo: "#111827",
-              decimalPlaces: metric === "glucose" ? 0 : 1,
-              color: () => (metric === "glucose" ? "#F472B6" : "#60A5FA"),
+              decimalPlaces: 0,
+              color: () => "#F472B6",
               labelColor: () => "#94A3B8",
               propsForDots: {
                 r: "4",
@@ -314,12 +265,10 @@ export default function ReportScreen() {
         </View>
 
         <View style={styles.ctaCard}>
-          <Text style={styles.ctaTitle}>건강을 꾸준히 관리해보세요.</Text>
-          <Text style={styles.ctaDesc}>
-            식사와 활동 패턴을 분석하면 혈당 변화를 더 잘 이해할 수 있어요.
-          </Text>
+          <Text style={styles.ctaTitle}>건강 리포트를 관리해보세요</Text>
+          <Text style={styles.ctaDesc}>식사와 운동 패턴을 분석하면 혈당 변화에 미리 대비할 수 있어요.</Text>
           <Pressable style={styles.ctaButton}>
-            <Text style={styles.ctaButtonText}>센서 구매하기</Text>
+            <Text style={styles.ctaButtonText}>리포트 구매하기</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -386,14 +335,14 @@ export default function ReportScreen() {
                 style={styles.pickerMonthArrow}
                 onPress={() => moveDraftMonth("prev")}
               >
-                <Text style={styles.pickerMonthArrowText}>◀</Text>
+                <Text style={styles.pickerMonthArrowText}>{"<"}</Text>
               </Pressable>
               <Text style={styles.pickerMonthText}>{formatMonthNumeric(draftMonth)}</Text>
               <Pressable
                 style={styles.pickerMonthArrow}
                 onPress={() => moveDraftMonth("next")}
               >
-                <Text style={styles.pickerMonthArrowText}>▶</Text>
+                <Text style={styles.pickerMonthArrowText}>{">"}</Text>
               </Pressable>
             </View>
 
@@ -505,24 +454,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   navText: { fontSize: 14, color: "#1E293B" },
-
-  metricTabs: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
-    marginBottom: 14,
-  },
-  metricTab: {
-    paddingVertical: 12,
-    marginRight: 20,
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-  },
-  metricTabActive: {
-    borderBottomColor: "#4F46E5",
-  },
-  metricText: { fontSize: 14, color: "#94A3B8", fontWeight: "600" },
-  metricTextActive: { color: "#1E293B" },
 
   chartCard: {
     borderRadius: 26,
@@ -747,3 +678,18 @@ const styles = StyleSheet.create({
   },
   pickerApplyText: { color: "#111827", fontSize: 16, fontWeight: "800" },
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

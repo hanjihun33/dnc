@@ -73,6 +73,17 @@ public class FoodRecord {
         this.memo = memo;
     }
 
+    @Column(name = "ai_guide", columnDefinition = "TEXT")
+    private String aiGuide;
+
+    public String getAiGuide() {
+        return aiGuide;
+    }
+
+    public void setAiGuide(String aiGuide) {
+        this.aiGuide = aiGuide;
+    }
+
     public MealType getMealType() {
         return mealType;
     }
