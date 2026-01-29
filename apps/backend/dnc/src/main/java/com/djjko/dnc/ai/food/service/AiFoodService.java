@@ -10,6 +10,8 @@ import com.djjko.dnc.prediction.entity.GlucosePrediction;
 import com.djjko.dnc.prediction.repository.GlucosePredictionRepository;
 import com.djjko.dnc.meal.domain.FoodMetadata;
 import com.djjko.dnc.meal.repository.FoodMetadataRepository;
+import com.djjko.dnc.meal.domain.FoodRecord;
+import com.djjko.dnc.meal.repository.FoodRecordRepository;
 import com.djjko.dnc.storage.FileStorageService;
 import com.djjko.dnc.auth.entity.User;
 import com.djjko.dnc.auth.repository.UserRepository;
@@ -59,17 +61,20 @@ public class AiFoodService {
     private final FoodAnalysisRepository foodAnalysisRepository;
     private final GlucosePredictionRepository glucosePredictionRepository;
     private final ObjectMapper objectMapper;
+    private final com.djjko.dnc.ai.gemini.service.AiFoodGuideService aiFoodGuideService;
+    private final FoodRecordRepository foodRecordRepository;
 
     public AiFoodService(
-        AiServerClient aiServerClient,
-        FoodMetadataRepository foodMetadataRepository,
-        FileStorageService fileStorageService,
-        UserRepository userRepository,
-        GlucoseDataRepository glucoseDataRepository,
-        FoodAnalysisRepository foodAnalysisRepository,
-        GlucosePredictionRepository glucosePredictionRepository,
-        ObjectMapper objectMapper
-    ) {
+            AiServerClient aiServerClient,
+            FoodMetadataRepository foodMetadataRepository,
+            FileStorageService fileStorageService,
+            UserRepository userRepository,
+            GlucoseDataRepository glucoseDataRepository,
+            FoodAnalysisRepository foodAnalysisRepository,
+            GlucosePredictionRepository glucosePredictionRepository,
+            ObjectMapper objectMapper,
+            com.djjko.dnc.ai.gemini.service.AiFoodGuideService aiFoodGuideService,
+            FoodRecordRepository foodRecordRepository) {
         this.aiServerClient = aiServerClient;
         this.foodMetadataRepository = foodMetadataRepository;
         this.fileStorageService = fileStorageService;
@@ -78,20 +83,22 @@ public class AiFoodService {
         this.foodAnalysisRepository = foodAnalysisRepository;
         this.glucosePredictionRepository = glucosePredictionRepository;
         this.objectMapper = objectMapper;
+        this.aiFoodGuideService = aiFoodGuideService;
+        this.foodRecordRepository = foodRecordRepository;
     }
 
     public AiFoodAnalyzeResponse analyze(Long userId, MultipartFile image, Double estimatedWeight) {
         if (image == null || image.isEmpty()) {
             return new AiFoodAnalyzeResponse(
-                DEFAULT_LABELS,
-                ZERO_VALUES,
-                "No image provided.",
-                FALLBACK_FOOD_NAME,
-                null,
-                null,
-                null,
-                estimatedWeight
-            );
+                    DEFAULT_LABELS,
+                    ZERO_VALUES,
+                    "No image provided.",
+                    FALLBACK_FOOD_NAME,
+                    null,
+                    null,
+                    null,
+                    estimatedWeight,
+                    null);
         }
 
         String imageUrl = null;
@@ -103,21 +110,21 @@ public class AiFoodService {
 
         var detection = aiServerClient.analyzeFood(image);
         String detectedName = detection.map(result -> result.foodName())
-            .filter(name -> name != null && !name.isBlank())
-            .orElse(FALLBACK_FOOD_NAME);
+                .filter(name -> name != null && !name.isBlank())
+                .orElse(FALLBACK_FOOD_NAME);
         var detectedBox = detection.map(result -> result.box()).orElse(null);
         Optional<FoodMetadata> metadata = resolveMetadata(detectedName);
         String foodName = metadata.map(FoodMetadata::getFoodName).orElse(detectedName);
         AiFoodNutrition nutrition = metadata
-            .map(result -> toNutrition(result, estimatedWeight))
-            .orElse(null);
+                .map(result -> toNutrition(result, estimatedWeight))
+                .orElse(null);
         Double resolvedWeight = metadata
-            .map(result -> resolveWeight(result.getBaseWeight(), estimatedWeight))
-            .orElse(estimatedWeight);
+                .map(result -> resolveWeight(result.getBaseWeight(), estimatedWeight))
+                .orElse(estimatedWeight);
 
         String guide = detection.isPresent()
-            ? DEFAULT_GUIDE
-            : "AI server returned no detectable food.";
+                ? DEFAULT_GUIDE
+                : "AI server returned no detectable food.";
 
         List<Integer> values = DEFAULT_VALUES;
         Optional<List<Double>> predictedValues = fetchGlucosePrediction(userId, nutrition);
@@ -125,28 +132,56 @@ public class AiFoodService {
             values = mapPredictionValues(predictedValues.get());
         }
 
-        return buildResponse(DEFAULT_LABELS, values, guide, foodName, detectedBox, imageUrl, nutrition, resolvedWeight);
+        // AI Guide Generation
+        String aiGuide = null;
+        try {
+            // 임시 FoodRecord 생성 (가이드 생성을 위한 데이터 전달용)
+            // 주의: 실제 DB에 저장되지 않은 상태이므로 ID는 null입니다.
+            FoodRecord tempRecord = new FoodRecord();
+            tempRecord.setEatenAt(LocalDateTime.now());
+            tempRecord.setMealType(com.djjko.dnc.meal.domain.MealType.LUNCH); // 기본값 설정 (필요시 파라미터로 받아야 함)
+
+            // 영양 성분 문자열 생성
+            String nutritionSummary = nutrition != null ? String.format(
+                    "- 칼로리: %d kcal\n- 탄수화물: %d g\n- 단백질: %d g\n- 지방: %d g\n- 당류: %d g\n- 나트륨: %d mg",
+                    nutrition.calories(), nutrition.carbs(), nutrition.protein(), nutrition.fat(), nutrition.sugar(),
+                    nutrition.sodium()) : "영양 성분 정보 없음";
+
+            // 음식 목록 문자열 생성
+            String foodListString = foodName
+                    + (resolvedWeight != null ? String.format(" (%.0fg)", resolvedWeight) : "");
+
+            com.djjko.dnc.auth.entity.User user = userRepository.findById(userId).orElse(null);
+            if (user != null) {
+                aiGuide = aiFoodGuideService.generateGuide(user, tempRecord, foodListString, nutritionSummary);
+            }
+        } catch (Exception e) {
+            log.warn("AI Guide generation failed: {}", e.getMessage());
+            aiGuide = "가이드 생성 실패";
+        }
+
+        return buildResponse(DEFAULT_LABELS, values, guide, foodName, detectedBox, imageUrl, nutrition, resolvedWeight,
+                aiGuide);
     }
 
     public void analyzeAndPersist(
-        Long userId,
-        Long foodId,
-        LocalDateTime eatenAt,
-        MultipartFile image,
-        Double estimatedWeight
-    ) {
+            Long userId,
+            Long foodId,
+            LocalDateTime eatenAt,
+            MultipartFile image,
+            Double estimatedWeight) {
         if (foodId == null || image == null || image.isEmpty()) {
             return;
         }
 
         Optional<AiFoodDetectResult> detection = aiServerClient.analyzeFood(image);
         String detectedName = detection.map(AiFoodDetectResult::foodName)
-            .filter(name -> name != null && !name.isBlank())
-            .orElse(null);
+                .filter(name -> name != null && !name.isBlank())
+                .orElse(null);
         Optional<FoodMetadata> metadata = resolveMetadata(detectedName);
         Double resolvedWeight = metadata
-            .map(result -> resolveWeight(result.getBaseWeight(), estimatedWeight))
-            .orElse(estimatedWeight);
+                .map(result -> resolveWeight(result.getBaseWeight(), estimatedWeight))
+                .orElse(estimatedWeight);
 
         FoodAnalysis analysis = new FoodAnalysis();
         analysis.setFoodId(foodId);
@@ -161,11 +196,34 @@ public class AiFoodService {
         foodAnalysisRepository.save(analysis);
 
         AiFoodNutrition nutrition = metadata
-            .map(result -> toNutrition(result, estimatedWeight))
-            .orElse(null);
+                .map(result -> toNutrition(result, estimatedWeight))
+                .orElse(null);
         Optional<List<Double>> predictionValues = fetchGlucosePrediction(userId, nutrition);
         if (predictionValues.isPresent()) {
             persistPredictions(userId, foodId, eatenAt, predictionValues.get());
+        }
+
+        // Persist AI Guide
+        try {
+            com.djjko.dnc.auth.entity.User user = userRepository.findById(userId).orElse(null);
+            FoodRecord record = foodRecordRepository.findById(foodId).orElse(null);
+
+            if (user != null && record != null) {
+                String nutritionSummary = nutrition != null ? String.format(
+                        "- 칼로리: %d kcal\n- 탄수화물: %d g\n- 단백질: %d g\n- 지방: %d g\n- 당류: %d g\n- 나트륨: %d mg",
+                        nutrition.calories(), nutrition.carbs(), nutrition.protein(), nutrition.fat(),
+                        nutrition.sugar(), nutrition.sodium()) : "영양 성분 정보 없음";
+
+                String foodName = metadata.map(FoodMetadata::getFoodName).orElse(detectedName);
+                String foodListString = (foodName != null ? foodName : "알 수 없는 음식")
+                        + (resolvedWeight != null ? String.format(" (%.0fg)", resolvedWeight) : "");
+
+                String aiGuide = aiFoodGuideService.generateGuide(user, record, foodListString, nutritionSummary);
+                record.setAiGuide(aiGuide);
+                foodRecordRepository.save(record);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to persist AI guide: {}", e.getMessage());
         }
     }
 
@@ -189,25 +247,25 @@ public class AiFoodService {
     }
 
     private AiFoodAnalyzeResponse buildResponse(
-        List<String> labels,
-        List<Integer> values,
-        String guide,
-        String foodName,
-        com.djjko.dnc.ai.food.dto.AiFoodDetectBox foodBox,
-        String imageUrl,
-        AiFoodNutrition nutrition,
-        Double estimatedWeight
-    ) {
+            List<String> labels,
+            List<Integer> values,
+            String guide,
+            String foodName,
+            com.djjko.dnc.ai.food.dto.AiFoodDetectBox foodBox,
+            String imageUrl,
+            AiFoodNutrition nutrition,
+            Double estimatedWeight,
+            String aiGuide) {
         return new AiFoodAnalyzeResponse(
-            labels,
-            values,
-            guide,
-            foodName,
-            foodBox,
-            imageUrl,
-            nutrition,
-            estimatedWeight
-        );
+                labels,
+                values,
+                guide,
+                foodName,
+                foodBox,
+                imageUrl,
+                nutrition,
+                estimatedWeight,
+                aiGuide);
     }
 
     private Optional<List<Double>> fetchGlucosePrediction(Long userId, AiFoodNutrition nutrition) {
@@ -228,58 +286,55 @@ public class AiFoodService {
         }
 
         double weightKg = user.get().getWeightKg() != null
-            ? user.get().getWeightKg().doubleValue()
-            : DEFAULT_WEIGHT_KG;
+                ? user.get().getWeightKg().doubleValue()
+                : DEFAULT_WEIGHT_KG;
         double heightCm = user.get().getHeightCm() != null
-            ? user.get().getHeightCm().doubleValue()
-            : DEFAULT_HEIGHT_CM;
+                ? user.get().getHeightCm().doubleValue()
+                : DEFAULT_HEIGHT_CM;
         boolean isT2d = user.get().getDiabetesType() == DiabetesType.TYPE2;
 
         Double latestGlucose = Optional.ofNullable(
-            glucoseDataRepository.findTopByUser_UserIdOrderByMeasuredAtDesc(userId)
-        ).map(data -> data.getValue() == null ? null : data.getValue().doubleValue())
-            .orElse(null);
+                glucoseDataRepository.findTopByUser_UserIdOrderByMeasuredAtDesc(userId))
+                .map(data -> data.getValue() == null ? null : data.getValue().doubleValue())
+                .orElse(null);
         double sysBg = latestGlucose != null ? latestGlucose : DEFAULT_SYS_BG;
 
         return Optional.of(new AiGlucosePredictionRequest(
-            nutrition.carbs(),
-            nutrition.protein(),
-            nutrition.fat(),
-            DEFAULT_FIBER,
-            nutrition.sodium(),
-            DEFAULT_MEAL_ORDER,
-            DEFAULT_EXERCISE_INTENSITY,
-            weightKg,
-            heightCm,
-            sysBg,
-            DEFAULT_SYS_BP,
-            DEFAULT_FASTING_HOURS,
-            DEFAULT_TREND_SLOPE_UP,
-            DEFAULT_TREND_SLOPE_DOWN,
-            isT2d
-        ));
+                nutrition.carbs(),
+                nutrition.protein(),
+                nutrition.fat(),
+                DEFAULT_FIBER,
+                nutrition.sodium(),
+                DEFAULT_MEAL_ORDER,
+                DEFAULT_EXERCISE_INTENSITY,
+                weightKg,
+                heightCm,
+                sysBg,
+                DEFAULT_SYS_BP,
+                DEFAULT_FASTING_HOURS,
+                DEFAULT_TREND_SLOPE_UP,
+                DEFAULT_TREND_SLOPE_DOWN,
+                isT2d));
     }
 
     private List<Integer> mapPredictionValues(List<Double> values) {
         if (values == null || values.size() < 25) {
             return DEFAULT_VALUES;
         }
-        int[] indices = {0, 6, 12, 18, 24};
+        int[] indices = { 0, 6, 12, 18, 24 };
         return List.of(
-            roundValue(values.get(indices[0])),
-            roundValue(values.get(indices[1])),
-            roundValue(values.get(indices[2])),
-            roundValue(values.get(indices[3])),
-            roundValue(values.get(indices[4]))
-        );
+                roundValue(values.get(indices[0])),
+                roundValue(values.get(indices[1])),
+                roundValue(values.get(indices[2])),
+                roundValue(values.get(indices[3])),
+                roundValue(values.get(indices[4])));
     }
 
     private void persistPredictions(
-        Long userId,
-        Long foodId,
-        LocalDateTime eatenAt,
-        List<Double> values
-    ) {
+            Long userId,
+            Long foodId,
+            LocalDateTime eatenAt,
+            List<Double> values) {
         if (userId == null || foodId == null || values == null || values.isEmpty()) {
             return;
         }
@@ -357,18 +412,17 @@ public class AiFoodService {
         Double resolvedWeight = resolveWeight(baseWeight, estimatedWeight);
         double ratio = resolveRatio(baseWeight, resolvedWeight);
         String servingSize = resolvedWeight == null
-            ? "1 serving"
-            : String.format("%.0fg", resolvedWeight);
+                ? "1 serving"
+                : String.format("%.0fg", resolvedWeight);
 
         return new AiFoodNutrition(
-            scale(metadata.getCaloriesPerBase(), ratio),
-            servingSize,
-            scale(metadata.getCarbsPerBase(), ratio),
-            scale(metadata.getProteinPerBase(), ratio),
-            scale(metadata.getFatPerBase(), ratio),
-            scale(metadata.getSugarsPerBase(), ratio),
-            scale(metadata.getSodiumPerBase(), ratio)
-        );
+                scale(metadata.getCaloriesPerBase(), ratio),
+                servingSize,
+                scale(metadata.getCarbsPerBase(), ratio),
+                scale(metadata.getProteinPerBase(), ratio),
+                scale(metadata.getFatPerBase(), ratio),
+                scale(metadata.getSugarsPerBase(), ratio),
+                scale(metadata.getSodiumPerBase(), ratio));
     }
 
     private Double resolveWeight(Double baseWeight, Double estimatedWeight) {
