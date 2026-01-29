@@ -1,4 +1,4 @@
-import { alertConfig, AlertType } from "./config";
+import { alertConfig, AlertType } from "./_config";
 
 export type AlertKey = AlertType | "rapid-rise";
 
