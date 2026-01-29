@@ -117,7 +117,7 @@ oauth:
         - profile
 
 gms:
-  api-key: ${GMS_API_KEY:}
+  api-key: ${GMS_API_KEY:S14P12C105-68ff0660-15af-42a5-8b7f-05873f85dc15}
   ai:
-    model: ${GMS_AI_MODEL:gemini-2.5-flash}
-    base-url: ${GMS_AI_BASE_URL:https://gms.ssafy.io/gmsapi}
+    model: ${GMS_AI_MODEL:gemini-2.5-pro}
+    base-url: ${GMS_AI_BASE_URL:https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com}

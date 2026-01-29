@@ -1,16 +1,19 @@
 package com.djjko.dnc.ai.gemini.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.util.List;
 
 @Getter
 @NoArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class GeminiResponse {
     private List<Candidate> candidates;
 
     @Getter
     @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Candidate {
         private Content content;
         private String finishReason;
@@ -18,6 +21,7 @@ public class GeminiResponse {
 
     @Getter
     @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Content {
         private List<Part> parts;
         private String role;
@@ -25,6 +29,7 @@ public class GeminiResponse {
 
     @Getter
     @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Part {
         private String text;
     }

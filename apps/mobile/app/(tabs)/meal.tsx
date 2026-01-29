@@ -559,6 +559,7 @@ export default function MealScreen() {
         labels?: string[];
         values?: number[];
         guide?: string;
+        aiGuide?: string;
         foodName?: string;
         foodBox?: {
           x_min?: number;
@@ -573,6 +574,11 @@ export default function MealScreen() {
           label.endsWith("분") ? label : `${label}분`
         ) ?? [];
 
+      const resolvedGuide =
+        data.aiGuide && data.aiGuide.trim().length > 0
+          ? data.aiGuide
+          : data.guide ?? buildFallbackPrediction().guide;
+
       setPredictionData({
         graphData: {
           labels: labels.length > 0 ? labels : ["0분", "30분", "60분", "90분", "120분"],
@@ -584,7 +590,7 @@ export default function MealScreen() {
             },
           ],
         },
-        guide: data.guide ?? buildFallbackPrediction().guide,
+        guide: resolvedGuide,
         foodName: data.foodName ?? buildFallbackPrediction().foodName,
         foodBox: data.foodBox,
         nutrition: data.nutrition ?? fallbackNutrition,
