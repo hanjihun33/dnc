@@ -53,7 +53,8 @@ public class ReportService {
     }
 
     private double calculatePercent(long part, long total) {
-        if (total == 0) return 0.0;
+        if (total == 0)
+            return 0.0;
         return (double) part / total * 100.0;
     }
 
@@ -90,23 +91,23 @@ public class ReportService {
             saveWeeklyReport(userId, weekStart, report);
 
             weeks.add(MonthlyWeeklyGlucoseReportDto.WeeklyGlucoseReportDto.builder()
-                .weekIndex(weekIndex)
-                .weekStartDate(weekStart)
-                .weekEndDate(weekEnd)
-                .rangeStart(rangeStart)
-                .rangeEnd(rangeEnd)
-                .report(report)
-                .build());
+                    .weekIndex(weekIndex)
+                    .weekStartDate(weekStart)
+                    .weekEndDate(weekEnd)
+                    .rangeStart(rangeStart)
+                    .rangeEnd(rangeEnd)
+                    .report(report)
+                    .build());
 
             cursor = cursor.plusWeeks(1);
             weekIndex++;
         }
 
         return MonthlyWeeklyGlucoseReportDto.builder()
-            .year(year)
-            .month(month)
-            .weeks(weeks)
-            .build();
+                .year(year)
+                .month(month)
+                .weeks(weeks)
+                .build();
     }
 
     public GlucoseReportDto generateMonthlyReportAndSave(Long userId, int year, int month) {
@@ -131,69 +132,68 @@ public class ReportService {
     }
 
     private GlucoseReportDto buildGlucoseReport(
-        Long userId,
-        List<GlucoseData> data,
-        LocalDateTime start,
-        LocalDateTime end,
-        String period
-    ) {
+            Long userId,
+            List<GlucoseData> data,
+            LocalDateTime start,
+            LocalDateTime end,
+            String period) {
         if (data.isEmpty()) {
             return GlucoseReportDto.builder()
-                .userId(userId)
-                .period(period)
-                .startDate(start)
-                .endDate(end)
-                .recordCount(0)
-                .build();
+                    .userId(userId)
+                    .period(period)
+                    .startDate(start)
+                    .endDate(end)
+                    .recordCount(0)
+                    .build();
         }
 
         IntSummaryStatistics stats = data.stream()
-            .mapToInt(GlucoseData::getValue)
-            .summaryStatistics();
+                .mapToInt(GlucoseData::getValue)
+                .summaryStatistics();
 
         double average = stats.getAverage();
         long count = stats.getCount();
 
         double standardDeviation = Math.sqrt(data.stream()
-            .mapToDouble(d -> Math.pow(d.getValue() - average, 2))
-            .sum() / count);
+                .mapToDouble(d -> Math.pow(d.getValue() - average, 2))
+                .sum() / count);
 
         TirThresholds thresholds = resolveTirThresholds(userId);
         long veryLowCount = data.stream().filter(d -> d.getValue() < thresholds.veryLowUpperExclusive).count();
         long lowCount = data.stream().filter(d -> d.getValue() >= thresholds.veryLowUpperExclusive
-            && d.getValue() <= thresholds.lowUpperInclusive).count();
+                && d.getValue() <= thresholds.lowUpperInclusive).count();
         long inRangeCount = data.stream().filter(d -> d.getValue() > thresholds.lowUpperInclusive
-            && d.getValue() <= thresholds.inRangeUpperInclusive).count();
+                && d.getValue() <= thresholds.inRangeUpperInclusive).count();
         long highCount = data.stream().filter(d -> d.getValue() > thresholds.inRangeUpperInclusive
-            && d.getValue() <= thresholds.highUpperInclusive).count();
+                && d.getValue() <= thresholds.highUpperInclusive).count();
         long veryHighCount = data.stream().filter(d -> d.getValue() > thresholds.highUpperInclusive).count();
 
         GlucoseReportDto.TimeInRangeDto tirDto = GlucoseReportDto.TimeInRangeDto.builder()
-            .veryLowPercent(calculatePercent(veryLowCount, count))
-            .lowPercent(calculatePercent(lowCount, count))
-            .inRangePercent(calculatePercent(inRangeCount, count))
-            .highPercent(calculatePercent(highCount, count))
-            .veryHighPercent(calculatePercent(veryHighCount, count))
-            .build();
+                .veryLowPercent(calculatePercent(veryLowCount, count))
+                .lowPercent(calculatePercent(lowCount, count))
+                .inRangePercent(calculatePercent(inRangeCount, count))
+                .highPercent(calculatePercent(highCount, count))
+                .veryHighPercent(calculatePercent(veryHighCount, count))
+                .build();
 
         return GlucoseReportDto.builder()
-            .userId(userId)
-            .period(period)
-            .startDate(start)
-            .endDate(end)
-            .recordCount((int) count)
-            .averageGlucose((int) average)
-            .maxGlucose(stats.getMax())
-            .minGlucose(stats.getMin())
-            .standardDeviation(standardDeviation)
-            .timeInRange(tirDto)
-            .build();
+                .userId(userId)
+                .period(period)
+                .startDate(start)
+                .endDate(end)
+                .recordCount((int) count)
+                .averageGlucose((int) average)
+                .maxGlucose(stats.getMax())
+                .minGlucose(stats.getMin())
+                .standardDeviation(standardDeviation)
+                .timeInRange(tirDto)
+                .build();
     }
 
     private void saveMonthlyReport(Long userId, int year, int month, GlucoseReportDto report) {
         MonthlyReport entity = monthlyReportRepository
-            .findByUserIdAndYearAndMonth(userId, year, month)
-            .orElseGet(MonthlyReport::new);
+                .findByUserIdAndYearAndMonth(userId, year, month)
+                .orElseGet(MonthlyReport::new);
 
         entity.setUserId(userId);
         entity.setYear(year);
@@ -203,6 +203,7 @@ public class ReportService {
         entity.setMaxGlucose(report.getMaxGlucose());
         entity.setMinGlucose(report.getMinGlucose());
         entity.setStandardDeviation(report.getStandardDeviation());
+        entity.setAiAnalysis(report.getAiAnalysis());
 
         applyTimeInRange(entity, report);
 
@@ -211,8 +212,8 @@ public class ReportService {
 
     private void saveWeeklyReport(Long userId, LocalDate weekStartDate, GlucoseReportDto report) {
         WeeklyReport entity = weeklyReportRepository
-            .findByUserIdAndWeekStartDate(userId, weekStartDate)
-            .orElseGet(WeeklyReport::new);
+                .findByUserIdAndWeekStartDate(userId, weekStartDate)
+                .orElseGet(WeeklyReport::new);
 
         entity.setUserId(userId);
         entity.setWeekStartDate(weekStartDate);
@@ -221,6 +222,7 @@ public class ReportService {
         entity.setMaxGlucose(report.getMaxGlucose());
         entity.setMinGlucose(report.getMinGlucose());
         entity.setStandardDeviation(report.getStandardDeviation());
+        entity.setAiAnalysis(report.getAiAnalysis());
 
         applyTimeInRange(entity, report);
 
@@ -229,8 +231,8 @@ public class ReportService {
 
     private TirThresholds resolveTirThresholds(Long userId) {
         DiabetesType diabetesType = userRepository.findById(userId)
-            .map(user -> user.getDiabetesType())
-            .orElse(null);
+                .map(user -> user.getDiabetesType())
+                .orElse(null);
 
         if (diabetesType == null) {
             return DEFAULT_TIR;
@@ -290,7 +292,8 @@ public class ReportService {
         private final int inRangeUpperInclusive;
         private final int highUpperInclusive;
 
-        private TirThresholds(int veryLowUpperExclusive, int lowUpperInclusive, int inRangeUpperInclusive, int highUpperInclusive) {
+        private TirThresholds(int veryLowUpperExclusive, int lowUpperInclusive, int inRangeUpperInclusive,
+                int highUpperInclusive) {
             this.veryLowUpperExclusive = veryLowUpperExclusive;
             this.lowUpperInclusive = lowUpperInclusive;
             this.inRangeUpperInclusive = inRangeUpperInclusive;

@@ -14,7 +14,7 @@ import java.time.format.DateTimeFormatter;
 @RequiredArgsConstructor
 public class AiReportService {
 
-    private final GoogleAiService googleAiService;
+    private final GeminiService geminiService;
 
     public String generateAnalysis(User user, GlucoseReportDto report) {
         if (report.getRecordCount() == 0) {
@@ -22,7 +22,7 @@ public class AiReportService {
         }
 
         String prompt = buildPrompt(user, report);
-        return googleAiService.generateContent(prompt);
+        return geminiService.generateContent(prompt);
     }
 
     private String buildPrompt(User user, GlucoseReportDto report) {

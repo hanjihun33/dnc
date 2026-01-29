@@ -2,10 +2,12 @@ package com.djjko.dnc.report.dto;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
 @Getter
+@Setter
 @Builder
 public class GlucoseReportDto {
     private Long userId;
