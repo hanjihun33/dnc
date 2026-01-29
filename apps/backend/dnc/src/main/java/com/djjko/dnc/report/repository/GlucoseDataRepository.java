@@ -14,5 +14,13 @@ public interface GlucoseDataRepository extends JpaRepository<GlucoseData, Long> 
         LocalDateTime end
     );
 
+    List<GlucoseData> findAllByUser_UserIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(
+        Long userId,
+        LocalDateTime start,
+        LocalDateTime end
+    );
+
     GlucoseData findTopByUser_UserIdOrderByMeasuredAtDesc(Long userId);
+
+    boolean existsByUser_UserIdAndMeasuredAtBefore(Long userId, LocalDateTime measuredAt);
 }
