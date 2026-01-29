@@ -212,9 +212,24 @@ public class CgmPipelineService {
 
     private Sensor getOrRotateSensor(User user, DexcomResponse.Record record) {
         String incomingDeviceId = record.getTransmitterId();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime endsAt = now.plusDays(10);
 
         // 현재 ACTIVE 상태인 동일 기기 확인
         return sensorRepository.findByDeviceIdAndStatus(incomingDeviceId, Sensor.SensorStatus.ACTIVE)
+                .map(activeSensor -> {
+                    if (activeSensor.getStartedAt() == null || activeSensor.getEndedAt() == null) {
+                        LocalDateTime start = activeSensor.getStartedAt() != null
+                                ? activeSensor.getStartedAt()
+                                : now;
+                        LocalDateTime end = activeSensor.getEndedAt() != null
+                                ? activeSensor.getEndedAt()
+                                : start.plusDays(10);
+                        activeSensor.updatePeriod(start, end);
+                        return sensorRepository.save(activeSensor);
+                    }
+                    return activeSensor;
+                })
                 .orElseGet(() -> {
                     log.info("센서 상태 변경 감지: {}", incomingDeviceId);
 
@@ -222,6 +237,7 @@ public class CgmPipelineService {
                     sensorRepository.findByUserAndStatus(user, Sensor.SensorStatus.ACTIVE)
                             .ifPresent(oldSensor -> {
                                 oldSensor.changeStatus(Sensor.SensorStatus.INACTIVE);
+                                oldSensor.updateEndedAt(now);
                                 sensorRepository.saveAndFlush(oldSensor);
                             });
 
@@ -229,6 +245,7 @@ public class CgmPipelineService {
                     return sensorRepository.findByDeviceId(incomingDeviceId)
                             .map(existing -> {
                                 existing.changeStatus(Sensor.SensorStatus.ACTIVE);
+                                existing.updatePeriod(now, endsAt);
                                 return sensorRepository.save(existing);
                             })
                             .orElseGet(() -> createNewSensor(user, record));
@@ -236,12 +253,14 @@ public class CgmPipelineService {
     }
 
     private Sensor createNewSensor(User user, DexcomResponse.Record record) {
+        LocalDateTime now = LocalDateTime.now();
         Sensor newSensor = Sensor.builder()
                 .user(user)
                 .deviceId(record.getTransmitterId())
                 .provider("Dexcom")
                 .status(Sensor.SensorStatus.ACTIVE)
-                .startedAt(LocalDateTime.now())
+                .startedAt(now)
+                .endedAt(now.plusDays(10))
                 .build();
         return sensorRepository.save(newSensor);
     }

@@ -35,4 +35,6 @@ public class UserProfileResponse {
     private BigDecimal weightKg;
     @Schema(example = "https://example.com/profile.jpg")
     private String profileImageUrl;
+    @Schema(example = "true")
+    private Boolean sensorConnected;
 }

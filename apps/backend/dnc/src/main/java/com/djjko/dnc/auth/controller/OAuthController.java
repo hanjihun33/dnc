@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import com.djjko.dnc.auth.dto.response.OAuthAuthorizeResponse;
 
 @Slf4j
 @RestController
@@ -76,6 +77,21 @@ public class OAuthController {
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(URI.create(authorizeUrl));
         return new ResponseEntity<>(headers, HttpStatus.FOUND);
+    }
+
+    @GetMapping("/{provider}/authorize-url")
+    @Operation(summary = "OAuth 인가 URL 조회")
+    public OAuthAuthorizeResponse authorizeUrl(
+        @PathVariable String provider,
+        @RequestParam(required = false) String state,
+        HttpServletRequest request
+    ) {
+        String clientState = (state == null || state.isBlank()) ? UUID.randomUUID().toString() : state;
+        String resolvedState = resolveAuthenticatedUserOrHeader(request)
+            .map(user -> oAuthStateService.issueState(user, clientState))
+            .orElse(clientState);
+        String authorizeUrl = oAuthService.buildAuthorizeUrl(provider, resolvedState);
+        return new OAuthAuthorizeResponse(authorizeUrl);
     }
 
     @GetMapping("/{provider}/callback")
