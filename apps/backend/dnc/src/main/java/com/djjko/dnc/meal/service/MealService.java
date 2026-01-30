@@ -35,12 +35,11 @@ public class MealService {
     private final FoodMetadataRepository foodMetadataRepository;
 
     public MealService(
-        FoodRecordRepository repository,
-        FileStorageService fileStorageService,
-        AiFoodService aiFoodService,
-        FoodAnalysisRepository foodAnalysisRepository,
-        FoodMetadataRepository foodMetadataRepository
-    ) {
+            FoodRecordRepository repository,
+            FileStorageService fileStorageService,
+            AiFoodService aiFoodService,
+            FoodAnalysisRepository foodAnalysisRepository,
+            FoodMetadataRepository foodMetadataRepository) {
         this.repository = repository;
         this.fileStorageService = fileStorageService;
         this.aiFoodService = aiFoodService;
@@ -49,14 +48,13 @@ public class MealService {
     }
 
     public MealResponse create(
-        Long userId,
-        MultipartFile image,
-        String foodName,
-        Double carbsGrams,
-        String mealType,
-        String eatenAt,
-        String memo
-    ) {
+            Long userId,
+            MultipartFile image,
+            String foodName,
+            Double carbsGrams,
+            String mealType,
+            String eatenAt,
+            String memo) {
         FoodRecord record = new FoodRecord();
         record.setUserId(userId);
         record.setFoodName(foodName);
@@ -77,12 +75,11 @@ public class MealService {
         if (image != null && !image.isEmpty()) {
             try {
                 aiFoodService.analyzeAndPersist(
-                    userId,
-                    savedRecord.getFoodId(),
-                    savedRecord.getEatenAt(),
-                    image,
-                    null
-                );
+                        userId,
+                        savedRecord.getFoodId(),
+                        savedRecord.getEatenAt(),
+                        image,
+                        null);
             } catch (Exception ex) {
                 log.warn("Failed to persist AI analysis for meal {}: {}", savedRecord.getFoodId(), ex.getMessage());
             }
@@ -94,8 +91,8 @@ public class MealService {
     @Transactional(readOnly = true)
     public List<MealResponse> findAll(Long userId) {
         return repository.findByUserIdOrderByRecordedAtDesc(userId).stream()
-            .map(this::buildMealResponse)
-            .toList();
+                .map(this::buildMealResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -154,12 +151,11 @@ public class MealService {
         }
         NutritionSummary nutrition = resolveNutrition(record.getFoodId());
         return MealResponse.from(
-            record,
-            nutrition == null ? null : nutrition.calories(),
-            nutrition == null ? null : nutrition.carbs(),
-            nutrition == null ? null : nutrition.protein(),
-            nutrition == null ? null : nutrition.fat(),
-            nutrition == null ? null : nutrition.foodName());
+                record,
+                nutrition == null ? null : nutrition.calories(),
+                nutrition == null ? null : nutrition.carbs(),
+                nutrition == null ? null : nutrition.protein(),
+                nutrition == null ? null : nutrition.fat());
     }
 
     private NutritionSummary resolveNutrition(Long foodId) {
@@ -167,7 +163,7 @@ public class MealService {
             return null;
         }
         Optional<FoodAnalysis> analysis = foodAnalysisRepository
-            .findTopByFoodIdOrderByAnalyzedAtDesc(foodId);
+                .findTopByFoodIdOrderByAnalyzedAtDesc(foodId);
         if (analysis.isEmpty()) {
             return null;
         }
@@ -221,10 +217,10 @@ public class MealService {
     }
 
     private record NutritionSummary(
-        Integer calories,
-        Integer carbs,
-        Integer protein,
-        Integer fat,
-        String foodName
-    ) {}
+            Integer calories,
+            Integer carbs,
+            Integer protein,
+            Integer fat,
+            String foodName) {
+    }
 }

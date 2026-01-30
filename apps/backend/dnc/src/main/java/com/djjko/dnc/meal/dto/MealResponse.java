@@ -19,13 +19,12 @@ public record MealResponse(
         Integer calories,
         Integer carbs,
         Integer protein,
-        Integer fat,
-        String foodName) {
+        Integer fat) {
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     public static MealResponse from(FoodRecord record) {
-        return from(record, null, null, null, null, null);
+        return from(record, null, null, null, null);
     }
 
     public static MealResponse from(
@@ -33,8 +32,7 @@ public record MealResponse(
             Integer calories,
             Integer carbs,
             Integer protein,
-            Integer fat,
-            String foodName) {
+            Integer fat) {
         return new MealResponse(
                 record.getFoodId(),
                 record.getUserId(),
@@ -50,8 +48,7 @@ public record MealResponse(
                 calories,
                 carbs,
                 protein,
-                fat,
-                foodName);
+                fat);
     }
 
     private static String formatDate(LocalDateTime value) {
