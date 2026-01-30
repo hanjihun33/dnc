@@ -77,6 +77,7 @@ oauth:
       redirect-uri: ${DEXCOM_REDIRECT_URI:http://192.168.100.44:8080/api/v1/oauth/dexcom/callback}
       auth-uri: ${DEXCOM_AUTH_URI:https://sandbox-api.dexcom.com/v3/oauth2/login}
       token-uri: ${DEXCOM_TOKEN_URI:https://sandbox-api.dexcom.com/v3/oauth2/token}
+      revoke-uri: ${DEXCOM_REVOKE_URI:}
       api-base: ${DEXCOM_API_BASE:https://sandbox-api.dexcom.com/v3}
       scopes:
         - offline_access

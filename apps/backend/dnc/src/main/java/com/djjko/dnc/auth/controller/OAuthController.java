@@ -1,6 +1,7 @@
 package com.djjko.dnc.auth.controller;
 
 import java.net.URI;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import com.djjko.dnc.auth.dto.response.OAuthTokenResponse;
@@ -10,6 +11,9 @@ import com.djjko.dnc.auth.service.oauth.OAuthStateService;
 import com.djjko.dnc.auth.service.oauth.OAuthTokenService;
 import com.djjko.dnc.auth.repository.UserRepository;
 import com.djjko.dnc.auth.security.JwtUtil;
+import com.djjko.dnc.glucose.entity.Sensor;
+import com.djjko.dnc.glucose.repository.SensorRepository;
+import com.djjko.dnc.report.repository.GlucoseDataRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +26,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,6 +45,8 @@ public class OAuthController {
     private final OAuthStateService oAuthStateService;
     private final OAuthTokenService oAuthTokenService;
     private final UserRepository userRepository;
+    private final SensorRepository sensorRepository;
+    private final GlucoseDataRepository glucoseDataRepository;
     private final JwtUtil jwtUtil;
     private final ObjectMapper objectMapper;
 
@@ -48,6 +55,8 @@ public class OAuthController {
         OAuthStateService oAuthStateService,
         OAuthTokenService oAuthTokenService,
         UserRepository userRepository,
+        SensorRepository sensorRepository,
+        GlucoseDataRepository glucoseDataRepository,
         JwtUtil jwtUtil,
         ObjectMapper objectMapper
     ) {
@@ -55,12 +64,14 @@ public class OAuthController {
         this.oAuthStateService = oAuthStateService;
         this.oAuthTokenService = oAuthTokenService;
         this.userRepository = userRepository;
+        this.sensorRepository = sensorRepository;
+        this.glucoseDataRepository = glucoseDataRepository;
         this.jwtUtil = jwtUtil;
         this.objectMapper = objectMapper;
     }
 
     @GetMapping("/{provider}/authorize")
-    @Operation(summary = "OAuth 인가 URL 요청")
+    @Operation(summary = "OAuth authorize URL redirect")
     public ResponseEntity<Void> authorize(
         @PathVariable String provider,
         @RequestParam(required = false) String state,
@@ -80,7 +91,7 @@ public class OAuthController {
     }
 
     @GetMapping("/{provider}/authorize-url")
-    @Operation(summary = "OAuth 인가 URL 조회")
+    @Operation(summary = "OAuth authorize URL")
     public OAuthAuthorizeResponse authorizeUrl(
         @PathVariable String provider,
         @RequestParam(required = false) String state,
@@ -95,7 +106,7 @@ public class OAuthController {
     }
 
     @GetMapping("/{provider}/callback")
-    @Operation(summary = "OAuth 콜백 처리")
+    @Operation(summary = "OAuth callback handler")
     public ResponseEntity<?> callback(
         @PathVariable String provider,
         @RequestParam String code,
@@ -116,7 +127,7 @@ public class OAuthController {
     }
 
     @PostMapping("/{provider}/token")
-    @Operation(summary = "OAuth 토큰 발급 및 저장")
+    @Operation(summary = "OAuth token exchange")
     public OAuthTokenResponse exchangeAndStore(
         @PathVariable String provider,
         @RequestParam String code
@@ -129,7 +140,7 @@ public class OAuthController {
     }
 
     @PostMapping("/{provider}/refresh")
-    @Operation(summary = "OAuth 토큰 갱신")
+    @Operation(summary = "OAuth token refresh")
     public OAuthTokenResponse refreshToken(@PathVariable String provider) {
         com.djjko.dnc.auth.entity.User user = resolveRequiredUser();
         String refreshToken = oAuthTokenService.getToken(user, provider).getRefreshToken();
@@ -141,8 +152,35 @@ public class OAuthController {
         return response;
     }
 
+    @PostMapping("/{provider}/disconnect")
+    @Operation(summary = "OAuth disconnect")
+    @Transactional
+    public ResponseEntity<Void> disconnect(
+        @PathVariable String provider,
+        @RequestParam(defaultValue = "false") boolean deleteData
+    ) {
+        User user = resolveRequiredUser();
+
+        oAuthTokenService.findToken(user, provider)
+            .ifPresent(token -> oAuthService.revokeToken(provider, token));
+
+        oAuthTokenService.deleteToken(user, provider);
+
+        if ("dexcom".equalsIgnoreCase(provider)) {
+            user.setDexcomUserId(null);
+            userRepository.save(user);
+            deactivateSensors(user);
+            if (deleteData) {
+                glucoseDataRepository.deleteAllByUser_UserId(user.getUserId());
+                sensorRepository.deleteAllByUser_UserId(user.getUserId());
+            }
+        }
+
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{provider}/egvs")
-    @Operation(summary = "CGM 혈당 데이터 조회")
+    @Operation(summary = "CGM EGV data")
     public ResponseEntity<String> fetchEgvs(
         @PathVariable String provider,
         @Parameter(description = "Start date (YYYY-MM-DDTHH:mm:ss)", example = "2026-01-27T00:00:00")
@@ -157,7 +195,7 @@ public class OAuthController {
     }
 
     @GetMapping("/{provider}/data-range")
-    @Operation(summary = "CGM 데이터 범위 조회")
+    @Operation(summary = "CGM data range")
     public ResponseEntity<String> fetchDataRange(
         @PathVariable String provider,
         @RequestParam(required = false) String lastSyncTime
@@ -238,8 +276,23 @@ public class OAuthController {
         }
     }
 
+    private void deactivateSensors(User user) {
+        java.util.List<Sensor> activeSensors =
+            sensorRepository.findAllByUserAndStatus(user, Sensor.SensorStatus.ACTIVE);
+        if (activeSensors.isEmpty()) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        for (Sensor sensor : activeSensors) {
+            sensor.changeStatus(Sensor.SensorStatus.INACTIVE);
+            sensor.updateEndedAt(now);
+        }
+        sensorRepository.saveAll(activeSensors);
+    }
+
     private com.djjko.dnc.auth.entity.User resolveRequiredUser() {
         return resolveAuthenticatedUser()
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Login required"));
     }
 }
+

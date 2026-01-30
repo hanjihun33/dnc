@@ -23,4 +23,6 @@ public interface GlucoseDataRepository extends JpaRepository<GlucoseData, Long> 
     GlucoseData findTopByUser_UserIdOrderByMeasuredAtDesc(Long userId);
 
     boolean existsByUser_UserIdAndMeasuredAtBefore(Long userId, LocalDateTime measuredAt);
+
+    void deleteAllByUser_UserId(Long userId);
 }

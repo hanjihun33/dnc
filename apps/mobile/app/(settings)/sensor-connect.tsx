@@ -1,5 +1,6 @@
-import React from "react";
+﻿import React from "react";
 import {
+  Alert,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -9,8 +10,14 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import * as WebBrowser from "expo-web-browser";
-import { getAuthHeaders, loadAuthSession } from "../session";
+import {
+  bumpProfileRevision,
+  getAuthHeaders,
+  loadAuthSession,
+  subscribeProfileRevision,
+} from "../session";
 
 const palette = {
   background: "#F8FAFC",
@@ -19,6 +26,8 @@ const palette = {
   text: "#0F172A",
   textMuted: "#64748B",
   accent: "#FACC15",
+  danger: "#EF4444",
+  dangerSoft: "#FEE2E2",
 };
 
 const API_BASE_URL =
@@ -27,6 +36,39 @@ const API_BASE_URL =
 export default function SensorConnectScreen() {
   const router = useRouter();
   const [isConnecting, setIsConnecting] = React.useState(false);
+  const [isDisconnecting, setIsDisconnecting] = React.useState(false);
+  const [sensorConnected, setSensorConnected] = React.useState(false);
+
+  const loadProfile = React.useCallback(async () => {
+    try {
+      await loadAuthSession();
+      const response = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
+        headers: getAuthHeaders(),
+      });
+      if (!response.ok) {
+        return;
+      }
+      const profile = (await response.json()) as {
+        sensorConnected?: boolean | null;
+      };
+      setSensorConnected(Boolean(profile.sensorConnected));
+    } catch {
+      // Ignore profile load errors.
+    }
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      void loadProfile();
+    }, [loadProfile])
+  );
+
+  React.useEffect(() => {
+    const unsubscribe = subscribeProfileRevision(() => {
+      void loadProfile();
+    });
+    return unsubscribe;
+  }, [loadProfile]);
 
   const handleDexcomConnect = async () => {
     if (isConnecting) return;
@@ -52,17 +94,52 @@ export default function SensorConnectScreen() {
     }
   };
 
+  const handleDexcomDisconnect = async () => {
+    if (isDisconnecting) return;
+    setIsDisconnecting(true);
+    try {
+      await loadAuthSession();
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/oauth/dexcom/disconnect`,
+        {
+          method: "POST",
+          headers: getAuthHeaders(),
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Dexcom 연동 해제에 실패했습니다.");
+      }
+      setSensorConnected(false);
+      bumpProfileRevision();
+    } catch {
+      Alert.alert("연동 해제 실패", "잠시 후 다시 시도해주세요.");
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
+  const confirmDisconnect = () => {
+    Alert.alert(
+      "Dexcom 연동 해제",
+      "Dexcom 연동을 해제할까요?",
+      [
+        { text: "취소", style: "cancel" },
+        { text: "연동 해제", style: "destructive", onPress: handleDexcomDisconnect },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.container}>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backIcon}>←</Text>
+          <Text style={styles.backIcon}>{"<"}</Text>
         </Pressable>
 
-        <Text style={styles.title}>사용하실 센서 선택</Text>
+        <Text style={styles.title}>센서 연결 정보</Text>
         <Text style={styles.subtitle}>
-          센서란 실시간으로 혈당을 모니터링할 수 있는{"\n"}
+          센서는 실시간으로 혈당을 모니터링하는{"\n"}
           연속혈당측정기(CGM)를 의미합니다.
         </Text>
 
@@ -78,9 +155,27 @@ export default function SensorConnectScreen() {
             <View style={styles.deviceBase} />
           </View>
           <Text style={styles.sensorName}>Dexcom G7</Text>
-          <Text style={styles.sensorHint}>
-            {isConnecting ? "연동 준비 중..." : "탭하여 연동하기"}
-          </Text>
+          {isConnecting ? (
+            <Text style={styles.sensorHint}>연동 중..</Text>
+          ) : sensorConnected ? (
+            <View style={styles.sensorHintRow}>
+              <Text style={styles.sensorHint}>연동됨</Text>
+              <Pressable
+                style={[
+                  styles.disconnectInlineButton,
+                  isDisconnecting && styles.disconnectInlineButtonDisabled,
+                ]}
+                onPress={confirmDisconnect}
+                disabled={isDisconnecting}
+              >
+                <Text style={styles.disconnectInlineText}>
+                  {isDisconnecting ? "해제 중.." : "연동 해제"}
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Text style={styles.sensorHint}>연동하기</Text>
+          )}
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -172,4 +267,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 6,
   },
+  sensorHintRow: {
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  disconnectInlineButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: palette.danger,
+    backgroundColor: palette.dangerSoft,
+  },
+  disconnectInlineButtonDisabled: {
+    opacity: 0.6,
+  },
+  disconnectInlineText: {
+    color: palette.danger,
+    fontSize: 12,
+    fontWeight: "700",
+  },
 });
+

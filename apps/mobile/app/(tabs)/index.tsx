@@ -65,13 +65,12 @@ type MealSummary = {
   eatenAt?: string | null;
   imageUrl?: string | null;
   memo?: string | null;
-};
-
-const mealTypeLabel: Record<string, string> = {
-  BREAKFAST: "아침",
-  LUNCH: "점심",
-  DINNER: "저녁",
-  SNACK: "간식",
+  aiGuide?: string | null;
+  calories?: number | null;
+  carbs?: number | null;
+  protein?: number | null;
+  fat?: number | null;
+  foodName?: string | null;
 };
 
 const pad2 = (value: number) => String(value).padStart(2, "0");
@@ -131,6 +130,34 @@ const parseLocalDateTime = (value: string | null) => {
 };
 
 const formatClock = (date: Date) => `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+
+const formatMealTime = (date: Date) => {
+  const hour = date.getHours();
+  const period = hour < 12 ? "오전" : "오후";
+  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${period} ${displayHour}:${pad2(date.getMinutes())}`;
+};
+
+const calcMacroPercents = (
+  carbs?: number | null,
+  protein?: number | null,
+  fat?: number | null
+) => {
+  if (carbs == null || protein == null || fat == null) {
+    return null;
+  }
+  const safeCarbs = Math.max(0, carbs);
+  const safeProtein = Math.max(0, protein);
+  const safeFat = Math.max(0, fat);
+  const totalCalories = safeCarbs * 4 + safeProtein * 4 + safeFat * 9;
+  if (totalCalories <= 0) {
+    return null;
+  }
+  const carbPercent = Math.round((safeCarbs * 4 * 100) / totalCalories);
+  const proteinPercent = Math.round((safeProtein * 4 * 100) / totalCalories);
+  const fatPercent = Math.max(0, 100 - carbPercent - proteinPercent);
+  return { carbPercent, proteinPercent, fatPercent };
+};
 
 const roundToFiveMinutes = (date: Date) => {
   const rounded = new Date(date);
@@ -279,6 +306,14 @@ export default function HomeScreen() {
     setSelectedDate(next);
   };
 
+  const openAllMeals = () => {
+    router.push("/(tabs)/meal");
+  };
+
+  const openMealDetail = (mealId?: number) => {
+    router.push("/(tabs)/meal");
+  };
+
   const fetchRealtime = React.useCallback(
     async (start: Date, end: Date, mode: "replace" | "prepend") => {
       await loadAuthSession();
@@ -412,7 +447,8 @@ export default function HomeScreen() {
   useFocusEffect(
     React.useCallback(() => {
       void fetchProfile();
-    }, [fetchProfile])
+      void fetchMeals();
+    }, [fetchMeals, fetchProfile])
   );
 
   React.useEffect(() => {
@@ -947,54 +983,59 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <Text style={styles.sectionTitle}>오늘의 식단</Text>
-          <View style={styles.card}>
-            {todayMeals.length === 0 ? (
-              <>
-                <Text style={styles.cardTitle}>등록된 식단이 없어요</Text>
-                <Text style={styles.cardDesc}>
-                  식단 탭에서 사진을 추가하고 혈당 변화를 확인해보세요.
-                </Text>
-                <TouchableOpacity
-                  style={styles.callout}
-                  onPress={() => router.push("/(tabs)/meal")}
-                >
-                  <Text style={styles.calloutText}>식단 기록하러 가기 →</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <Text style={styles.cardTitle}>오늘 기록한 식단</Text>
-                <View style={styles.mealList}>
-                  {todayMeals.slice(0, 3).map((meal) => {
-                    const eaten = parseLocalDateTime(meal.eatenAt ?? null);
-                    const timeLabel = eaten ? formatClock(eaten) : "--:--";
-                    const typeLabel = meal.mealType
-                      ? mealTypeLabel[meal.mealType] ?? meal.mealType
-                      : "식사";
-                    return (
-                      <View key={meal.mealId ?? `${meal.eatenAt}-${meal.mealType}`}>
-                        <View style={styles.mealRow}>
-                          <Text style={styles.mealTime}>{timeLabel}</Text>
-                          <Text style={styles.mealType}>{typeLabel}</Text>
-                          <Text style={styles.mealNote}>
-                            {meal.memo ? meal.memo : "기록 완료"}
-                          </Text>
-                        </View>
-                        <View style={styles.mealDivider} />
-                      </View>
-                    );
-                  })}
-                </View>
-                <TouchableOpacity
-                  style={styles.callout}
-                  onPress={() => router.push("/(tabs)/meal")}
-                >
-                  <Text style={styles.calloutText}>전체 식단 보기 →</Text>
-                </TouchableOpacity>
-              </>
-            )}
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>기록</Text>
+            <Pressable style={styles.sectionLink} onPress={openAllMeals}>
+              <Text style={styles.sectionLinkText}>더보기</Text>
+              <Text style={styles.sectionLinkChevron}>›</Text>
+            </Pressable>
           </View>
+
+          {todayMeals.length === 0 ? (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>등록된 식단이 없어요</Text>
+              <Text style={styles.cardDesc}>
+                식단 탭에서 사진을 추가하고 혈당 변화를 확인해보세요.
+              </Text>
+              <TouchableOpacity style={styles.callout} onPress={openAllMeals}>
+                <Text style={styles.calloutText}>식단 기록하러 가기 →</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.mealCardList}>
+              {todayMeals.slice(0, 2).map((meal) => {
+                const eaten = parseLocalDateTime(meal.eatenAt ?? null);
+                const timeLabel = eaten ? formatMealTime(eaten) : "--:--";
+                const title = meal.memo || meal.foodName || "기록 완료";
+                const caloriesText =
+                  meal.calories != null ? `${meal.calories}kcal` : "--kcal";
+                const macroPercents = calcMacroPercents(
+                  meal.carbs,
+                  meal.protein,
+                  meal.fat
+                );
+                const macroText = macroPercents
+                  ? `탄 ${macroPercents.carbPercent}% · 단 ${macroPercents.proteinPercent}% · 지 ${macroPercents.fatPercent}%`
+                  : "탄 --% · 단 --% · 지 --%";
+                return (
+                  <Pressable
+                    key={meal.mealId ?? `${meal.eatenAt}-${meal.mealType}`}
+                    style={styles.mealCard}
+                    onPress={() => openMealDetail(meal.mealId)}
+                  >
+                    <View style={styles.mealCardHeader}>
+                      <Text style={styles.mealTitle} numberOfLines={1}>
+                        {title}
+                      </Text>
+                      <Text style={styles.mealCalories}>{caloriesText}</Text>
+                    </View>
+                    <Text style={styles.mealTimeLabel}>{timeLabel}</Text>
+                    <Text style={styles.mealMacroText}>{macroText}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
 
           {isLoading && (
             <Text style={styles.loadingText}>혈당 데이터를 불러오는 중...</Text>
@@ -1396,6 +1437,28 @@ const styles = StyleSheet.create({
     marginTop: 18,
     marginBottom: 12,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 18,
+    marginBottom: 12,
+  },
+  sectionLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  sectionLinkText: {
+    color: palette.textMuted,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  sectionLinkChevron: {
+    color: palette.textMuted,
+    fontSize: 16,
+    marginTop: -1,
+  },
   card: {
     backgroundColor: palette.card,
     borderRadius: 22,
@@ -1436,6 +1499,86 @@ const styles = StyleSheet.create({
     color: "#92400E",
     fontWeight: "700",
     fontSize: 13,
+  },
+  mealCardList: {
+    gap: 14,
+    marginBottom: 12,
+  },
+  mealCard: {
+    backgroundColor: "#0F172A",
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.2)",
+  },
+  mealCardHeader: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  mealCardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  mealImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
+    marginRight: 14,
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+  },
+  mealImagePlaceholder: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
+    marginRight: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(30, 41, 59, 0.8)",
+  },
+  mealImagePlaceholderText: { fontSize: 22 },
+  mealInfo: {
+    flex: 1,
+  },
+  mealTypeBadge: {
+    color: "#E2E8F0",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  mealTitle: {
+    color: "#F8FAFC",
+    fontSize: 18,
+    fontWeight: "700",
+    flex: 1,
+    marginRight: 8,
+  },
+  mealCalories: {
+    color: "#FACC15",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  mealTimeLabel: {
+    color: "rgba(226, 232, 240, 0.7)",
+    fontSize: 12,
+    marginTop: 6,
+  },
+  mealMacroText: {
+    color: "rgba(226, 232, 240, 0.6)",
+    fontSize: 12,
+    marginTop: 8,
+  },
+  mealDetailLink: {
+    color: "rgba(226, 232, 240, 0.8)",
+    fontSize: 13,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  mealGuide: {
+    color: "rgba(226, 232, 240, 0.6)",
+    fontSize: 12,
+    marginTop: 12,
+    lineHeight: 16,
   },
   mealList: { marginTop: 12 },
   mealRow: {
