@@ -361,6 +361,29 @@ public class AiFoodService {
         }
 
         glucosePredictionRepository.saveAll(predictions);
+        updatePeakGlucose(foodId, values);
+    }
+
+    private void updatePeakGlucose(Long foodId, List<Double> values) {
+        Integer peak = null;
+        for (Double value : values) {
+            if (value == null) {
+                continue;
+            }
+            int rounded = roundValue(value);
+            if (peak == null || rounded > peak) {
+                peak = rounded;
+            }
+        }
+        if (peak == null) {
+            return;
+        }
+        final int peakValue = peak;
+        foodRecordRepository.findById(foodId).ifPresent(record -> {
+            record.setPeakGlucose(peakValue);
+            record.setUpdatedAt(LocalDateTime.now());
+            foodRecordRepository.save(record);
+        });
     }
 
     private List<Integer> resolvePredictionOffsets(int size) {
