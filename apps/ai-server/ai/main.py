@@ -1,6 +1,6 @@
 from fastapi import FastAPI, File, UploadFile
 from typing import Optional
-from settings.schema import InfoRequest, LearningRequest
+from settings.schema import InfoRequest, ModelUpdateRequest
 from services.food_detection import food
 from services.glucose_prediction import glucose_pred
 from services.update_parameter import parameter_update
@@ -32,7 +32,7 @@ def predictions(data: InfoRequest) -> dict:
     return {"result": result} 
 
 # 3. 개인의 가중치 업데이트
-@app.post("/api/v1/learning/events")
-def learning(data: LearningRequest) -> dict:
-    result = parameter_update.update(data)
+@app.post("/api/v1/model/update")
+def learning(data: ModelUpdateRequest) -> dict:
+    result = parameter_update.update_slopes(data)
     return {"result": result}
