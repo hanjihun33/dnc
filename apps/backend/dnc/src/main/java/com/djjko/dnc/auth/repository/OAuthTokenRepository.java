@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface OAuthTokenRepository extends JpaRepository<OAuthToken, Long> {
 
     Optional<OAuthToken> findByUserUserIdAndProvider(Long userId, String provider);
+
+    void deleteByUserUserIdAndProvider(Long userId, String provider);
 }
