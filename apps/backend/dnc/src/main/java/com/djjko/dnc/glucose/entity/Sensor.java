@@ -28,6 +28,7 @@ public class Sensor {
     private SensorStatus status;
 
     private LocalDateTime startedAt;
+    private LocalDateTime endedAt;
 
     public enum SensorStatus {
         ACTIVE, INACTIVE, EXPIRED

@@ -21,17 +21,40 @@ public class ReportController {
     private final CurrentUserService currentUserService;
 
     @GetMapping("/glucose")
-    @Operation(summary = "Get glucose report (Weekly/Monthly)", description = "Fetch aggregated glucose data including TIR and statistics.")
+    @Operation(summary = "Get glucose report (Weekly/Monthly or Custom Range)", description = "Fetch aggregated glucose data. If startDate/endDate provided, uses that range. Otherwise uses period.")
     public GlucoseReportDto getGlucoseReport(
-            @RequestParam(value = "period", defaultValue = "weekly") String period) {
+            @RequestParam(value = "period", defaultValue = "weekly") String period,
+            @RequestParam(value = "startDate", required = false) String startDate,
+            @RequestParam(value = "endDate", required = false) String endDate) {
+
         Long userId = currentUserService.getRequiredUserId();
+
+        if (startDate != null && endDate != null) {
+            return reportService.generateGlucoseReport(
+                    userId,
+                    parseDateTime(startDate),
+                    parseDateTime(endDate),
+                    "CUSTOM");
+        }
+
         GlucoseReportDto report = reportService.generateGlucoseReport(userId, period);
-
-        // Client-side rule-based analysis is now used.
-        // AI Analysis removed for optimization.
         report.setAiAnalysis(null);
-
         return report;
+    }
+
+    private java.time.LocalDateTime parseDateTime(String dateTimeStr) {
+        try {
+            // 1. 공백을 T로 치환
+            String normalized = dateTimeStr.replace(" ", "T");
+            // 2. Z가 있다면 제거 (단순 로컬 시간으로 취급)
+            if (normalized.endsWith("Z")) {
+                normalized = normalized.substring(0, normalized.length() - 1);
+            }
+            return java.time.LocalDateTime.parse(normalized);
+        } catch (Exception e) {
+            log.error("Date parsing failed: {}", dateTimeStr, e);
+            throw new IllegalArgumentException("Invalid date format: " + dateTimeStr);
+        }
     }
 
     @GetMapping("/glucose/monthly-weeks")

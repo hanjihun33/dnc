@@ -54,8 +54,20 @@ public class MealController {
             @RequestParam("startDate") String startDate,
             @RequestParam("endDate") String endDate) {
         Long userId = currentUserService.getRequiredUserId();
-        return mealService.getMealsByRange(userId, java.time.LocalDateTime.parse(startDate),
-                java.time.LocalDateTime.parse(endDate));
+        return mealService.getMealsByRange(userId, parseDateTime(startDate),
+                parseDateTime(endDate));
+    }
+
+    private java.time.LocalDateTime parseDateTime(String dateTimeStr) {
+        try {
+            String normalized = dateTimeStr.replace(" ", "T");
+            if (normalized.endsWith("Z")) {
+                normalized = normalized.substring(0, normalized.length() - 1);
+            }
+            return java.time.LocalDateTime.parse(normalized);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid date format: " + dateTimeStr);
+        }
     }
 
     @GetMapping("/{mealId}")

@@ -126,7 +126,7 @@ public class ReportService {
         return report;
     }
 
-    private GlucoseReportDto generateGlucoseReport(Long userId, LocalDateTime start, LocalDateTime end, String period) {
+    public GlucoseReportDto generateGlucoseReport(Long userId, LocalDateTime start, LocalDateTime end, String period) {
         List<GlucoseData> data = glucoseDataRepository.findAllByUser_UserIdAndMeasuredAtBetween(userId, start, end);
         return buildGlucoseReport(userId, data, start, end, period);
     }
