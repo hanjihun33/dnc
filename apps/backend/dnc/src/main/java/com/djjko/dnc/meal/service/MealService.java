@@ -29,22 +29,20 @@ public class MealService {
     private final AiFoodService aiFoodService;
 
     public MealService(
-        FoodRecordRepository repository,
-        FileStorageService fileStorageService,
-        AiFoodService aiFoodService
-    ) {
+            FoodRecordRepository repository,
+            FileStorageService fileStorageService,
+            AiFoodService aiFoodService) {
         this.repository = repository;
         this.fileStorageService = fileStorageService;
         this.aiFoodService = aiFoodService;
     }
 
     public MealResponse create(
-        Long userId,
-        MultipartFile image,
-        String mealType,
-        String eatenAt,
-        String memo
-    ) {
+            Long userId,
+            MultipartFile image,
+            String mealType,
+            String eatenAt,
+            String memo) {
         FoodRecord record = new FoodRecord();
         record.setUserId(userId);
         record.setMealType(MealType.from(mealType));
@@ -63,12 +61,11 @@ public class MealService {
         if (image != null && !image.isEmpty()) {
             try {
                 aiFoodService.analyzeAndPersist(
-                    userId,
-                    savedRecord.getFoodId(),
-                    savedRecord.getEatenAt(),
-                    image,
-                    null
-                );
+                        userId,
+                        savedRecord.getFoodId(),
+                        savedRecord.getEatenAt(),
+                        image,
+                        null);
             } catch (Exception ex) {
                 log.warn("Failed to persist AI analysis for meal {}: {}", savedRecord.getFoodId(), ex.getMessage());
             }
@@ -80,8 +77,8 @@ public class MealService {
     @Transactional(readOnly = true)
     public List<MealResponse> findAll(Long userId) {
         return repository.findByUserIdOrderByRecordedAtDesc(userId).stream()
-            .map(MealResponse::from)
-            .toList();
+                .map(MealResponse::from)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -108,6 +105,13 @@ public class MealService {
 
     public void delete(Long mealId) {
         repository.deleteById(mealId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MealResponse> getMealsByRange(Long userId, LocalDateTime start, LocalDateTime end) {
+        return repository.findByUserIdAndEatenAtBetween(userId, start, end).stream()
+                .map(MealResponse::from)
+                .toList();
     }
 
     private LocalDateTime parseDateTime(String value) {

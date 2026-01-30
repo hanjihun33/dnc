@@ -168,6 +168,10 @@ public class ReportService {
                 && d.getValue() <= thresholds.highUpperInclusive).count();
         long veryHighCount = data.stream().filter(d -> d.getValue() > thresholds.highUpperInclusive).count();
 
+        GlucoseData maxData = data.stream()
+                .max((d1, d2) -> Integer.compare(d1.getValue(), d2.getValue()))
+                .orElse(null);
+
         GlucoseReportDto.TimeInRangeDto tirDto = GlucoseReportDto.TimeInRangeDto.builder()
                 .veryLowPercent(calculatePercent(veryLowCount, count))
                 .lowPercent(calculatePercent(lowCount, count))
@@ -184,6 +188,7 @@ public class ReportService {
                 .recordCount((int) count)
                 .averageGlucose((int) average)
                 .maxGlucose(stats.getMax())
+                .maxGlucoseDateTime(maxData != null ? maxData.getMeasuredAt() : null)
                 .minGlucose(stats.getMin())
                 .standardDeviation(standardDeviation)
                 .timeInRange(tirDto)

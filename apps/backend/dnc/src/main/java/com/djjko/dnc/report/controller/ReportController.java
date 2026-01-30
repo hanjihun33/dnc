@@ -18,8 +18,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReportController {
 
     private final ReportService reportService;
-    private final com.djjko.dnc.ai.gemini.service.AiReportService aiReportService;
-    private final com.djjko.dnc.auth.repository.UserRepository userRepository;
     private final CurrentUserService currentUserService;
 
     @GetMapping("/glucose")
@@ -29,16 +27,9 @@ public class ReportController {
         Long userId = currentUserService.getRequiredUserId();
         GlucoseReportDto report = reportService.generateGlucoseReport(userId, period);
 
-        // AI Analysis
-        try {
-            userRepository.findById(userId).ifPresent(user -> {
-                String analysis = aiReportService.generateAnalysis(user, report);
-                report.setAiAnalysis(analysis);
-            });
-        } catch (Exception e) {
-            log.error("Failed to generate AI report analysis", e);
-            report.setAiAnalysis("AI 분석을 생성하는 중 오류가 발생했습니다.");
-        }
+        // Client-side rule-based analysis is now used.
+        // AI Analysis removed for optimization.
+        report.setAiAnalysis(null);
 
         return report;
     }

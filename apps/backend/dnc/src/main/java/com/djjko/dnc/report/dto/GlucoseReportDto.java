@@ -21,6 +21,7 @@ public class GlucoseReportDto {
     private double standardDeviation;
     private TimeInRangeDto timeInRange;
     private String aiAnalysis;
+    private LocalDateTime maxGlucoseDateTime;
 
     @Getter
     @Builder

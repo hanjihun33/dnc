@@ -35,20 +35,27 @@ public class MealController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "식사 기록 생성")
     public MealResponse create(
-        @RequestPart(value = "image", required = false) MultipartFile image,
-        @RequestParam(value = "mealType", required = false) String mealType,
-        @RequestParam(value = "eatenAt", required = false) String eatenAt,
-        @RequestParam(value = "memo", required = false) String memo
-    ) {
+            @RequestPart(value = "image", required = false) MultipartFile image,
+            @RequestParam(value = "mealType", required = false) String mealType,
+            @RequestParam(value = "eatenAt", required = false) String eatenAt,
+            @RequestParam(value = "memo", required = false) String memo) {
         Long userId = currentUserService.getRequiredUserId();
         return mealService.create(userId, image, mealType, eatenAt, memo);
     }
 
-    @GetMapping
-    @Operation(summary = "식사 기록 목록 조회")
     public List<MealResponse> list() {
         Long userId = currentUserService.getRequiredUserId();
         return mealService.findAll(userId);
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "기간별 식사 기록 조회")
+    public List<MealResponse> search(
+            @RequestParam("startDate") String startDate,
+            @RequestParam("endDate") String endDate) {
+        Long userId = currentUserService.getRequiredUserId();
+        return mealService.getMealsByRange(userId, java.time.LocalDateTime.parse(startDate),
+                java.time.LocalDateTime.parse(endDate));
     }
 
     @GetMapping("/{mealId}")
@@ -60,9 +67,8 @@ public class MealController {
     @PatchMapping("/{mealId}")
     @Operation(summary = "식사 기록 수정")
     public Optional<MealResponse> update(
-        @PathVariable Long mealId,
-        @RequestBody MealUpdateRequest request
-    ) {
+            @PathVariable Long mealId,
+            @RequestBody MealUpdateRequest request) {
         return mealService.update(mealId, request);
     }
 
