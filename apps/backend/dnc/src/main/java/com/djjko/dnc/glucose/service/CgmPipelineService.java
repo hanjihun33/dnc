@@ -6,6 +6,7 @@ import com.djjko.dnc.auth.entity.User;
 import com.djjko.dnc.auth.repository.UserRepository;
 import com.djjko.dnc.auth.service.oauth.OAuthService;
 import com.djjko.dnc.auth.service.oauth.OAuthTokenService;
+import com.djjko.dnc.alert.service.GlucoseAlertService;
 import com.djjko.dnc.glucose.client.DexcomApiClient;
 import com.djjko.dnc.glucose.dto.DexcomResponse;
 import com.djjko.dnc.glucose.entity.GlucoseData;
@@ -36,6 +37,7 @@ public class CgmPipelineService {
     private final DexcomApiClient dexcomApiClient;
     private final OAuthTokenService oAuthTokenService;
     private final OAuthService oAuthService;
+    private final GlucoseAlertService glucoseAlertService;
 
     // API 호출을 위한 함수형 인터페이스 정의
     @FunctionalInterface
@@ -93,7 +95,7 @@ public class CgmPipelineService {
             if (egvResponse != null && egvResponse.getRecords() != null && !egvResponse.getRecords().isEmpty()) {
                 log.info("   -> [혈당] {}건 실시간 저장 시작 (User: {})", egvResponse.getRecords().size(), user.getNickname());
                 this.bufferCgmData(egvResponse);
-                this.syncBufferToDb(user.getDexcomUserId());
+                this.syncBufferToDb(user.getDexcomUserId(), true);
             }
         } catch (Exception e) {
             log.error("실시간 데이터 수집 중 사용자 {} 처리 실패: {}", user.getUserId(), e.getMessage());
@@ -134,7 +136,7 @@ public class CgmPipelineService {
 
                 if (egvResponse != null && egvResponse.getRecords() != null) {
                     this.bufferCgmData(egvResponse);
-                    this.syncBufferToDb(user.getDexcomUserId());
+                    this.syncBufferToDb(user.getDexcomUserId(), false);
                     totalEgvCount += egvResponse.getRecords().size();
                 }
 
@@ -172,7 +174,7 @@ public class CgmPipelineService {
      * 2. Redis -> MySQL 동기화 실행 (트랜잭션 관리)
      */
     @Transactional
-    public void syncBufferToDb(String dexcomUserId) {
+    public void syncBufferToDb(String dexcomUserId, boolean evaluateAlerts) {
         String redisKey = "cgm:buffer:" + dexcomUserId;
         long count = 0;
         while (true) {
@@ -180,7 +182,7 @@ public class CgmPipelineService {
             if (data == null) break;
 
             DexcomResponse.Record record = objectMapper.convertValue(data, DexcomResponse.Record.class);
-            saveOneRecordToDb(dexcomUserId, record);
+            saveOneRecordToDb(dexcomUserId, record, evaluateAlerts);
             count++;
         }
         if (count > 0) {
@@ -191,7 +193,7 @@ public class CgmPipelineService {
     /**
      * 3. 단일 혈당 레코드 저장 (중복 체크 및 센서 매핑)
      */
-    public void saveOneRecordToDb(String dexcomUserId, DexcomResponse.Record record) {
+    public void saveOneRecordToDb(String dexcomUserId, DexcomResponse.Record record, boolean evaluateAlerts) {
         // 중복 데이터 방지 (dexcom_record_id 기반)
         if (glucoseDataRepository.existsByDexcomRecordId(record.getRecordId())) {
             // log.debug("중복 데이터 스킵: {}", record.getRecordId());
@@ -208,6 +210,13 @@ public class CgmPipelineService {
         // 엔티티 변환 및 저장 (Trend, TrendRate 필드 포함)
         GlucoseData glucoseData = record.toEntity(user, sensor);
         glucoseDataRepository.save(glucoseData);
+        if (evaluateAlerts) {
+            try {
+                glucoseAlertService.evaluate(user, glucoseData);
+            } catch (Exception e) {
+                log.warn("혈당 알림 처리 실패 (User: {}): {}", user.getUserId(), e.getMessage());
+            }
+        }
     }
 
     private Sensor getOrRotateSensor(User user, DexcomResponse.Record record) {

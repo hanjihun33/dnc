@@ -11,8 +11,14 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { alertConfig, AlertType } from "./config";
-import { getAlertValue, setAlertValue } from "./store";
+import { alertConfig, AlertType } from "./_config";
+import { updateAlertSetting } from "./_api";
+import {
+  getAlertSetting,
+  getAlertValue,
+  setAlertSetting,
+  setAlertValue,
+} from "./_store";
 
 const palette = {
   background: "#F8FAFC",
@@ -25,7 +31,10 @@ const palette = {
 };
 
 const ITEM_HEIGHT = 52;
-const DEFAULT_INTERVAL = "15분마다";
+const DEFAULT_INTERVAL_MINUTES = 15;
+
+const formatInterval = (minutes: number) =>
+  minutes === 60 ? "1시간" : `${minutes}분`;
 
 export default function AlertDetailScreen() {
   const router = useRouter();
@@ -42,8 +51,8 @@ export default function AlertDetailScreen() {
 
   const [enabled, setEnabled] = React.useState(true);
   const [value, setValue] = React.useState(() => getAlertValue(routeType));
-  const [intervalValue, setIntervalValue] =
-    React.useState(DEFAULT_INTERVAL);
+  const [intervalMinutes, setIntervalMinutes] =
+    React.useState(DEFAULT_INTERVAL_MINUTES);
   const listRef = React.useRef<FlatList<number>>(null);
 
   const values = React.useMemo(() => {
@@ -55,6 +64,9 @@ export default function AlertDetailScreen() {
 
   React.useEffect(() => {
     const storedValue = getAlertValue(routeType);
+    const storedSetting = getAlertSetting(routeType);
+    setEnabled(storedSetting.enabled);
+    setIntervalMinutes(storedSetting.intervalMinutes);
     setValue(storedValue);
     const index = values.indexOf(storedValue);
     if (index >= 0) {
@@ -66,7 +78,12 @@ export default function AlertDetailScreen() {
 
   React.useEffect(() => {
     if (typeof interval === "string" && interval.length > 0) {
-      setIntervalValue(interval);
+      const nextInterval = Number(interval);
+      if (!Number.isNaN(nextInterval)) {
+        setIntervalMinutes(nextInterval);
+        setAlertSetting(routeType, { intervalMinutes: nextInterval });
+        void updateAlertSetting(routeType, { intervalMinutes: nextInterval });
+      }
     }
   }, [interval]);
 
@@ -87,7 +104,11 @@ export default function AlertDetailScreen() {
           <Text style={styles.rowLabel}>알림</Text>
           <Switch
             value={enabled}
-            onValueChange={setEnabled}
+            onValueChange={(next) => {
+              setEnabled(next);
+              setAlertSetting(routeType, { enabled: next });
+              void updateAlertSetting(routeType, { enabled: next });
+            }}
             trackColor={{ false: "#E2E8F0", true: palette.accent }}
             thumbColor={enabled ? palette.accentInk : "#FFFFFF"}
           />
@@ -125,6 +146,7 @@ export default function AlertDetailScreen() {
               const next = values[index] ?? config.defaultValue;
               setValue(next);
               setAlertValue(routeType, next);
+              void updateAlertSetting(routeType, { thresholdValue: next });
             }}
             renderItem={({ item }) => {
               const isActive = item === value;
@@ -150,13 +172,15 @@ export default function AlertDetailScreen() {
             onPress={() =>
               router.push({
                 pathname: "/(settings)/alert/interval",
-                params: { type: currentType, interval: intervalValue },
+                params: { type: currentType, interval: String(intervalMinutes) },
               })
             }
           >
             <Text style={styles.listTitle}>상태 지속 시 알림 간격</Text>
             <View style={styles.listValue}>
-              <Text style={styles.listValueText}>{intervalValue}</Text>
+              <Text style={styles.listValueText}>
+                {formatInterval(intervalMinutes)}마다
+              </Text>
               <Text style={styles.chevron}>›</Text>
             </View>
           </Pressable>

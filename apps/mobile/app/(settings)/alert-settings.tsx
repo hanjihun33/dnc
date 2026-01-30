@@ -11,8 +11,15 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { alertConfig, AlertType } from "./alert/config";
-import { getAlertValues } from "./alert/store";
+import { alertConfig, AlertType } from "./alert/_config";
+import { fetchAlertSettings, updateAlertSetting } from "./alert/_api";
+import {
+  AlertKey,
+  AlertSetting,
+  getAlertSettings,
+  setAlertSetting,
+  setAlertSettings,
+} from "./alert/_store";
 
 const palette = {
   background: "#F8FAFC",
@@ -27,31 +34,62 @@ const palette = {
 const alertRowMeta: Array<{
   key: AlertType;
   title: string;
-  interval: string;
 }> = [
-  { key: "high", title: "높음", interval: "15분마다" },
-  { key: "low", title: "낮음", interval: "15분마다" },
-  { key: "very-low", title: "매우 낮음", interval: "15분마다" },
-  { key: "urgent-low", title: "곧 저혈당", interval: "15분마다" },
+  { key: "high", title: "높음" },
+  { key: "low", title: "낮음" },
+  { key: "very-low", title: "매우 낮음" },
+  { key: "urgent-low", title: "곧 저혈당" },
 ];
+
+const formatInterval = (minutes: number) =>
+  minutes === 60 ? "1시간" : `${minutes}분`;
 
 export default function AlertSettingsScreen() {
   const router = useRouter();
-  const [riseEnabled, setRiseEnabled] = React.useState(true);
-  const [alertValues, setAlertValues] = React.useState(() => getAlertValues());
+  const [settingsSnapshot, setSettingsSnapshot] = React.useState(() =>
+    getAlertSettings()
+  );
+
+  const syncFromStore = React.useCallback(() => {
+    setSettingsSnapshot(getAlertSettings());
+  }, []);
+
+  const loadSettings = React.useCallback(async () => {
+    try {
+      const response = await fetchAlertSettings();
+      const next: Partial<Record<AlertKey, AlertSetting>> = {};
+      response.forEach((item) => {
+        next[item.type] = {
+          enabled: item.enabled,
+          thresholdValue: item.thresholdValue ?? null,
+          intervalMinutes: item.intervalMinutes,
+        };
+      });
+      setAlertSettings(next);
+      syncFromStore();
+    } catch {
+      syncFromStore();
+    }
+  }, [syncFromStore]);
 
   useFocusEffect(
     React.useCallback(() => {
-      setAlertValues(getAlertValues());
-    }, [])
+      void loadSettings();
+    }, [loadSettings])
   );
 
-  const alertRows = alertRowMeta.map((row) => ({
-    key: row.key,
-    title: row.title,
-    desc: alertConfig[row.key].display(alertValues[row.key]),
-    value: row.interval,
-  }));
+  const alertRows = alertRowMeta.map((row) => {
+    const setting = settingsSnapshot[row.key];
+    const value =
+      setting?.thresholdValue ?? alertConfig[row.key].defaultValue;
+    const interval = setting?.intervalMinutes ?? 15;
+    return {
+      key: row.key,
+      title: row.title,
+      desc: alertConfig[row.key].display(value),
+      value: `${formatInterval(interval)}마다`,
+    };
+  });
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -91,10 +129,21 @@ export default function AlertSettingsScreen() {
               <Text style={styles.rowDesc}>혈당 급상승 할 때 변동 안내</Text>
             </View>
             <Switch
-              value={riseEnabled}
-              onValueChange={setRiseEnabled}
+              value={settingsSnapshot["rapid-rise"].enabled}
+              onValueChange={(next) => {
+                setSettingsSnapshot((prev) => ({
+                  ...prev,
+                  "rapid-rise": { ...prev["rapid-rise"], enabled: next },
+                }));
+                setAlertSetting("rapid-rise", { enabled: next });
+                void updateAlertSetting("rapid-rise", { enabled: next });
+              }}
               trackColor={{ false: "#E2E8F0", true: palette.accent }}
-              thumbColor={riseEnabled ? palette.accentInk : "#FFFFFF"}
+              thumbColor={
+                settingsSnapshot["rapid-rise"].enabled
+                  ? palette.accentInk
+                  : "#FFFFFF"
+              }
             />
           </View>
         </View>

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { loadAuthSession, setAuthSession } from "../session";
+import { registerPushTokenWithServer } from "../push";
 
 const palette = {
   background: "#F8FAFC",
@@ -75,6 +76,7 @@ export default function LoginScreen() {
       }
       const tokenType = loginData.tokenType ?? "Bearer";
       await setAuthSession({ accessToken, tokenType });
+      await registerPushTokenWithServer();
 
       try {
         await loadAuthSession();
