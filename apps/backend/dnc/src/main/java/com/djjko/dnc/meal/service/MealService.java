@@ -51,12 +51,16 @@ public class MealService {
     public MealResponse create(
         Long userId,
         MultipartFile image,
+        String foodName,
+        Double carbsGrams,
         String mealType,
         String eatenAt,
         String memo
     ) {
         FoodRecord record = new FoodRecord();
         record.setUserId(userId);
+        record.setFoodName(foodName);
+        record.setCarbsGrams(carbsGrams);
         record.setMealType(MealType.from(mealType));
         record.setEatenAt(parseDateTime(eatenAt));
         record.setMemo(memo);
@@ -104,6 +108,15 @@ public class MealService {
             MealType newType = MealType.from(request.mealType());
             if (newType != null) {
                 record.setMealType(newType);
+            }
+            if (request.foodName() != null) {
+                record.setFoodName(request.foodName());
+            }
+            if (request.carbsGrams() != null) {
+                record.setCarbsGrams(request.carbsGrams());
+            }
+            if (request.peakGlucose() != null) {
+                record.setPeakGlucose(request.peakGlucose());
             }
             if (request.eatenAt() != null && !request.eatenAt().isBlank()) {
                 record.setEatenAt(parseDateTime(request.eatenAt()));

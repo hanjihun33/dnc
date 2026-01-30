@@ -7,6 +7,9 @@ import java.time.format.DateTimeFormatter;
 public record MealResponse(
         Long mealId,
         Long userId,
+        String foodName,
+        Double carbsGrams,
+        Integer peakGlucose,
         String imageUrl,
         String mealType,
         String eatenAt,
@@ -35,6 +38,9 @@ public record MealResponse(
         return new MealResponse(
                 record.getFoodId(),
                 record.getUserId(),
+                record.getFoodName(),
+                record.getCarbsGrams(),
+                record.getPeakGlucose(),
                 record.getImageUrl(),
                 record.getMealType() == null ? null : record.getMealType().name(),
                 formatDate(record.getEatenAt()),

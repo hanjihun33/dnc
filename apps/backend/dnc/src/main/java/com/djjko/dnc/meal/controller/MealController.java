@@ -36,12 +36,14 @@ public class MealController {
     @Operation(summary = "식사 기록 생성")
     public MealResponse create(
         @RequestPart(value = "image", required = false) MultipartFile image,
+        @RequestParam(value = "foodName", required = false) String foodName,
+        @RequestParam(value = "carbsGrams", required = false) Double carbsGrams,
         @RequestParam(value = "mealType", required = false) String mealType,
         @RequestParam(value = "eatenAt", required = false) String eatenAt,
         @RequestParam(value = "memo", required = false) String memo
     ) {
         Long userId = currentUserService.getRequiredUserId();
-        return mealService.create(userId, image, mealType, eatenAt, memo);
+        return mealService.create(userId, image, foodName, carbsGrams, mealType, eatenAt, memo);
     }
 
     @GetMapping
