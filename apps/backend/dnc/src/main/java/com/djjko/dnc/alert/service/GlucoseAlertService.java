@@ -37,6 +37,7 @@ public class GlucoseAlertService {
             settingMap.put(setting.getAlertType(), setting);
         }
 
+        boolean rapidRiseActive = isRapidRise(settingMap.get(AlertType.RAPID_RISE), data.getTrendRate());
         AlertType triggered = selectAlertType(settingMap, data);
         if (triggered == null) {
             return;
@@ -52,7 +53,8 @@ public class GlucoseAlertService {
         }
 
         markNotified(user.getUserId(), setting.getAlertType());
-        sendPush(user, setting.getAlertType(), data);
+        boolean attachRapidRise = triggered == AlertType.HIGH && rapidRiseActive;
+        sendPush(user, setting.getAlertType(), data, attachRapidRise);
     }
 
     private AlertType selectAlertType(Map<AlertType, UserAlertSetting> settings, GlucoseData data) {
@@ -140,14 +142,14 @@ public class GlucoseAlertService {
         return LAST_ALERT_KEY_PREFIX + userId + ":" + type.name();
     }
 
-    private void sendPush(User user, AlertType type, GlucoseData data) {
+    private void sendPush(User user, AlertType type, GlucoseData data, boolean attachRapidRise) {
         List<UserPushToken> tokens = pushTokenService.getEnabledTokens(user.getUserId());
         if (tokens.isEmpty()) {
             return;
         }
 
         String title = "혈당 알림";
-        String body = buildBody(type, data.getValue());
+        String body = buildBody(type, data.getValue(), attachRapidRise);
         Map<String, String> payload = Map.of(
                 "type", type.getCode(),
                 "value", String.valueOf(data.getValue() == null ? 0 : data.getValue())
@@ -164,14 +166,18 @@ public class GlucoseAlertService {
         log.info("FCM sent (userId={}, type={}, tokens={})", user.getUserId(), type, tokenValues.size());
     }
 
-    private String buildBody(AlertType type, Integer value) {
+    private String buildBody(AlertType type, Integer value, boolean attachRapidRise) {
         String displayValue = value == null ? "-" : value + "mg/dL";
-        return switch (type) {
+        String base = switch (type) {
             case VERY_LOW -> "혈당이 매우 낮습니다. (" + displayValue + ")";
             case LOW -> "혈당이 낮습니다. (" + displayValue + ")";
             case URGENT_LOW -> "곧 저혈당 위험입니다. (" + displayValue + ")";
             case HIGH -> "혈당이 높습니다. (" + displayValue + ")";
             case RAPID_RISE -> "혈당이 급상승 중입니다. (" + displayValue + ")";
         };
+        if (type == AlertType.HIGH && attachRapidRise) {
+            return base + " 급상승 중입니다.";
+        }
+        return base;
     }
 }

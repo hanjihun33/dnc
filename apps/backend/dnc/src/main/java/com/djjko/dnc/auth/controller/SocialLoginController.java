@@ -7,13 +7,17 @@ import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @RestController
@@ -44,11 +48,98 @@ public class SocialLoginController {
 
     @GetMapping("/{provider}/callback")
     @Operation(summary = "소셜 로그인 콜백 처리")
-    public SocialLoginResponse callback(
+    public ResponseEntity<?> callback(
         @PathVariable String provider,
         @RequestParam String code,
-        @RequestParam(required = false) String state
+        @RequestParam(required = false) String state,
+        @RequestHeader(value = "Accept", required = false) String accept
     ) {
-        return socialLoginService.login(provider, code, state);
+        SocialLoginResponse response = socialLoginService.login(provider, code, state);
+        if (wantsHtml(accept)) {
+            return ResponseEntity.ok()
+                .contentType(MediaType.TEXT_HTML)
+                .body(buildHtmlResponse(response));
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    private boolean wantsHtml(String accept) {
+        if (accept == null || accept.isBlank()) {
+            return true;
+        }
+        String normalized = accept.toLowerCase();
+        if (normalized.contains("application/json")) {
+            return false;
+        }
+        return normalized.contains("text/html") || normalized.contains("*/*");
+    }
+
+    private String buildHtmlResponse(SocialLoginResponse response) {
+        String accessToken = urlEncode(response.getAccessToken());
+        String refreshToken = urlEncode(response.getRefreshToken());
+        String tokenType = urlEncode(response.getTokenType());
+        String userId = response.getUserId() == null ? "" : String.valueOf(response.getUserId());
+        String expiresIn = String.valueOf(response.getExpiresIn());
+        return """
+            <!doctype html>
+            <html lang="ko">
+              <head>
+                <meta charset="utf-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <title>로그인 완료</title>
+                <style>
+                  body {
+                    margin: 0;
+                    padding: 32px 20px;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                    background: #f8fafc;
+                    color: #0f172a;
+                  }
+                  .card {
+                    max-width: 420px;
+                    margin: 0 auto;
+                    background: #ffffff;
+                    border-radius: 16px;
+                    padding: 24px;
+                    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+                    text-align: center;
+                  }
+                  .title { font-size: 18px; font-weight: 700; }
+                  .desc { margin-top: 8px; color: #475569; font-size: 14px; }
+                </style>
+              </head>
+              <body>
+                <div class="card">
+                  <div class="title">로그인이 완료되었습니다.</div>
+                  <div class="desc">앱으로 돌아가 주세요.</div>
+                  <div class="link">
+                    앱이 열리지 않으면 <a id="open-app" href="#">여기를 눌러주세요</a>.
+                  </div>
+                </div>
+                <script>
+                  (function () {
+                    var appUrl = "testapp://auth?accessToken=%s&refreshToken=%s&tokenType=%s&userId=%s&expiresIn=%s";
+                    var anchor = document.getElementById("open-app");
+                    if (anchor) {
+                      anchor.setAttribute("href", appUrl);
+                    }
+                    setTimeout(function () {
+                      window.location.href = appUrl;
+                    }, 50);
+                    setTimeout(function () {
+                      window.close();
+                    }, 500);
+                  })();
+                </script>
+              </body>
+            </html>
+            """.formatted(accessToken, refreshToken, tokenType, userId, expiresIn);
+    }
+
+    private String urlEncode(String value) {
+        if (value == null) {
+            return "";
+        }
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 }
