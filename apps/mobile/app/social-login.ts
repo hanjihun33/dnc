@@ -64,6 +64,7 @@ export const startSocialLogin = async (provider: SocialProvider) => {
   if (state) {
     callback.searchParams.set("state", state);
   }
+  callback.searchParams.set("format", "json");
 
   const response = await fetch(callback.toString(), {
     headers: {

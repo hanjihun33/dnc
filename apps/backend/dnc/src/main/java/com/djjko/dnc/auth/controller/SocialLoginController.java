@@ -4,6 +4,7 @@ import com.djjko.dnc.auth.dto.response.SocialLoginResponse;
 import com.djjko.dnc.auth.service.oauth.OAuthService;
 import com.djjko.dnc.auth.service.oauth.SocialLoginService;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,10 +27,16 @@ public class SocialLoginController {
 
     private final OAuthService oAuthService;
     private final SocialLoginService socialLoginService;
+    private final String appRedirectUri;
 
-    public SocialLoginController(OAuthService oAuthService, SocialLoginService socialLoginService) {
+    public SocialLoginController(
+        OAuthService oAuthService,
+        SocialLoginService socialLoginService,
+        @Value("${app.social-login-redirect-uri:testapp://auth}") String appRedirectUri
+    ) {
         this.oAuthService = oAuthService;
         this.socialLoginService = socialLoginService;
+        this.appRedirectUri = appRedirectUri;
     }
 
     @GetMapping("/{provider}/authorize")
@@ -52,26 +59,31 @@ public class SocialLoginController {
         @PathVariable String provider,
         @RequestParam String code,
         @RequestParam(required = false) String state,
+        @RequestParam(required = false, name = "format") String format,
         @RequestHeader(value = "Accept", required = false) String accept
     ) {
         SocialLoginResponse response = socialLoginService.login(provider, code, state);
-        if (wantsHtml(accept)) {
-            return ResponseEntity.ok()
-                .contentType(MediaType.TEXT_HTML)
-                .body(buildHtmlResponse(response));
+        if (wantsJson(format, accept)) {
+            return ResponseEntity.ok(response);
         }
-        return ResponseEntity.ok(response);
+        String redirectUrl = buildAppRedirectUrl(response);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setLocation(URI.create(redirectUrl));
+        return new ResponseEntity<>(headers, HttpStatus.FOUND);
     }
 
-    private boolean wantsHtml(String accept) {
-        if (accept == null || accept.isBlank()) {
+    private boolean wantsJson(String format, String accept) {
+        if (format != null && format.equalsIgnoreCase("json")) {
             return true;
         }
-        String normalized = accept.toLowerCase();
-        if (normalized.contains("application/json")) {
+        if (accept == null || accept.isBlank()) {
             return false;
         }
-        return normalized.contains("text/html") || normalized.contains("*/*");
+        String normalized = accept.toLowerCase();
+        boolean hasJson = normalized.contains("application/json");
+        boolean hasHtml = normalized.contains("text/html");
+        boolean hasWildcard = normalized.contains("*/*");
+        return hasJson && !hasHtml && !hasWildcard;
     }
 
     private String buildHtmlResponse(SocialLoginResponse response) {
@@ -80,6 +92,7 @@ public class SocialLoginController {
         String tokenType = urlEncode(response.getTokenType());
         String userId = response.getUserId() == null ? "" : String.valueOf(response.getUserId());
         String expiresIn = String.valueOf(response.getExpiresIn());
+        String appUrl = buildAppRedirectUrl(response);
         return """
             <!doctype html>
             <html lang="ko">
@@ -118,7 +131,7 @@ public class SocialLoginController {
                 </div>
                 <script>
                   (function () {
-                    var appUrl = "testapp://auth?accessToken=%s&refreshToken=%s&tokenType=%s&userId=%s&expiresIn=%s";
+                    var appUrl = "%s";
                     var anchor = document.getElementById("open-app");
                     if (anchor) {
                       anchor.setAttribute("href", appUrl);
@@ -133,7 +146,29 @@ public class SocialLoginController {
                 </script>
               </body>
             </html>
-            """.formatted(accessToken, refreshToken, tokenType, userId, expiresIn);
+            """.formatted(appUrl);
+    }
+
+    private String buildAppRedirectUrl(SocialLoginResponse response) {
+        String accessToken = urlEncode(response.getAccessToken());
+        String refreshToken = urlEncode(response.getRefreshToken());
+        String tokenType = urlEncode(response.getTokenType());
+        String userId = response.getUserId() == null ? "" : String.valueOf(response.getUserId());
+        String expiresIn = String.valueOf(response.getExpiresIn());
+
+        String separator = appRedirectUri.contains("?") ? "&" : "?";
+        return appRedirectUri
+            + separator
+            + "accessToken="
+            + accessToken
+            + "&refreshToken="
+            + refreshToken
+            + "&tokenType="
+            + tokenType
+            + "&userId="
+            + userId
+            + "&expiresIn="
+            + expiresIn;
     }
 
     private String urlEncode(String value) {
