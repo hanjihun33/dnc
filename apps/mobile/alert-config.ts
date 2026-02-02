@@ -1,6 +1,6 @@
 export const alertConfig = {
   high: {
-    title: "높음",
+    title: "고혈당",
     min: 140,
     max: 400,
     step: 5,
@@ -8,7 +8,7 @@ export const alertConfig = {
     display: (value: number) => `${value}mg/dL 이상`,
   },
   low: {
-    title: "낮음",
+    title: "저혈당",
     min: 70,
     max: 90,
     step: 1,
@@ -16,7 +16,7 @@ export const alertConfig = {
     display: (value: number) => `${value}mg/dL 미만`,
   },
   "very-low": {
-    title: "매우 낮음",
+    title: "매우 저혈당",
     min: 54,
     max: 60,
     step: 1,
@@ -24,13 +24,13 @@ export const alertConfig = {
     display: (value: number) => `${value}mg/dL 미만`,
   },
   "urgent-low": {
-    title: "곧 저혈당",
+    title: "급성 저혈당",
     min: 90,
     max: 140,
     step: 1,
     defaultValue: 90,
     display: (value: number) =>
-      `${value}mg/dL 미만에서 분당 3mg/dL로 하강 시`,
+      `${value}mg/dL 미만에서 분당 3mg/dL로 하락 중`,
   },
 } as const;
 

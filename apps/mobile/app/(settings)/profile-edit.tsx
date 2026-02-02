@@ -18,7 +18,7 @@ import {
   bumpProfileRevision,
   getAuthHeaders,
   loadAuthSession,
-} from "../session";
+} from "@/session";
 
 const palette = {
   background: "#F8FAFC",

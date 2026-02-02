@@ -1,23 +1,35 @@
 import * as Device from "expo-device";
-import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { getAuthHeaders, getAuthSession, loadAuthSession } from "./session";
 
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+const isExpoGo = Constants.appOwnership === "expo";
+
+let handlerReady = false;
+
+const getNotifications = async () => import("expo-notifications");
+
+const ensureNotificationHandler = async () => {
+  if (handlerReady) return;
+  const Notifications = await getNotifications();
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+  handlerReady = true;
+};
 
 const ensureNotificationChannel = async () => {
   if (Platform.OS !== "android") {
     return;
   }
+  const Notifications = await getNotifications();
   await Notifications.setNotificationChannelAsync("default", {
     name: "default",
     importance: Notifications.AndroidImportance.HIGH,
@@ -25,10 +37,16 @@ const ensureNotificationChannel = async () => {
 };
 
 const getDevicePushToken = async () => {
+  if (isExpoGo) {
+    return null;
+  }
   const allowAndroidEmulator = Platform.OS === "android";
   if (!Device.isDevice && !allowAndroidEmulator) {
     return null;
   }
+
+  const Notifications = await getNotifications();
+  await ensureNotificationHandler();
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
@@ -48,6 +66,9 @@ const getDevicePushToken = async () => {
 
 export const registerPushTokenWithServer = async () => {
   try {
+    if (isExpoGo) {
+      return;
+    }
     await loadAuthSession();
     const session = getAuthSession();
     if (!session.accessToken) {

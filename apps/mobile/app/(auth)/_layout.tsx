@@ -1,7 +1,7 @@
 import React from "react";
 import { Stack } from "expo-router";
 
-import { SignupDraftProvider } from "./_signup-context";
+import { SignupDraftProvider } from "@/components/signup-context";
 
 export default function AuthLayout() {
   return (

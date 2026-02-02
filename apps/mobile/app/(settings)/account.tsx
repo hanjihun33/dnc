@@ -17,7 +17,7 @@ import {
   getAuthHeaders,
   loadAuthSession,
   subscribeProfileRevision,
-} from "../session";
+} from "@/session";
 
 const palette = {
   background: "#F8FAFC",

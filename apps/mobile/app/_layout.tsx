@@ -5,8 +5,8 @@ import React from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { loadAuthSession } from './session';
-import { registerPushTokenWithServer } from './push';
+import { loadAuthSession } from '@/session';
+import { registerPushTokenWithServer } from '@/push';
 
 export const unstable_settings = {
   anchor: '(auth)',
@@ -29,7 +29,6 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(settings)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

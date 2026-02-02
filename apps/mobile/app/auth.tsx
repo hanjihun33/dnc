@@ -2,8 +2,8 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
-import { registerPushTokenWithServer } from "./push";
-import { setAuthSession } from "./session";
+import { registerPushTokenWithServer } from "@/push";
+import { setAuthSession } from "@/session";
 
 const palette = {
   background: "#F8FAFC",

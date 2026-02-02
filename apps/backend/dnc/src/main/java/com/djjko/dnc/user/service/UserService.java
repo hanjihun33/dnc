@@ -1,6 +1,7 @@
 package com.djjko.dnc.user.service;
 
 import com.djjko.dnc.auth.entity.User;
+import com.djjko.dnc.auth.repository.OAuthTokenRepository;
 import com.djjko.dnc.auth.repository.UserRepository;
 import com.djjko.dnc.user.dto.UserHealthUpdateRequest;
 import com.djjko.dnc.user.dto.UserPasswordChangeRequest;
@@ -23,17 +24,20 @@ public class UserService {
     private final FileStorageService fileStorageService;
     private final PasswordEncoder passwordEncoder;
     private final SensorRepository sensorRepository;
+    private final OAuthTokenRepository oauthTokenRepository;
 
     public UserService(
         UserRepository userRepository,
         FileStorageService fileStorageService,
         PasswordEncoder passwordEncoder,
-        SensorRepository sensorRepository
+        SensorRepository sensorRepository,
+        OAuthTokenRepository oauthTokenRepository
     ) {
         this.userRepository = userRepository;
         this.fileStorageService = fileStorageService;
         this.passwordEncoder = passwordEncoder;
         this.sensorRepository = sensorRepository;
+        this.oauthTokenRepository = oauthTokenRepository;
     }
 
     public UserProfileResponse getProfile(Long userId) {
@@ -156,7 +160,7 @@ public class UserService {
     }
 
     private boolean isSensorConnected(User user) {
-        return sensorRepository.findByUserAndStatus(user, Sensor.SensorStatus.ACTIVE)
+        boolean hasActiveSensor = sensorRepository.findByUserAndStatus(user, Sensor.SensorStatus.ACTIVE)
             .map(sensor -> {
                 LocalDateTime startedAt = sensor.getStartedAt();
                 if (startedAt == null) return false;
@@ -164,6 +168,18 @@ public class UserService {
                 if (now.isBefore(startedAt)) return false;
                 LocalDateTime endedAt = sensor.getEndedAt();
                 return endedAt == null || !now.isAfter(endedAt);
+            })
+            .orElse(false);
+        if (hasActiveSensor) {
+            return true;
+        }
+
+        return oauthTokenRepository.findByUserUserIdAndProvider(user.getUserId(), "dexcom")
+            .map(token -> {
+                String accessToken = token.getAccessToken();
+                String refreshToken = token.getRefreshToken();
+                return (accessToken != null && !accessToken.isBlank())
+                    || (refreshToken != null && !refreshToken.isBlank());
             })
             .orElse(false);
     }
