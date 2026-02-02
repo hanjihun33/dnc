@@ -15,6 +15,8 @@ public interface SensorRepository extends JpaRepository<Sensor, Long> {
 
     Optional<Sensor> findByDeviceIdAndStatus(String deviceId, Sensor.SensorStatus status);
 
+    Optional<Sensor> findByUserAndDeviceId(User user, String deviceId);
+
     List<Sensor> findAllByUserAndStatus(User user, Sensor.SensorStatus status);
 
     List<Sensor> findAllByUser(User user);
