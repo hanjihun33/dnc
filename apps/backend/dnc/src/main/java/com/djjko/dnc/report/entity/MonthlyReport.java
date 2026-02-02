@@ -65,9 +65,6 @@ public class MonthlyReport {
     @Column(name = "very_high_percent")
     private Double veryHighPercent;
 
-    @Column(name = "ai_analysis", columnDefinition = "TEXT")
-    private String aiAnalysis;
-
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

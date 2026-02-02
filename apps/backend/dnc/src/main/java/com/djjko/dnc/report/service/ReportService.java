@@ -208,7 +208,6 @@ public class ReportService {
         entity.setMaxGlucose(report.getMaxGlucose());
         entity.setMinGlucose(report.getMinGlucose());
         entity.setStandardDeviation(report.getStandardDeviation());
-        entity.setAiAnalysis(report.getAiAnalysis());
 
         applyTimeInRange(entity, report);
 
@@ -227,7 +226,6 @@ public class ReportService {
         entity.setMaxGlucose(report.getMaxGlucose());
         entity.setMinGlucose(report.getMinGlucose());
         entity.setStandardDeviation(report.getStandardDeviation());
-        entity.setAiAnalysis(report.getAiAnalysis());
 
         applyTimeInRange(entity, report);
 

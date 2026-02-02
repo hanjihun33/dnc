@@ -38,7 +38,7 @@ public class ReportController {
         }
 
         GlucoseReportDto report = reportService.generateGlucoseReport(userId, period);
-        report.setAiAnalysis(null);
+
         return report;
     }
 

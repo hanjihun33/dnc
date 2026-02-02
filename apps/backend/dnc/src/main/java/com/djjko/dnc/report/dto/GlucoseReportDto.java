@@ -20,7 +20,7 @@ public class GlucoseReportDto {
     private int minGlucose;
     private double standardDeviation;
     private TimeInRangeDto timeInRange;
-    private String aiAnalysis;
+
     private LocalDateTime maxGlucoseDateTime;
 
     @Getter
