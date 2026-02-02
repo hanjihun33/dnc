@@ -6,6 +6,9 @@ import com.djjko.dnc.user.dto.UserHealthUpdateRequest;
 import com.djjko.dnc.user.dto.UserPasswordChangeRequest;
 import com.djjko.dnc.user.dto.UserProfileResponse;
 import com.djjko.dnc.user.dto.UserProfileUpdateRequest;
+import com.djjko.dnc.glucose.entity.Sensor;
+import com.djjko.dnc.glucose.repository.SensorRepository;
+import java.time.LocalDateTime;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -19,15 +22,18 @@ public class UserService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final PasswordEncoder passwordEncoder;
+    private final SensorRepository sensorRepository;
 
     public UserService(
         UserRepository userRepository,
         FileStorageService fileStorageService,
-        PasswordEncoder passwordEncoder
+        PasswordEncoder passwordEncoder,
+        SensorRepository sensorRepository
     ) {
         this.userRepository = userRepository;
         this.fileStorageService = fileStorageService;
         this.passwordEncoder = passwordEncoder;
+        this.sensorRepository = sensorRepository;
     }
 
     public UserProfileResponse getProfile(Long userId) {
@@ -131,6 +137,7 @@ public class UserService {
     }
 
     private UserProfileResponse toResponse(User user) {
+        boolean sensorConnected = isSensorConnected(user);
         return new UserProfileResponse(
             user.getUserId(),
             user.getEmail(),
@@ -143,7 +150,21 @@ public class UserService {
             user.getGender(),
             user.getHeightCm(),
             user.getWeightKg(),
-            user.getProfileImageUrl()
+            user.getProfileImageUrl(),
+            sensorConnected
         );
+    }
+
+    private boolean isSensorConnected(User user) {
+        return sensorRepository.findByUserAndStatus(user, Sensor.SensorStatus.ACTIVE)
+            .map(sensor -> {
+                LocalDateTime startedAt = sensor.getStartedAt();
+                if (startedAt == null) return false;
+                LocalDateTime now = LocalDateTime.now();
+                if (now.isBefore(startedAt)) return false;
+                LocalDateTime endedAt = sensor.getEndedAt();
+                return endedAt == null || !now.isAfter(endedAt);
+            })
+            .orElse(false);
     }
 }

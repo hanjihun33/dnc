@@ -4,6 +4,7 @@ import com.djjko.dnc.ai.food.dto.AiFoodDetectResponse;
 import com.djjko.dnc.ai.food.dto.AiFoodDetectResult;
 import com.djjko.dnc.ai.food.dto.AiGlucosePredictionRequest;
 import com.djjko.dnc.ai.food.dto.AiGlucosePredictionResponse;
+import com.djjko.dnc.ai.model.dto.ModelUpdateRequest;
 import java.io.IOException;
 import java.net.http.HttpClient;
 import java.util.Comparator;
@@ -95,6 +96,20 @@ public class AiServerClient {
         } catch (RestClientException ex) {
             log.warn("AI server prediction request failed: {}", ex.getMessage());
             return Optional.empty();
+        }
+    }
+
+    public void updateModel(ModelUpdateRequest request) {
+        try {
+            restClient
+                .post()
+                .uri("/api/v1/model/update")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(request)
+                .retrieve()
+                .toBodilessEntity();
+        } catch (RestClientException ex) {
+            log.warn("AI server model update request failed: {}", ex.getMessage());
         }
     }
 }

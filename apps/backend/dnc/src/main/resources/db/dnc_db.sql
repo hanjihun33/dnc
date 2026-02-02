@@ -200,6 +200,9 @@ CREATE TABLE glucose_data (
 CREATE TABLE food_records (
     food_id      BIGINT NOT NULL AUTO_INCREMENT,
     user_id      BIGINT NOT NULL,
+    food_name    VARCHAR(100) NULL,
+    carbs_grams  FLOAT NULL,
+    peak_glucose INT NULL,
     image_url    VARCHAR(500) NULL,
     memo         TEXT NULL,
     meal_type    ENUM('BREAKFAST','LUNCH','DINNER','SNACK') NULL,

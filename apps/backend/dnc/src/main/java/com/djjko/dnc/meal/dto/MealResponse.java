@@ -7,25 +7,48 @@ import java.time.format.DateTimeFormatter;
 public record MealResponse(
         Long mealId,
         Long userId,
+        String foodName,
+        Double carbsGrams,
+        Integer peakGlucose,
         String imageUrl,
         String mealType,
         String eatenAt,
         String memo,
         String recordedAt,
-        String aiGuide) {
+        String aiGuide,
+        Integer calories,
+        Integer carbs,
+        Integer protein,
+        Integer fat) {
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     public static MealResponse from(FoodRecord record) {
+        return from(record, null, null, null, null);
+    }
+
+    public static MealResponse from(
+            FoodRecord record,
+            Integer calories,
+            Integer carbs,
+            Integer protein,
+            Integer fat) {
         return new MealResponse(
                 record.getFoodId(),
                 record.getUserId(),
+                record.getFoodName(),
+                record.getCarbsGrams(),
+                record.getPeakGlucose(),
                 record.getImageUrl(),
                 record.getMealType() == null ? null : record.getMealType().name(),
                 formatDate(record.getEatenAt()),
                 record.getMemo(),
                 formatDate(record.getRecordedAt()),
-                record.getAiGuide());
+                record.getAiGuide(),
+                calories,
+                carbs,
+                protein,
+                fat);
     }
 
     private static String formatDate(LocalDateTime value) {

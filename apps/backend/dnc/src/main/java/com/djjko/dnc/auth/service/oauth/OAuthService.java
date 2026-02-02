@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import com.djjko.dnc.config.oauth.OAuthProviderProperties;
 import com.djjko.dnc.config.oauth.OAuthProvidersProperties;
 import com.djjko.dnc.auth.dto.response.OAuthTokenResponse;
+import com.djjko.dnc.auth.entity.OAuthToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -104,6 +105,50 @@ public class OAuthService {
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
 
         return restTemplate.postForObject(URI.create(provider.getTokenUri()), request, OAuthTokenResponse.class);
+    }
+
+    public void revokeToken(String providerName, OAuthToken token) {
+        if (token == null) {
+            return;
+        }
+
+        OAuthProviderProperties provider = providersProperties.getProvider(providerName);
+        String revokeUri = provider.getRevokeUri();
+        if (revokeUri == null || revokeUri.isBlank()) {
+            log.info("OAuth revoke URI is not configured for {}", providerName);
+            return;
+        }
+
+        String tokenValue = token.getRefreshToken();
+        String tokenHint = "refresh_token";
+        if (tokenValue == null || tokenValue.isBlank()) {
+            tokenValue = token.getAccessToken();
+            tokenHint = "access_token";
+        }
+        if (tokenValue == null || tokenValue.isBlank()) {
+            log.warn("OAuth revoke skipped: token is missing for {}", providerName);
+            return;
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("token", tokenValue);
+        body.add("token_type_hint", tokenHint);
+        if (provider.getClientId() != null && !provider.getClientId().isBlank()) {
+            body.add("client_id", provider.getClientId());
+        }
+        if (provider.getClientSecret() != null && !provider.getClientSecret().isBlank()) {
+            body.add("client_secret", provider.getClientSecret());
+        }
+
+        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
+        try {
+            restTemplate.postForEntity(URI.create(revokeUri), request, String.class);
+        } catch (RestClientException ex) {
+            log.warn("OAuth token revoke failed for {}: {}", providerName, ex.getMessage());
+        }
     }
 
     public JsonNode fetchUserInfo(String providerName, String accessToken) {

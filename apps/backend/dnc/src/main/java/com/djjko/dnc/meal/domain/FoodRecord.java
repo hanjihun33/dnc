@@ -22,6 +22,15 @@ public class FoodRecord {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    @Column(name = "food_name")
+    private String foodName;
+
+    @Column(name = "carbs_grams")
+    private Double carbsGrams;
+
+    @Column(name = "peak_glucose")
+    private Integer peakGlucose;
+
     @Column(name = "image_url")
     private String imageUrl;
 
@@ -55,6 +64,30 @@ public class FoodRecord {
 
     public void setUserId(Long userId) {
         this.userId = userId;
+    }
+
+    public String getFoodName() {
+        return foodName;
+    }
+
+    public void setFoodName(String foodName) {
+        this.foodName = foodName;
+    }
+
+    public Double getCarbsGrams() {
+        return carbsGrams;
+    }
+
+    public void setCarbsGrams(Double carbsGrams) {
+        this.carbsGrams = carbsGrams;
+    }
+
+    public Integer getPeakGlucose() {
+        return peakGlucose;
+    }
+
+    public void setPeakGlucose(Integer peakGlucose) {
+        this.peakGlucose = peakGlucose;
     }
 
     public String getImageUrl() {
