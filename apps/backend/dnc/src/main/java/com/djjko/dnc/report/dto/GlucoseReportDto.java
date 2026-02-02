@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 @Builder
 public class GlucoseReportDto {
     private Long userId;
+    private double sensorUsagePercent;
     private String period;
     private LocalDateTime startDate;
     private LocalDateTime endDate;

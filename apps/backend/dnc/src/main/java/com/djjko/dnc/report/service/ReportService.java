@@ -28,6 +28,7 @@ public class ReportService {
     private final MonthlyReportRepository monthlyReportRepository;
     private final WeeklyReportRepository weeklyReportRepository;
     private final UserRepository userRepository;
+    private final com.djjko.dnc.glucose.repository.SensorRepository sensorRepository;
 
     private static final TirThresholds DEFAULT_TIR = new TirThresholds(54, 69, 180, 250);
     // 임의 값: 프로젝트 요구에 맞게 이 숫자만 수정해서 기준치를 조정하세요.
@@ -192,6 +193,7 @@ public class ReportService {
                 .minGlucose(stats.getMin())
                 .standardDeviation(standardDeviation)
                 .timeInRange(tirDto)
+                .sensorUsagePercent(calculateSensorUsagePercent(userId, start, end, count))
                 .build();
     }
 
@@ -302,5 +304,47 @@ public class ReportService {
             this.inRangeUpperInclusive = inRangeUpperInclusive;
             this.highUpperInclusive = highUpperInclusive;
         }
+    }
+
+    private double calculateSensorUsagePercent(Long userId, java.time.LocalDateTime start, java.time.LocalDateTime end,
+            long recordCount) {
+        List<com.djjko.dnc.glucose.entity.Sensor> sensors = sensorRepository
+                .findAllByUser(userRepository.getReferenceById(userId));
+
+        long totalActiveMinutes = 0;
+
+        for (com.djjko.dnc.glucose.entity.Sensor sensor : sensors) {
+            java.time.LocalDateTime sensorStart = sensor.getStartedAt();
+            java.time.LocalDateTime sensorEnd = sensor.getEndedAt();
+
+            if (sensorStart == null)
+                continue;
+
+            if (sensor.getStatus() == com.djjko.dnc.glucose.entity.Sensor.SensorStatus.ACTIVE && sensorEnd == null) {
+                sensorEnd = java.time.LocalDateTime.now();
+            }
+            if (sensorEnd == null)
+                continue;
+
+            // Calculate overlap with report period
+            java.time.LocalDateTime overlapStart = sensorStart.isAfter(start) ? sensorStart : start;
+            java.time.LocalDateTime overlapEnd = sensorEnd.isBefore(end) ? sensorEnd : end;
+
+            if (overlapStart.isBefore(overlapEnd)) {
+                totalActiveMinutes += java.time.temporal.ChronoUnit.MINUTES.between(overlapStart, overlapEnd);
+            }
+        }
+
+        if (totalActiveMinutes == 0)
+            return 0.0;
+
+        // Assuming 5 minutes interval (Dexcom/CareSens standard)
+        long expectedRecords = totalActiveMinutes / 5;
+
+        if (expectedRecords == 0)
+            return 0.0;
+
+        double usage = (double) recordCount / expectedRecords * 100.0;
+        return Math.min(usage, 100.0); // Cap at 100%
     }
 }

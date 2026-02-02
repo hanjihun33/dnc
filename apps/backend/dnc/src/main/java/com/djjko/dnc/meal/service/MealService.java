@@ -132,7 +132,7 @@ public class MealService {
 
     @Transactional(readOnly = true)
     public List<MealResponse> getMealsByRange(Long userId, LocalDateTime start, LocalDateTime end) {
-        return repository.findByUserIdAndEatenAtBetween(userId, start, end).stream()
+        return repository.findAllByUserIdAndEatenAtBetween(userId, start, end).stream()
                 .map(MealResponse::from)
                 .toList();
     }
