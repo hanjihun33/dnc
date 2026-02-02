@@ -1,6 +1,8 @@
 package com.djjko.dnc.auth.controller;
 
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -20,6 +22,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -49,6 +53,7 @@ public class OAuthController {
     private final GlucoseDataRepository glucoseDataRepository;
     private final JwtUtil jwtUtil;
     private final ObjectMapper objectMapper;
+    private final String appOauthRedirectUri;
 
     public OAuthController(
         OAuthService oAuthService,
@@ -58,7 +63,8 @@ public class OAuthController {
         SensorRepository sensorRepository,
         GlucoseDataRepository glucoseDataRepository,
         JwtUtil jwtUtil,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        @Value("${app.oauth-redirect-uri:testapp://}") String appOauthRedirectUri
     ) {
         this.oAuthService = oAuthService;
         this.oAuthStateService = oAuthStateService;
@@ -68,6 +74,7 @@ public class OAuthController {
         this.glucoseDataRepository = glucoseDataRepository;
         this.jwtUtil = jwtUtil;
         this.objectMapper = objectMapper;
+        this.appOauthRedirectUri = appOauthRedirectUri;
     }
 
     @GetMapping("/{provider}/authorize")
@@ -110,20 +117,32 @@ public class OAuthController {
     public ResponseEntity<?> callback(
         @PathVariable String provider,
         @RequestParam String code,
-        @RequestParam(required = false) String state
+        @RequestParam(required = false) String state,
+        @RequestParam(required = false, name = "format") String format,
+        @RequestHeader(value = "Accept", required = false) String accept
     ) {
-        OAuthTokenResponse response = oAuthService.exchangeCodeForToken(provider, code, state);
-        java.util.Optional<com.djjko.dnc.auth.entity.User> userOpt = resolveAuthenticatedUserOrState(state);
-        if (userOpt.isPresent()) {
-            com.djjko.dnc.auth.entity.User user = userOpt.get();
-            log.info("OAuth callback resolved userId={} provider={}", user.getUserId(), provider);
-            updateProviderIdIfDexcom(user, provider, response);
-            oAuthTokenService.saveToken(user, provider, response);
-            log.info("OAuth token saved for userId={} provider={}", user.getUserId(), provider);
-        } else {
-            log.warn("OAuth callback could not resolve user. provider={} statePresent={}", provider, state != null && !state.isBlank());
+        try {
+            OAuthTokenResponse response = oAuthService.exchangeCodeForToken(provider, code, state);
+            java.util.Optional<com.djjko.dnc.auth.entity.User> userOpt = resolveAuthenticatedUserOrState(state);
+            if (userOpt.isPresent()) {
+                com.djjko.dnc.auth.entity.User user = userOpt.get();
+                log.info("OAuth callback resolved userId={} provider={}", user.getUserId(), provider);
+                updateProviderIdIfDexcom(user, provider, response);
+                oAuthTokenService.saveToken(user, provider, response);
+                log.info("OAuth token saved for userId={} provider={}", user.getUserId(), provider);
+            } else {
+                log.warn("OAuth callback could not resolve user. provider={} statePresent={}", provider, state != null && !state.isBlank());
+            }
+            if (shouldRedirectToApp(format, accept)) {
+                return redirectToApp(provider, "success", null, accept);
+            }
+            return ResponseEntity.ok(response);
+        } catch (Exception ex) {
+            if (shouldRedirectToApp(format, accept)) {
+                return redirectToApp(provider, "error", ex.getMessage(), accept);
+            }
+            throw ex;
         }
-        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{provider}/token")
@@ -294,5 +313,124 @@ public class OAuthController {
         return resolveAuthenticatedUser()
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Login required"));
     }
-}
 
+    private boolean shouldRedirectToApp(String format, String accept) {
+        if (appOauthRedirectUri == null || appOauthRedirectUri.isBlank()) {
+            return false;
+        }
+        if (format != null && format.equalsIgnoreCase("json")) {
+            return false;
+        }
+        if (accept == null || accept.isBlank()) {
+            return true;
+        }
+        String normalized = accept.toLowerCase();
+        boolean hasJson = normalized.contains("application/json");
+        boolean hasHtml = normalized.contains("text/html");
+        boolean hasWildcard = normalized.contains("*/*");
+        return !hasJson || hasHtml || hasWildcard;
+    }
+
+    private ResponseEntity<?> redirectToApp(String provider, String status, String error, String accept) {
+        String redirectUrl = buildAppRedirectUrl(provider, status, error);
+        if (wantsHtml(accept)) {
+            return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.TEXT_HTML)
+                .body(buildHtmlResponse(status, redirectUrl));
+        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.setLocation(URI.create(redirectUrl));
+        return new ResponseEntity<>(headers, HttpStatus.FOUND);
+    }
+
+    private boolean wantsHtml(String accept) {
+        if (accept == null || accept.isBlank()) {
+            return true;
+        }
+        String normalized = accept.toLowerCase();
+        if (normalized.contains("application/json")) {
+            return false;
+        }
+        return normalized.contains("text/html") || normalized.contains("*/*");
+    }
+
+    private String buildAppRedirectUrl(String provider, String status, String error) {
+        String separator = appOauthRedirectUri.contains("?") ? "&" : "?";
+        StringBuilder url = new StringBuilder(appOauthRedirectUri).append(separator);
+        url.append("provider=").append(urlEncode(provider));
+        url.append("&status=").append(urlEncode(status));
+        if (error != null && !error.isBlank()) {
+            url.append("&error=").append(urlEncode(error));
+        }
+        return url.toString();
+    }
+
+    private String buildHtmlResponse(String status, String appUrl) {
+        String title = "success".equalsIgnoreCase(status) ? "연동 완료" : "연동 실패";
+        String description = "success".equalsIgnoreCase(status)
+            ? "앱으로 돌아가 주세요."
+            : "잠시 후 다시 시도해주세요.";
+        String safeAppUrl = urlEncode(appUrl);
+        return """
+            <!doctype html>
+            <html lang="ko">
+              <head>
+                <meta charset="utf-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <title>%s</title>
+                <style>
+                  body {
+                    margin: 0;
+                    padding: 32px 20px;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                    background: #f8fafc;
+                    color: #0f172a;
+                  }
+                  .card {
+                    max-width: 420px;
+                    margin: 0 auto;
+                    background: #ffffff;
+                    border-radius: 16px;
+                    padding: 24px;
+                    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+                    text-align: center;
+                  }
+                  .title { font-size: 18px; font-weight: 700; }
+                  .desc { margin-top: 8px; color: #475569; font-size: 14px; }
+                </style>
+              </head>
+              <body>
+                <div class="card">
+                  <div class="title">%s</div>
+                  <div class="desc">%s</div>
+                  <div class="link">
+                    앱이 열리지 않으면 <a id="open-app" href="#">여기를 눌러주세요</a>.
+                  </div>
+                </div>
+                <script>
+                  (function () {
+                    var appUrl = decodeURIComponent("%s");
+                    var anchor = document.getElementById("open-app");
+                    if (anchor) {
+                      anchor.setAttribute("href", appUrl);
+                    }
+                    setTimeout(function () {
+                      window.location.href = appUrl;
+                    }, 50);
+                    setTimeout(function () {
+                      window.close();
+                    }, 500);
+                  })();
+                </script>
+              </body>
+            </html>
+            """.formatted(title, title, description, safeAppUrl);
+    }
+
+    private String urlEncode(String value) {
+        if (value == null) {
+            return "";
+        }
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+}
