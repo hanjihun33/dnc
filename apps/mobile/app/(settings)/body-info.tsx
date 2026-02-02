@@ -11,7 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   bumpProfileRevision,
@@ -49,6 +49,8 @@ const getDaysInMonth = (year: number, month: number) =>
 
 export default function BodyInfoScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const isOnboarding = params.onboarding === "1";
   const now = new Date();
   const currentYear = now.getFullYear();
   const defaultYear = currentYear - 30;
@@ -231,8 +233,17 @@ export default function BodyInfoScreen() {
         }
       }
       bumpProfileRevision();
-      Alert.alert("저장 완료", "신체 정보가 저장되었습니다.");
-      router.back();
+      if (isOnboarding) {
+        Alert.alert("저장 완료", "신체 정보가 저장되었습니다.", [
+          {
+            text: "완료",
+            onPress: () => router.replace("/(tabs)"),
+          },
+        ]);
+      } else {
+        Alert.alert("저장 완료", "신체 정보가 저장되었습니다.");
+        router.back();
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "저장에 실패했습니다.";

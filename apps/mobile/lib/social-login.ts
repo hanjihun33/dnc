@@ -1,5 +1,6 @@
-import * as WebBrowser from "expo-web-browser";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -12,6 +13,67 @@ export type SocialLoginResponse = {
   refreshToken?: string;
   tokenType?: string;
   expiresIn?: number;
+};
+
+const PENDING_KEY = "social_login_pending_v1";
+let pendingSocialLogin = false;
+let processingSocialLogin = false;
+const pendingListeners = new Set<(value: boolean) => void>();
+const processingListeners = new Set<(value: boolean) => void>();
+
+const persistPending = async (value: boolean) => {
+  try {
+    if (value) {
+      await AsyncStorage.setItem(PENDING_KEY, "1");
+    } else {
+      await AsyncStorage.removeItem(PENDING_KEY);
+    }
+  } catch {
+    // Ignore storage errors.
+  }
+};
+
+export const setSocialLoginPending = (value: boolean) => {
+  pendingSocialLogin = value;
+  pendingListeners.forEach((listener) => listener(value));
+  void persistPending(value);
+};
+
+export const getSocialLoginPending = () => pendingSocialLogin;
+
+export const subscribeSocialLoginPending = (listener: (value: boolean) => void) => {
+  pendingListeners.add(listener);
+  return () => {
+    pendingListeners.delete(listener);
+  };
+};
+
+export const loadSocialLoginPending = async () => {
+  try {
+    const stored = await AsyncStorage.getItem(PENDING_KEY);
+    const value = stored === "1";
+    pendingSocialLogin = value;
+    pendingListeners.forEach((listener) => listener(value));
+    return value;
+  } catch {
+    return pendingSocialLogin;
+  }
+};
+
+export const setSocialLoginProcessing = (value: boolean) => {
+  processingSocialLogin = value;
+  processingListeners.forEach((listener) => listener(value));
+};
+
+export const getSocialLoginProcessing = () => processingSocialLogin;
+
+export const subscribeSocialLoginProcessing = (
+  listener: (value: boolean) => void
+) => {
+  processingListeners.add(listener);
+  return () => {
+    processingListeners.delete(listener);
+  };
 };
 
 const API_BASE_URL =

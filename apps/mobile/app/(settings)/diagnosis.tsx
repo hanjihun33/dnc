@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   bumpProfileRevision,
@@ -62,6 +62,8 @@ const mapRequestType = (value: DiabetesStatus) => {
 
 export default function DiagnosisScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const isOnboarding = params.onboarding === "1";
   const now = new Date();
   const currentYear = now.getFullYear();
   const yearOptions = Array.from(
@@ -207,8 +209,21 @@ export default function DiagnosisScreen() {
         throw new Error("진단 유형 저장에 실패했습니다.");
       }
       bumpProfileRevision();
-      Alert.alert("저장 완료", "진단 유형이 저장되었습니다.");
-      router.back();
+      if (isOnboarding) {
+        Alert.alert("저장 완료", "진단 유형이 저장되었습니다.", [
+          {
+            text: "다음",
+            onPress: () =>
+              router.replace({
+                pathname: "/(settings)/body-info",
+                params: { onboarding: "1" },
+              }),
+          },
+        ]);
+      } else {
+        Alert.alert("저장 완료", "진단 유형이 저장되었습니다.");
+        router.back();
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "저장에 실패했습니다.";
