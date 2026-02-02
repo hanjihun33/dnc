@@ -10,9 +10,9 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { setAuthSession } from "../session";
+import { setAuthSession } from "@/session";
 
-import { useSignupDraft } from "./_signup-context";
+import { useSignupDraft } from "@/components/signup-context";
 
 const palette = {
   background: "#F8FAFC",

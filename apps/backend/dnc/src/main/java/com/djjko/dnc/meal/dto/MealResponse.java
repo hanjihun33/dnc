@@ -33,10 +33,24 @@ public record MealResponse(
             Integer carbs,
             Integer protein,
             Integer fat) {
+        return from(record, calories, carbs, protein, fat, null);
+    }
+
+    public static MealResponse from(
+            FoodRecord record,
+            Integer calories,
+            Integer carbs,
+            Integer protein,
+            Integer fat,
+            String foodNameOverride) {
+        String resolvedFoodName = record == null ? null : record.getFoodName();
+        if (foodNameOverride != null && !foodNameOverride.isBlank()) {
+            resolvedFoodName = foodNameOverride;
+        }
         return new MealResponse(
                 record.getFoodId(),
                 record.getUserId(),
-                record.getFoodName(),
+                resolvedFoodName,
                 record.getCarbsGrams(),
                 record.getPeakGlucose(),
                 record.getImageUrl(),

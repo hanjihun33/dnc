@@ -9,9 +9,8 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { loadAuthSession, setAuthSession } from "../session";
-import { registerPushTokenWithServer } from "../push";
-import SocialLoginSection from "@/components/social-login-section";
+import { loadAuthSession, setAuthSession } from "@/session";
+import { registerPushTokenWithServer } from "@/push";
 
 const palette = {
   background: "#F8FAFC",

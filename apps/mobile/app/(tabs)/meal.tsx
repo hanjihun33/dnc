@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   Image,
@@ -14,11 +14,11 @@ import {
   View,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { LineChart } from "react-native-chart-kit";
-import { useFocusEffect } from "@react-navigation/native";
-import { getAuthHeaders, loadAuthSession } from "../session";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { getAuthHeaders, loadAuthSession } from "@/session";
 
 const mealTypes = ["아침", "점심", "저녁", "간식"];
 const chartWidth = Dimensions.get("window").width - 48;
@@ -36,6 +36,13 @@ const mealTypeMap: Record<string, string> = {
   점심: "LUNCH",
   저녁: "DINNER",
   간식: "SNACK",
+};
+
+const mealTypeLabelMap: Record<string, string> = {
+  BREAKFAST: mealTypes[0],
+  LUNCH: mealTypes[1],
+  DINNER: mealTypes[2],
+  SNACK: mealTypes[3],
 };
 
 const palette = {
@@ -79,6 +86,22 @@ interface PredictionData {
   nutrition: NutritionData;
 }
 
+type MealResponse = {
+  mealId?: number;
+  mealType?: string | null;
+  eatenAt?: string | null;
+  recordedAt?: string | null;
+  imageUrl?: string | null;
+  memo?: string | null;
+  aiGuide?: string | null;
+  foodName?: string | null;
+  carbsGrams?: number | null;
+  calories?: number | null;
+  carbs?: number | null;
+  protein?: number | null;
+  fat?: number | null;
+};
+
 const fallbackNutrition: NutritionData = {
   calories: 460,
   servingSize: "1인분 (230g)",
@@ -118,6 +141,12 @@ const formatApiDate = (date: Date) => {
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const day = `${date.getDate()}`.padStart(2, "0");
   return `${year}-${month}-${day}`;
+};
+
+const parseApiDateTime = (value?: string | null) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
 const formatTime = (date: Date) => {
@@ -243,12 +272,25 @@ const getPredictionSummary = (type: string | null, values: number[]) => {
 
 export default function MealScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { mealId: mealIdParam } = useLocalSearchParams<{ mealId?: string }>();
+  const editMealId =
+    typeof mealIdParam === "string" && mealIdParam.length > 0
+      ? Number(mealIdParam)
+      : NaN;
+  const isEditMode = Number.isFinite(editMealId);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] =
     useState<ImagePicker.ImagePickerAsset | null>(null);
   const [predictionData, setPredictionData] = useState<PredictionData | null>(
     null
   );
+  const [analysisSnapshot, setAnalysisSnapshot] = useState<{
+    foodName?: string;
+    nutrition?: NutritionData;
+  } | null>(null);
+  const [editCarbsGrams, setEditCarbsGrams] = useState<number | null>(null);
+  const [editAiGuide, setEditAiGuide] = useState<string | null>(null);
   const [imageLayout, setImageLayout] = useState({ width: 0, height: 0 });
   const [mealType, setMealType] = useState(mealTypes[0]);
   const [mealDate, setMealDate] = useState(new Date());
@@ -259,6 +301,7 @@ export default function MealScreen() {
   const [pickerMode, setPickerMode] = useState<"date" | "time" | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditLoading, setIsEditLoading] = useState(false);
   const [replacePrompt, setReplacePrompt] = useState({
     visible: false,
     message: "",
@@ -276,6 +319,74 @@ export default function MealScreen() {
   const periodScrollRef = useRef<ScrollView | null>(null);
   const hourScrollRef = useRef<ScrollView | null>(null);
   const minuteScrollRef = useRef<ScrollView | null>(null);
+  const wasEditModeRef = useRef(false);
+
+  useEffect(() => {
+    if (!isEditMode) {
+      return;
+    }
+    let isActive = true;
+    const loadMealForEdit = async () => {
+      setIsEditLoading(true);
+      try {
+        await loadAuthSession();
+        const response = await fetch(`${API_BASE_URL}/api/v1/meals/${editMealId}`, {
+          headers: getAuthHeaders(),
+        });
+        if (!response.ok) {
+          throw new Error("\uae30\ub85d \uc815\ubcf4\ub97c \ubd88\ub7ec\uc624\uc9c0 \ubabb\ud588\uc5b4\uc694.");
+        }
+        const data = (await response.json()) as MealResponse;
+        if (!isActive) {
+          return;
+        }
+        const parsed =
+          parseApiDateTime(data.eatenAt) ??
+          parseApiDateTime(data.recordedAt) ??
+          new Date();
+        const resolvedType =
+          data.mealType != null ? mealTypeLabelMap[data.mealType] : undefined;
+        const nextMealType = resolvedType ?? mealTypes[0];
+        setMealType(nextMealType);
+        setMealDate(parsed);
+        setMealTime(parsed);
+        setTempDate(parsed);
+        setCalendarMonth(new Date(parsed.getFullYear(), parsed.getMonth(), 1));
+        const parts = getTimeParts(parsed);
+        setTimePeriod(parts.period);
+        setTimeHour(parts.hour);
+        setTimeMinute(parts.minute);
+        setMemo(data.memo ?? "");
+        setSelectedImage(data.imageUrl ?? null);
+        setSelectedAsset(null);
+        setPredictionData(null);
+        setAnalysisSnapshot(
+          data.foodName ? { foodName: data.foodName } : null
+        );
+        setEditCarbsGrams(
+          data.carbsGrams != null ? data.carbsGrams : null
+        );
+        setEditAiGuide(data.aiGuide ?? null);
+        setNoticeMessage(null);
+      } catch (error) {
+        console.warn(error);
+        if (isActive) {
+          Alert.alert(
+            "\ubd88\ub7ec\uc624\uae30 \uc2e4\ud328",
+            "\uae30\ub85d \uc815\ubcf4\ub97c \ubd88\ub7ec\uc624\uc9c0 \ubabb\ud588\uc5b4\uc694."
+          );
+        }
+      } finally {
+        if (isActive) {
+          setIsEditLoading(false);
+        }
+      }
+    };
+    void loadMealForEdit();
+    return () => {
+      isActive = false;
+    };
+  }, [isEditMode, editMealId]);
 
   const scrollToIndex = (ref: React.RefObject<ScrollView>, index: number) => {
     if (!ref.current) {
@@ -340,11 +451,15 @@ export default function MealScreen() {
   };
 
   const clearImage = React.useCallback(() => {
+    if (isEditMode) {
+      return;
+    }
     setSelectedImage(null);
     setSelectedAsset(null);
     setPredictionData(null);
+    setAnalysisSnapshot(null);
     setNoticeMessage(null);
-  }, []);
+  }, [isEditMode]);
 
   const resetForm = React.useCallback(() => {
     const now = new Date();
@@ -353,6 +468,8 @@ export default function MealScreen() {
     setMealDate(now);
     setMealTime(now);
     setMemo("");
+    setEditCarbsGrams(null);
+    setEditAiGuide(null);
     setAutoAdvanceTime(false);
     setPickerMode(null);
     setIsAnalyzing(false);
@@ -363,6 +480,17 @@ export default function MealScreen() {
     setTimeHour(parts.hour);
     setTimeMinute(parts.minute);
   }, [clearImage]);
+
+  useEffect(() => {
+    if (isEditMode) {
+      wasEditModeRef.current = true;
+      return;
+    }
+    if (wasEditModeRef.current) {
+      wasEditModeRef.current = false;
+      resetForm();
+    }
+  }, [isEditMode, resetForm]);
 
   const confirmReplaceMeal = React.useCallback(
     (targetDate: Date, targetMealLabel: string) =>
@@ -394,7 +522,9 @@ export default function MealScreen() {
           if (!meal.mealId || !meal.mealType || !meal.eatenAt) {
             return false;
           }
-          const dateKey = meal.eatenAt.slice(0, 10);
+          const parsed = parseApiDateTime(meal.eatenAt);
+          if (!parsed) return false;
+          const dateKey = formatApiDate(parsed);
           return meal.mealType === targetMealType && dateKey === targetDateKey;
         })
         .map((meal) => meal.mealId as number);
@@ -404,17 +534,31 @@ export default function MealScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
+      if (isEditMode) {
+        return;
+      }
       if (selectedAsset || selectedImage) {
         return;
       }
       resetForm();
-    }, [resetForm, selectedAsset, selectedImage])
+    }, [isEditMode, resetForm, selectedAsset, selectedImage])
   );
 
   useFocusEffect(
     React.useCallback(() => {
       void loadDiabetesType();
     }, [loadDiabetesType])
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        if (isEditMode) {
+          (navigation as { setParams?: (params: Record<string, unknown>) => void })
+            .setParams?.({ mealId: undefined });
+        }
+      };
+    }, [isEditMode, navigation])
   );
 
   const handleSubmit = async () => {
@@ -475,6 +619,12 @@ export default function MealScreen() {
           `meal-${Date.now()}.${selectedAsset.uri.split(".").pop() ?? "jpg"}`,
         type: selectedAsset.mimeType ?? "image/jpeg",
       } as unknown as Blob);
+      if (analysisSnapshot?.foodName && analysisSnapshot.foodName.trim()) {
+        formData.append("foodName", analysisSnapshot.foodName.trim());
+      }
+      if (analysisSnapshot?.nutrition?.carbs != null) {
+        formData.append("carbsGrams", String(analysisSnapshot.nutrition.carbs));
+      }
       formData.append("mealType", mealTypeMap[mealType] ?? "SNACK");
       formData.append("eatenAt", eatenAt.toISOString());
       if (memo.trim()) {
@@ -500,6 +650,87 @@ export default function MealScreen() {
       } else {
         Alert.alert("저장 실패", "식단 기록 저장에 실패했어요.");
       }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!isEditMode || !Number.isFinite(editMealId) || isSubmitting) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await loadAuthSession();
+      const parts = getTimeParts(mealTime);
+      const eatenAt = buildTimeDate(
+        mealDate,
+        parts.period,
+        parts.hour,
+        parts.minute
+      );
+
+      if (selectedAsset) {
+        const formData = new FormData();
+        formData.append("image", {
+          uri: selectedAsset.uri,
+          name:
+            selectedAsset.fileName ??
+            `meal-${Date.now()}.${selectedAsset.uri.split(".").pop() ?? "jpg"}`,
+          type: selectedAsset.mimeType ?? "image/jpeg",
+        } as unknown as Blob);
+        const imageResponse = await fetch(
+          `${API_BASE_URL}/api/v1/meals/${editMealId}/image`,
+          {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: formData,
+          }
+        );
+
+        if (!imageResponse.ok) {
+          throw new Error("\uae30\ub85d \uc218\uc815\uc5d0 \uc2e4\ud328\ud588\uc5b4\uc694.");
+        }
+      }
+
+      const payload: Record<string, unknown> = {
+        mealType: mealTypeMap[mealType] ?? "SNACK",
+        eatenAt: eatenAt.toISOString(),
+        memo: memo.trim(),
+      };
+      if (analysisSnapshot?.foodName && analysisSnapshot.foodName.trim()) {
+        payload.foodName = analysisSnapshot.foodName.trim();
+      }
+      const resolvedCarbs =
+        analysisSnapshot?.nutrition?.carbs ?? editCarbsGrams;
+      if (resolvedCarbs != null) {
+        payload.carbsGrams = resolvedCarbs;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/meals/${editMealId}`, {
+        method: "PATCH",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error("\uae30\ub85d \uc218\uc815\uc5d0 \uc2e4\ud328\ud588\uc5b4\uc694.");
+      }
+
+      router.replace({
+        pathname: "/(tabs)/meal-detail",
+        params: { mealId: String(editMealId) },
+      });
+    } catch (error) {
+      console.warn(error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "\uae30\ub85d \uc218\uc815\uc5d0 \uc2e4\ud328\ud588\uc5b4\uc694.";
+      Alert.alert("\uc218\uc815 \uc2e4\ud328", message);
     } finally {
       setIsSubmitting(false);
     }
@@ -569,6 +800,10 @@ export default function MealScreen() {
         };
         nutrition?: NutritionData;
       };
+      setAnalysisSnapshot({
+        foodName: data.foodName,
+        nutrition: data.nutrition,
+      });
       const labels =
         data.labels?.map((label) =>
           label.endsWith("분") ? label : `${label}분`
@@ -598,12 +833,18 @@ export default function MealScreen() {
     } catch (error) {
       console.warn(error);
       setPredictionData(buildFallbackPrediction());
+      setAnalysisSnapshot(null);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
   const pickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("\uad8c\ud55c \ud544\uc694", "\uac24\ub7ec\ub9ac \uc811\uadfc \uad8c\ud55c\uc744 \ud5c8\uc6a9\ud574\uc8fc\uc138\uc694.");
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -622,35 +863,111 @@ export default function MealScreen() {
       setMealTime(appliedDate);
       setNoticeMessage(
         exifDate
-          ? "사진이 촬영된 시간으로 변경되었어요!"
-          : "메타데이터가 없을 때 현재 시간으로 입력되었어요."
+          ? "\uc0ac\uc9c4\uc758 \ucd2c\uc601 \uc2dc\uac04\uc73c\ub85c \uc790\ub3d9 \uc785\ub825\ud588\uc5b4\uc694."
+          : "\uba54\ud0c0\ub370\uc774\ud130\uac00 \uc5c6\uc5b4 \ud604\uc7ac \uc2dc\uac04\uc73c\ub85c \uc785\ub825\ud588\uc5b4\uc694."
       );
       setSelectedAsset(asset);
       setSelectedImage(asset.uri);
       setPredictionData(null);
+      setAnalysisSnapshot(null);
       analyzeImage(asset);
     }
   };
 
+
+
+  const pickImageFromCamera = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("\uad8c\ud55c \ud544\uc694", "\uce74\uba54\ub77c \uc811\uadfc \uad8c\ud55c\uc744 \ud5c8\uc6a9\ud574\uc8fc\uc138\uc694.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+      exif: true,
+    });
+
+    if (!result.canceled) {
+      const asset = result.assets[0];
+      const exifDate = getExifDate(
+        asset.exif as Record<string, unknown> | undefined
+      );
+      const appliedDate = exifDate ?? new Date();
+      setMealDate(appliedDate);
+      setMealTime(appliedDate);
+      setNoticeMessage(
+        exifDate
+          ? "\uc0ac\uc9c4\uc758 \ucd2c\uc601 \uc2dc\uac04\uc73c\ub85c \uc790\ub3d9 \uc785\ub825\ud588\uc5b4\uc694."
+          : "\uba54\ud0c0\ub370\uc774\ud130\uac00 \uc5c6\uc5b4 \ud604\uc7ac \uc2dc\uac04\uc73c\ub85c \uc785\ub825\ud588\uc5b4\uc694."
+      );
+      setSelectedAsset(asset);
+      setSelectedImage(asset.uri);
+      setPredictionData(null);
+      setAnalysisSnapshot(null);
+      analyzeImage(asset);
+    }
+  };
+
+
+
   const calendarCells = getMonthMatrix(calendarMonth);
   const isTimePicker = pickerMode === "time";
+  /*
   const isSubmitDisabled = !selectedAsset || isSubmitting;
   const footerButtonLabel = isSubmitting ? "저장 중..." : "기록 완료";
+
+  */
+  const isSubmitDisabled =
+    isSubmitting || isEditLoading || (!isEditMode && !selectedAsset);
+  const footerButtonLabel = isSubmitting
+    ? isEditMode
+      ? "\uc218\uc815 \uc911..."
+      : "\uc800\uc7a5 \uc911..."
+    : isEditMode
+      ? "\uc218\uc815 \uc644\ub8cc"
+      : "\uae30\ub85d \uc644\ub8cc";
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.page}
+        contentContainerStyle={[styles.page, isEditMode && styles.pageEdit]}
       >
-        <View style={styles.headerRow}>
+        <View style={[styles.headerRow, isEditMode && styles.headerRowEdit]}>
+          <View style={styles.headerLeft}>
+          {isEditMode && (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.backButtonText}>{"<"}</Text>
+            </TouchableOpacity>
+          )}
+          {isEditMode ? (
+            <Text style={styles.pageTitle}>{"\uae30\ub85d \uc218\uc815"}</Text>
+          ) : (
+            <Text style={styles.pageTitle}>{"\uc2dd\ub2e8 \uae30\ub85d"}</Text>
+          )}
+          {/*
           <Text style={styles.pageTitle}>식사기록</Text>
-          <View style={styles.tipBadge}>
+          */}
+          </View>
+          <View style={[styles.tipBadge, isEditMode && styles.tipBadgeHidden]}>
             <Text style={styles.tipText}>음식을 추가해보세요!</Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>식사 유형</Text>
+        <Text
+          style={[
+            styles.sectionTitle,
+            isEditMode && styles.sectionTitleEdit,
+            isEditMode && styles.sectionTitleFirstEdit,
+          ]}
+        >
+          식사 유형
+        </Text>
         <View style={styles.mealTypeRow}>
           {mealTypes.map((type) => {
             const isActive = mealType === type;
@@ -676,7 +993,7 @@ export default function MealScreen() {
           })}
         </View>
 
-        {selectedImage && (
+        {(selectedImage || isEditMode) && (
           <View style={styles.infoRow}>
             <TouchableOpacity
               style={styles.infoCard}
@@ -701,34 +1018,61 @@ export default function MealScreen() {
           </View>
         )}
 
-        {selectedImage && (
+        {(selectedImage || isEditMode) && (
           <View style={styles.noticeCard}>
             <Text style={styles.noticeTitle}>
-              {noticeMessage ?? "사진이 촬영된 시간으로 변경되었어요!"}
+              {noticeMessage ?? "\uc0ac\uc9c4\uc758 \ucd2c\uc601 \uc2dc\uac04\uc73c\ub85c \uc790\ub3d9 \uc785\ub825\ud588\uc5b4\uc694."}
             </Text>
             <TouchableOpacity onPress={handleDirectEdit}>
-              <Text style={styles.noticeAction}>직접 수정하기</Text>
+              <Text style={styles.noticeAction}>{"\uc9c1\uc811 \uc218\uc815\ud558\uae30"}</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>사진</Text>
+        <Text
+          style={[styles.sectionTitle, isEditMode && styles.sectionTitleEdit]}
+        >
+          {"\uc0ac\uc9c4"}
+        </Text>
         {!selectedImage ? (
-          <TouchableOpacity style={styles.imagePickerCard} onPress={pickImage}>
-            <Text style={styles.imagePickerTitle}>음식 사진을 추가해보세요</Text>
+          <View style={styles.imagePickerCard}>
+            <Text style={styles.imagePickerTitle}>{"\uc74c\uc2dd \uc0ac\uc9c4\uc744 \ucd94\uac00\ud574\ubcf4\uc138\uc694"}</Text>
             <Text style={styles.imagePickerSubtitle}>
-              앨범에서 선택하거나 바로 촬영할 수 있어요.
+              {"\uac24\ub7ec\ub9ac\uc5d0\uc11c \uc120\ud0dd\ud558\uac70\ub098 \uc9c0\uae08 \ucd2c\uc601\ud560 \uc218 \uc788\uc5b4\uc694."}
             </Text>
-          </TouchableOpacity>
+            <View style={styles.imagePickerActions}>
+              <TouchableOpacity
+                style={styles.imagePickerButton}
+                onPress={pickImageFromCamera}
+              >
+                <Text style={styles.imagePickerButtonText}>{"\ucd2c\uc601\ud558\uae30"}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.imagePickerButton, styles.imagePickerButtonSecondary]}
+                onPress={pickImage}
+              >
+                <Text
+                  style={[
+                    styles.imagePickerButtonText,
+                    styles.imagePickerButtonTextSecondary,
+                  ]}
+                >
+                  {"\uc0ac\uc9c4"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         ) : (
           <View style={styles.imageCard} onLayout={handleImageLayout}>
             <Image source={{ uri: selectedImage }} style={styles.imagePreview} />
-            <TouchableOpacity
-              style={styles.imageRemoveButton}
-              onPress={clearImage}
-            >
-              <Text style={styles.imageRemoveText}>X</Text>
-            </TouchableOpacity>
+            {!isEditMode && (
+              <TouchableOpacity
+                style={styles.imageRemoveButton}
+                onPress={clearImage}
+              >
+                <Text style={styles.imageRemoveText}>X</Text>
+              </TouchableOpacity>
+            )}
             {predictionData?.foodName ? (
               <View
                 style={[
@@ -759,13 +1103,40 @@ export default function MealScreen() {
             ) : null}
           </View>
         )}
+        {isEditMode && (
+          <View style={styles.imagePickerActions}>
+            <TouchableOpacity
+              style={styles.imagePickerButton}
+              onPress={pickImageFromCamera}
+            >
+              <Text style={styles.imagePickerButtonText}>{"\ucd2c\uc601\ud558\uae30"}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.imagePickerButton, styles.imagePickerButtonSecondary]}
+              onPress={pickImage}
+            >
+              <Text
+                style={[
+                  styles.imagePickerButtonText,
+                  styles.imagePickerButtonTextSecondary,
+                ]}
+              >
+                {"\uc0ac\uc9c4"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
         {selectedImage && isAnalyzing && (
           <Text style={styles.analyzingText}>AI 분석 중...</Text>
         )}
 
         {selectedImage && predictionData && (
           <View style={styles.resultsContainer}>
-            <Text style={styles.sectionTitle}>예상 혈당 변화</Text>
+            <Text
+              style={[styles.sectionTitle, isEditMode && styles.sectionTitleEdit]}
+            >
+              예상 혈당 변화
+            </Text>
             <View style={styles.predictionBlock}>
               <Text style={styles.predictionTitle}>예상 혈당 반응</Text>
               <Text style={styles.predictionSubtitle}>
@@ -827,12 +1198,20 @@ export default function MealScreen() {
               </View>
             </View>
 
-            <Text style={styles.sectionTitle}>섭취 가이드</Text>
+            <Text
+              style={[styles.sectionTitle, isEditMode && styles.sectionTitleEdit]}
+            >
+              섭취 가이드
+            </Text>
             <View style={styles.guideCard}>
               <Text style={styles.guideText}>{predictionData.guide}</Text>
             </View>
 
-            <Text style={styles.sectionTitle}>영양 성분</Text>
+            <Text
+              style={[styles.sectionTitle, isEditMode && styles.sectionTitleEdit]}
+            >
+              영양 성분
+            </Text>
             <View style={styles.nutritionCard}>
               <View style={styles.caloriesRow}>
                 <Text style={styles.caloriesValue}>
@@ -880,9 +1259,26 @@ export default function MealScreen() {
           </View>
         )}
 
-        {selectedImage && (
+        {isEditMode && editAiGuide && !selectedAsset ? (
           <>
-            <Text style={styles.sectionTitle}>메모</Text>
+            <Text
+              style={[styles.sectionTitle, isEditMode && styles.sectionTitleEdit]}
+            >
+              {"AI \uac00\uc774\ub4dc"}
+            </Text>
+            <View style={styles.guideCard}>
+              <Text style={styles.guideText}>{editAiGuide}</Text>
+            </View>
+          </>
+        ) : null}
+
+        {(selectedImage || isEditMode) && (
+          <>
+            <Text
+              style={[styles.sectionTitle, isEditMode && styles.sectionTitleEdit]}
+            >
+              메모
+            </Text>
             <View style={styles.memoCard}>
               <TextInput
                 value={memo}
@@ -904,7 +1300,7 @@ export default function MealScreen() {
             styles.footerButton,
             isSubmitDisabled && styles.footerButtonDisabled,
           ]}
-          onPress={handleSubmit}
+          onPress={isEditMode ? handleUpdate : handleSubmit}
           disabled={isSubmitDisabled}
         >
           <Text
@@ -1242,11 +1638,31 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "android" ? 40 : 20,
     paddingBottom: 140,
   },
+  pageEdit: {
+    paddingTop: 0,
+  },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 16,
+  },
+  headerRowEdit: {
+    marginBottom: 0,
+    marginTop: Platform.OS === "android" ? -50 : -8,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  backButton: {
+    paddingVertical: 6,
+    paddingRight: 10,
+  },
+  backButtonText: {
+    fontSize: 20,
+    color: palette.text,
   },
   pageTitle: { fontSize: 26, fontWeight: "700", color: palette.text },
   tipBadge: {
@@ -1255,13 +1671,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
+  tipBadgeHidden: {
+    opacity: 0,
+    width: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    marginLeft: 0,
+  },
   tipText: { color: palette.ink, fontWeight: "700", fontSize: 13 },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
     color: palette.text,
-    marginTop: 18,
-    marginBottom: 12,
+    marginTop: 12,
+    marginBottom: 10,
+  },
+  sectionTitleEdit: {
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  sectionTitleFirstEdit: {
+    marginTop: -70,
   },
   mealTypeRow: {
     flexDirection: "row",
@@ -1352,6 +1782,31 @@ const styles = StyleSheet.create({
   imagePickerSubtitle: {
     fontSize: 13,
     color: palette.textMuted,
+  },
+  imagePickerActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 16,
+    alignSelf: "stretch",
+  },
+  imagePickerButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+    backgroundColor: palette.accent,
+  },
+  imagePickerButtonSecondary: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  imagePickerButtonText: {
+    color: palette.ink,
+    fontWeight: "700",
+  },
+  imagePickerButtonTextSecondary: {
+    color: palette.text,
   },
   imageCard: {
     borderRadius: 22,
