@@ -16,5 +16,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByProviderId(String providerId);
 
     Optional<User> findByProviderAndProviderId(String provider, String providerId);
+
     Optional<User> findByDexcomUserId(String dexcomUserId);
 }
