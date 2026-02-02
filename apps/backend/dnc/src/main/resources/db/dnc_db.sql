@@ -25,7 +25,10 @@ DROP TABLE IF EXISTS food_metadata;
 DROP TABLE IF EXISTS food_records;
 DROP TABLE IF EXISTS glucose_data;
 DROP TABLE IF EXISTS sensors;
+DROP TABLE IF EXISTS user_push_tokens;
+DROP TABLE IF EXISTS user_alert_settings;
 DROP TABLE IF EXISTS user_settings;
+DROP TABLE IF EXISTS social_accounts;
 DROP TABLE IF EXISTS oauth_tokens;
 DROP TABLE IF EXISTS users;
 
@@ -92,7 +95,43 @@ CREATE TABLE user_settings (
         FOREIGN KEY (user_id) REFERENCES users (user_id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
+-- 2-2-1. user_alert_settings (1:N)
+CREATE TABLE user_alert_settings (
+    alert_setting_id  BIGINT   NOT NULL AUTO_INCREMENT,
+    user_id           BIGINT   NOT NULL,
+    alert_type        ENUM('HIGH','LOW','VERY_LOW','URGENT_LOW','RAPID_RISE') NOT NULL,
+    threshold_value   INT      NULL,
+    rate_threshold    DOUBLE   NULL,
+    interval_minutes  INT      NOT NULL DEFAULT 15,
+    enabled           BOOLEAN  NOT NULL DEFAULT TRUE,
+    created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                          ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (alert_setting_id),
+    UNIQUE KEY uk_user_alert_type (user_id, alert_type),
+    CONSTRAINT fk_user_alert_settings_user
+        FOREIGN KEY (user_id) REFERENCES users (user_id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
 
+-- 2-2-2. user_push_tokens (1:N)
+CREATE TABLE user_push_tokens (
+    token_id          BIGINT   NOT NULL AUTO_INCREMENT,
+    user_id           BIGINT   NOT NULL,
+    platform          ENUM('ANDROID','IOS','WEB') NOT NULL,
+    token             VARCHAR(512) NOT NULL,
+    enabled           BOOLEAN NOT NULL DEFAULT TRUE,
+    last_seen_at      TIMESTAMP NULL,
+    created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                          ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (token_id),
+    UNIQUE KEY uk_user_token (user_id, token),
+    UNIQUE KEY uk_token (token),
+    CONSTRAINT fk_user_push_tokens_user
+        FOREIGN KEY (user_id) REFERENCES users (user_id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
 -- 2-3. oauth_tokens (OAuth 인증 토큰 관리)
 CREATE TABLE oauth_tokens (
     token_id      BIGINT       NOT NULL AUTO_INCREMENT,
@@ -161,6 +200,9 @@ CREATE TABLE glucose_data (
 CREATE TABLE food_records (
     food_id      BIGINT NOT NULL AUTO_INCREMENT,
     user_id      BIGINT NOT NULL,
+    food_name    VARCHAR(100) NULL,
+    carbs_grams  FLOAT NULL,
+    peak_glucose INT NULL,
     image_url    VARCHAR(500) NULL,
     memo         TEXT NULL,
     meal_type    ENUM('BREAKFAST','LUNCH','DINNER','SNACK') NULL,

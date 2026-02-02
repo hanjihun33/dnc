@@ -14,8 +14,9 @@ import os
 # RESNET_MODEL_PATH = r"C:\Users\SSAFY\Desktop\S14P11C105\ai\models\new_opencv_ckpt_b84_e200.pth"
 
 # ==============================================================================
-DEFAULT_YOLO_PATH = r"C:\Users\SSAFY\Desktop\S14P11C105\ai\models\best1to40.pt"
-DEFAULT_RESNET_PATH = r"C:\Users\SSAFY\Desktop\S14P11C105\ai\models\new_opencv_ckpt_b84_e200.pth"
+DEFAULT_YOLO_PATH = r"C:\Users\SSAFY\\S14P11C105\apps\ai-server\ai\models\best1to40.pt"
+DEFAULT_RESNET_PATH = r"C:\Users\SSAFY\\S14P11C105\apps\ai-server\ai\models\new_opencv_ckpt_b84_e200.pth"
+
 
 class FoodDetection:
 

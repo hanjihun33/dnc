@@ -27,7 +27,11 @@ public class Sensor {
     @Enumerated(EnumType.STRING)
     private SensorStatus status;
 
+    @Column(name = "started_at")
     private LocalDateTime startedAt;
+    private LocalDateTime endedAt;
+
+    @Column(name = "ended_at")
     private LocalDateTime endedAt;
 
     public enum SensorStatus {
@@ -36,5 +40,14 @@ public class Sensor {
 
     public void changeStatus(SensorStatus newStatus) {
         this.status = newStatus;
+    }
+
+    public void updatePeriod(LocalDateTime startedAt, LocalDateTime endedAt) {
+        this.startedAt = startedAt;
+        this.endedAt = endedAt;
+    }
+
+    public void updateEndedAt(LocalDateTime endedAt) {
+        this.endedAt = endedAt;
     }
 }

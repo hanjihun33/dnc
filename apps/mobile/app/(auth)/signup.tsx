@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 
-import { useSignupDraft } from "./signup-context";
+import { useSignupDraft } from "./_signup-context";
 
 const palette = {
   background: "#F8FAFC",

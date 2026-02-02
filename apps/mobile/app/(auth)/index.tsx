@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import SocialLoginSection from "@/components/social-login-section";
 
 const palette = {
   background: "#FFFFFF",
@@ -45,6 +46,8 @@ export default function AuthEntryScreen() {
             <Text style={styles.emailText}>이메일(아이디)로 가입하기</Text>
           </TouchableOpacity>
         </View>
+
+        <SocialLoginSection />
 
         <View style={styles.loginRow}>
           <Text style={styles.loginHint}>이미 계정이 있으신가요?</Text>

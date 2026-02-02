@@ -10,6 +10,8 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { loadAuthSession, setAuthSession } from "../session";
+import { registerPushTokenWithServer } from "../push";
+import SocialLoginSection from "@/components/social-login-section";
 
 const palette = {
   background: "#F8FAFC",
@@ -75,6 +77,7 @@ export default function LoginScreen() {
       }
       const tokenType = loginData.tokenType ?? "Bearer";
       await setAuthSession({ accessToken, tokenType });
+      await registerPushTokenWithServer();
 
       try {
         await loadAuthSession();
@@ -179,6 +182,8 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        <SocialLoginSection />
       </ScrollView>
     </SafeAreaView>
   );

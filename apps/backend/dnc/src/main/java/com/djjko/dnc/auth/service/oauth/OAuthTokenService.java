@@ -7,6 +7,7 @@ import com.djjko.dnc.auth.entity.OAuthToken;
 import com.djjko.dnc.auth.entity.User;
 import com.djjko.dnc.auth.dto.response.OAuthTokenResponse;
 import com.djjko.dnc.auth.repository.OAuthTokenRepository;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
@@ -40,6 +41,14 @@ public class OAuthTokenService {
         return oauthTokenRepository
             .findByUserUserIdAndProvider(user.getUserId(), provider)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "OAuth token not found"));
+    }
+
+    public Optional<OAuthToken> findToken(User user, String provider) {
+        return oauthTokenRepository.findByUserUserIdAndProvider(user.getUserId(), provider);
+    }
+
+    public void deleteToken(User user, String provider) {
+        oauthTokenRepository.deleteByUserUserIdAndProvider(user.getUserId(), provider);
     }
 
     private LocalDateTime resolveExpiresAt(Long expiresInSeconds) {

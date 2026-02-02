@@ -19,7 +19,7 @@ spring:
     import: "optional:file:./.env"
   task:
     scheduling:
-      enabled: true # 스케줄링 기능
+      enabled: true # 스케줄링 기능인
   application:
     name: dnc
   servlet:
@@ -41,6 +41,10 @@ spring:
       connection-timeout: 600000
       # data-source-properties:  <-- 로그가 시끄러우면
       #   profileSQL: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
   jpa:
     hibernate:
@@ -68,11 +72,12 @@ jwt:
 oauth:
   providers:
     dexcom:
-      client-id: ${DEXCOM_CLIENT_ID:}
-      client-secret: ${DEXCOM_CLIENT_SECRET:}
-      redirect-uri: ${DEXCOM_REDIRECT_URI:http://localhost:8080/api/v1/oauth/dexcom/callback}
+      client-id: ${DEXCOM_CLIENT_ID:7KaRpwoqMFGyYsLFcmH0DSiiiGkLhsdX}
+      client-secret: ${DEXCOM_CLIENT_SECRET:bPQO4Ul2XDEqGKY9}
+      redirect-uri: ${DEXCOM_REDIRECT_URI:http://192.168.100.44:8080/api/v1/oauth/dexcom/callback}
       auth-uri: ${DEXCOM_AUTH_URI:https://sandbox-api.dexcom.com/v3/oauth2/login}
       token-uri: ${DEXCOM_TOKEN_URI:https://sandbox-api.dexcom.com/v3/oauth2/token}
+      revoke-uri: ${DEXCOM_REVOKE_URI:}
       api-base: ${DEXCOM_API_BASE:https://sandbox-api.dexcom.com/v3}
       scopes:
         - offline_access
@@ -116,8 +121,13 @@ oauth:
         - name
         - profile
 
+app:
+  social-login-redirect-uri: ${APP_SOCIAL_LOGIN_REDIRECT_URI:testapp://auth}
+
 gms:
   api-key: ${GMS_API_KEY:S14P12C105-68ff0660-15af-42a5-8b7f-05873f85dc15}
   ai:
     model: ${GMS_AI_MODEL:gemini-2.5-pro}
     base-url: ${GMS_AI_BASE_URL:https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com}
+firebase:
+  service-account: ${FIREBASE_SERVICE_ACCOUNT:}

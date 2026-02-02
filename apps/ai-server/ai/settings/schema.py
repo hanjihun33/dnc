@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 
 # 혈당 예측 관련 변수 정의
@@ -33,9 +33,27 @@ class EventData(BaseModel):
     event_type: str = Field(..., description="이벤트 타입 (carbs 등)")
     value: float = Field(..., description="값 (탄수화물 양 등)")
 
-# 전체 요청
-class LearningRequest(BaseModel):
-    rise_slope: float = Field(..., description="현재 상승 기울기")
-    decay_slope: float = Field(..., description="현재 하강 기울기")
-    glucose_logs: List[GlucoseData] = Field(..., description="오늘의 혈당 기록 리스트")
-    meal_logs: List[EventData] = Field(..., description="오늘의 식사 기록 리스트")
+class ModelUpdateGlucose(BaseModel):
+    glucose_id: Optional[int] = None
+    user_id: Optional[int] = None
+    sensor_id: Optional[int] = None
+    value: Optional[float] = None
+    trend: Optional[str] = None
+    trend_rate: Optional[float] = None
+    dexcom_record_id: Optional[str] = None
+    source: Optional[str] = None
+    measured_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+
+
+class ModelUpdateEvent(BaseModel):
+    feed_value: Optional[float] = None
+    feed_measured_at: Optional[datetime] = None
+
+
+# 모델 업데이트 요청
+class ModelUpdateRequest(BaseModel):
+    glucose: List[ModelUpdateGlucose] = Field(default_factory=list)
+    events: List[ModelUpdateEvent] = Field(default_factory=list)
+    rise_slope: Optional[float] = None
+    decay_slope: Optional[float] = None

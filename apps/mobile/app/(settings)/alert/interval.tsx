@@ -19,7 +19,10 @@ const palette = {
   border: "#E2E8F0",
 };
 
-const options = ["5분", "10분", "15분", "20분", "30분", "1시간"];
+const options = [5, 10, 15, 20, 30, 60];
+
+const formatInterval = (minutes: number) =>
+  minutes === 60 ? "1시간" : `${minutes}분`;
 
 export default function AlertIntervalScreen() {
   const router = useRouter();
@@ -28,14 +31,16 @@ export default function AlertIntervalScreen() {
     interval?: string;
   }>();
   const initial =
-    typeof interval === "string" && interval.length > 0 ? interval : "15분";
+    typeof interval === "string" && interval.length > 0
+      ? Number(interval)
+      : 15;
   const [selected, setSelected] = React.useState(initial);
 
-  const goBackWith = (value: string) => {
+  const goBackWith = (value: number) => {
     const routeType = typeof type === "string" ? type : "high";
     router.replace({
       pathname: `/(settings)/alert/${routeType}`,
-      params: { interval: value },
+      params: { interval: String(value) },
     });
   };
 
@@ -69,7 +74,9 @@ export default function AlertIntervalScreen() {
                     <View style={styles.radioInactive} />
                   )}
                 </View>
-                <Text style={styles.optionText}>{option}</Text>
+                <Text style={styles.optionText}>
+                  {formatInterval(option)}
+                </Text>
               </Pressable>
             );
           })}

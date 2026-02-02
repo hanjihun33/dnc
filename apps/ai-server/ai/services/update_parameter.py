@@ -1,24 +1,39 @@
-from settings.schema import LearningRequest
+from settings.schema import ModelUpdateRequest, GlucoseData, EventData
 from models.update_slope import slope_calculator
 
 class ParameterUpdateService:
     def __init__(self):
         pass 
 
-    def update_slopes(self, request_data: LearningRequest):
+    def update_slopes(self, request_data: ModelUpdateRequest):
         
         # 0. 기본 반환값
         default_response = {
             "rise_slope": request_data.rise_slope,
             "decay_slope": request_data.decay_slope
         }
-        if not request_data.glucose_logs or not request_data.meal_logs:
+
+        glucose_logs = [
+            GlucoseData(measured_at=data.measured_at, value=data.value)
+            for data in request_data.glucose
+            if data.measured_at is not None and data.value is not None
+        ]
+        meal_logs = [
+            EventData(
+                measured_at=event.feed_measured_at,
+                event_type="carbs",
+                value=event.feed_value
+            )
+            for event in request_data.events
+            if event.feed_measured_at is not None and event.feed_value is not None
+        ]
+        if not glucose_logs or not meal_logs:
              return default_response
 
         # 1. df 변환
         bg_df, events_df = slope_calculator.preprocess_from_list(
-            request_data.glucose_logs, 
-            request_data.meal_logs
+            glucose_logs,
+            meal_logs
         )
         if bg_df.empty:
              return default_response
@@ -33,6 +48,12 @@ class ParameterUpdateService:
             print(f"분석 완료: 측정된 상승({measured_rise:.2f}), 하강({measured_decay:.2f})")
 
         # 3. 이동 평균법
+        if request_data.rise_slope is None or request_data.decay_slope is None:
+            return {
+                "rise_slope": measured_rise,
+                "decay_slope": measured_decay,
+            }
+
         new_rise = slope_calculator.apply_moving_average(request_data.rise_slope, measured_rise)
         new_decay = slope_calculator.apply_moving_average(request_data.decay_slope, measured_decay)
 
