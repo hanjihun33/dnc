@@ -9,9 +9,13 @@ import java.util.Optional;
 public interface SensorRepository extends JpaRepository<Sensor, Long> {
     // 기기 시리얼 번호로 센서 찾기
     Optional<Sensor> findByDeviceId(String deviceId);
+
     // 특정 유저의 활성 상태인 센서 찾기
     Optional<Sensor> findByUserAndStatus(User user, Sensor.SensorStatus status);
+
     Optional<Sensor> findByDeviceIdAndStatus(String deviceId, Sensor.SensorStatus status);
+
+    Optional<Sensor> findByUserAndDeviceId(User user, String deviceId);
 
     List<Sensor> findAllByUserAndStatus(User user, Sensor.SensorStatus status);
 
