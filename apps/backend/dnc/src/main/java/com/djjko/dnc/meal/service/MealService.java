@@ -145,7 +145,9 @@ public class MealService {
             return LocalDateTime.parse(value);
         } catch (DateTimeParseException ex) {
             try {
-                return OffsetDateTime.parse(value).toLocalDateTime();
+                return OffsetDateTime.parse(value)
+                        .atZoneSameInstant(java.time.ZoneId.systemDefault())
+                        .toLocalDateTime();
             } catch (DateTimeParseException ignored) {
                 return null;
             }

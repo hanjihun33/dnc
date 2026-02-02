@@ -72,7 +72,15 @@ interface MealResponse {
   imageUrl?: string;
   foodName?: string;
   memo?: string;
+  peakGlucose?: number;
 }
+
+const getGlucoseStatus = (glucose?: number) => {
+  if (glucose === undefined || glucose === null) return { label: '분석중', color: palette.textMuted, bg: '#f1f5f9' };
+  if (glucose < 140) return { label: '좋음', color: '#166534', bg: '#DCFCE7' };
+  if (glucose < 180) return { label: '보통', color: '#854D0E', bg: '#FEF9C3' };
+  return { label: '나쁨', color: '#991B1B', bg: '#FEE2E2' };
+};
 
 export default function ReportScreen() {
   const router = useRouter();
@@ -109,7 +117,9 @@ export default function ReportScreen() {
 
       // Determine Date Range
       const startDate = sensorData.startedAt;
-      const endDate = new Date().toISOString(); // Now
+      const now = new Date();
+      const offset = now.getTimezoneOffset() * 60000;
+      const endDate = new Date(now.getTime() - offset).toISOString().slice(0, -1); // Local ISO String
 
       // 2. Fetch Report (Custom Range)
       const reportRes = await fetch(
@@ -254,8 +264,8 @@ export default function ReportScreen() {
                   {/* 중량 및 등급 */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
                     <Text style={{ fontSize: 13, color: palette.text, marginRight: 8 }}>[임시] 200g</Text>
-                    <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                      <Text style={{ fontSize: 11, color: '#166534', fontWeight: '700' }}>[임시] 좋음</Text>
+                    <View style={{ backgroundColor: getGlucoseStatus(modalMeal.peakGlucose).bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ fontSize: 11, color: getGlucoseStatus(modalMeal.peakGlucose).color, fontWeight: '700' }}>{getGlucoseStatus(modalMeal.peakGlucose).label}</Text>
                     </View>
                     {/* 영양 정보 */}
                     <View style={{ marginTop: 4 }}>
@@ -337,8 +347,8 @@ const MealLogTab = ({ meals }: { meals: MealResponse[] }) => {
             {/* 중량 및 등급 (신규 컬럼 예정) */}
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
               <Text style={{ fontSize: 12, color: palette.text, marginRight: 8 }}>[임시] 200g</Text>
-              <View style={{ backgroundColor: palette.successBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                <Text style={{ fontSize: 11, color: '#166534', fontWeight: '700' }}>[임시] 좋음</Text>
+              <View style={{ backgroundColor: getGlucoseStatus(meal.peakGlucose).bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                <Text style={{ fontSize: 11, color: getGlucoseStatus(meal.peakGlucose).color, fontWeight: '700' }}>{getGlucoseStatus(meal.peakGlucose).label}</Text>
               </View>
             </View>
 

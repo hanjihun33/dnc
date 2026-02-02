@@ -62,10 +62,12 @@ public class MealController {
 
     private java.time.LocalDateTime parseDateTime(String dateTimeStr) {
         try {
-            String normalized = dateTimeStr.replace(" ", "T");
-            if (normalized.endsWith("Z")) {
-                normalized = normalized.substring(0, normalized.length() - 1);
+            if (dateTimeStr.endsWith("Z")) {
+                return java.time.Instant.parse(dateTimeStr)
+                        .atZone(java.time.ZoneId.systemDefault())
+                        .toLocalDateTime();
             }
+            String normalized = dateTimeStr.replace(" ", "T");
             return java.time.LocalDateTime.parse(normalized);
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid date format: " + dateTimeStr);

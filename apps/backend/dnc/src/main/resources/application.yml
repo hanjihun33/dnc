@@ -9,6 +9,8 @@ storage:
     bucket: ${S3_BUCKET:}
     region: ${S3_REGION:}
     public-url: ${S3_PUBLIC_URL:}
+    access-key: ${AWS_ACCESS_KEY_ID:}
+    secret-key: ${AWS_SECRET_ACCESS_KEY:}
 
 ai:
   server:
