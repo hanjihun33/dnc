@@ -2,6 +2,7 @@
 import {
   Alert,
   Pressable,
+  TouchableOpacity,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -14,6 +15,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import * as WebBrowser from "expo-web-browser";
 import {
   bumpProfileRevision,
+  getAuthSession,
   getAuthHeaders,
   loadAuthSession,
   subscribeProfileRevision,
@@ -75,20 +77,35 @@ export default function SensorConnectScreen() {
     setIsConnecting(true);
     try {
       await loadAuthSession();
+      const session = getAuthSession();
+      if (!session.accessToken) {
+        Alert.alert("로그인 필요", "로그인 후 다시 시도해주세요.");
+        return;
+      }
       const response = await fetch(
         `${API_BASE_URL}/api/v1/oauth/dexcom/authorize-url`,
         { headers: getAuthHeaders() }
       );
       if (!response.ok) {
-        throw new Error("Dexcom 연동 URL을 가져오지 못했습니다.");
+        let detail = "";
+        try {
+          detail = await response.text();
+        } catch {
+          detail = "";
+        }
+        const suffix = detail ? ` (${response.status})` : ` (${response.status})`;
+        throw new Error(`Dexcom 연동 URL을 가져오지 못했습니다.${suffix}`);
       }
       const payload = (await response.json()) as { authorizeUrl?: string };
       if (!payload.authorizeUrl) {
         throw new Error("Dexcom 연동 URL이 비어있습니다.");
       }
       await WebBrowser.openBrowserAsync(payload.authorizeUrl);
-    } catch {
-      // Ignore errors for now.
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Dexcom 연동에 실패했습니다.";
+      console.warn("Dexcom connect failed:", error);
+      Alert.alert("연동 실패", message);
     } finally {
       setIsConnecting(false);
     }
@@ -143,9 +160,12 @@ export default function SensorConnectScreen() {
           연속혈당측정기(CGM)를 의미합니다.
         </Text>
 
-        <Pressable
+        <TouchableOpacity
+          activeOpacity={0.85}
           style={[styles.sensorCard, isConnecting && styles.sensorCardDisabled]}
           onPress={handleDexcomConnect}
+          disabled={isConnecting}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <View style={styles.deviceShell}>
             <View style={styles.deviceTop} />
@@ -176,7 +196,7 @@ export default function SensorConnectScreen() {
           ) : (
             <Text style={styles.sensorHint}>연동하기</Text>
           )}
-        </Pressable>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -290,4 +310,3 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
-

@@ -123,6 +123,7 @@ oauth:
 
 app:
   social-login-redirect-uri: ${APP_SOCIAL_LOGIN_REDIRECT_URI:testapp://auth}
+  oauth-redirect-uri: ${APP_OAUTH_REDIRECT_URI:testapp://oauth}
 
 gms:
   api-key: ${GMS_API_KEY:S14P12C105-68ff0660-15af-42a5-8b7f-05873f85dc15}
