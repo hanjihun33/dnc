@@ -85,30 +85,20 @@ public class MealController {
 
     @PatchMapping("/{mealId}")
     @Operation(summary = "식사 기록 수정")
-<<<<<<< HEAD
-    public Optional<MealResponse> update(
+    public ResponseEntity<MealResponse> update(
             @PathVariable Long mealId,
             @RequestBody MealUpdateRequest request) {
-        return mealService.update(mealId, request);
-=======
-    public ResponseEntity<MealResponse> update(
-        @PathVariable Long mealId,
-        @RequestBody MealUpdateRequest request
-    ) {
         return mealService.update(mealId, request)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @RequestMapping(
-        value = "/{mealId}/image",
-        method = {RequestMethod.PATCH, RequestMethod.POST},
-        consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RequestMapping(value = "/{mealId}/image", method = { RequestMethod.PATCH,
+            RequestMethod.POST }, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Update meal image")
     public ResponseEntity<MealResponse> updateImage(
-        @PathVariable Long mealId,
-        @RequestPart(value = "image") MultipartFile image
-    ) {
+            @PathVariable Long mealId,
+            @RequestPart(value = "image") MultipartFile image) {
         if (image == null || image.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
@@ -116,7 +106,6 @@ public class MealController {
         return mealService.updateImage(mealId, userId, image)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
->>>>>>> 85f112e7999707cce475ff355e31698ac23b45e6
     }
 
     @DeleteMapping("/{mealId}")
