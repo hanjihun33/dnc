@@ -2,9 +2,9 @@ import React, { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useRouter } from "expo-router";
 
-import { registerPushTokenWithServer } from "@/app/push";
-import { setAuthSession } from "@/app/session";
-import { SocialProvider, startSocialLogin } from "@/app/social-login";
+import { registerPushTokenWithServer } from "@/push";
+import { setAuthSession } from "@/session";
+import { SocialProvider, startSocialLogin } from "@/lib/social-login";
 
 const palette = {
   border: "#E5E7EB",

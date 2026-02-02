@@ -11,6 +11,7 @@ import {
 import { useRouter } from "expo-router";
 import { loadAuthSession, setAuthSession } from "@/session";
 import { registerPushTokenWithServer } from "@/push";
+import SocialLoginSection from "@/components/social-login-section";
 
 const palette = {
   background: "#F8FAFC",

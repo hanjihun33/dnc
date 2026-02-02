@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { ActivityIndicator, Alert, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
-import { bumpProfileRevision } from "./session";
+import { bumpProfileRevision } from "@/session";
 
 const palette = {
   background: "#F8FAFC",
