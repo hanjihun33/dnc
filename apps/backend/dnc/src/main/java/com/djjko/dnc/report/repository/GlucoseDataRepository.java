@@ -9,20 +9,21 @@ public interface GlucoseDataRepository extends JpaRepository<GlucoseData, Long> 
     boolean existsByDexcomRecordId(String dexcomRecordId);
 
     List<GlucoseData> findAllByUser_UserIdAndMeasuredAtBetween(
-        Long userId,
-        LocalDateTime start,
-        LocalDateTime end
-    );
+            Long userId,
+            LocalDateTime start,
+            LocalDateTime end);
 
     List<GlucoseData> findAllByUser_UserIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(
-        Long userId,
-        LocalDateTime start,
-        LocalDateTime end
-    );
+            Long userId,
+            LocalDateTime start,
+            LocalDateTime end);
 
     GlucoseData findTopByUser_UserIdOrderByMeasuredAtDesc(Long userId);
 
     boolean existsByUser_UserIdAndMeasuredAtBefore(Long userId, LocalDateTime measuredAt);
+
+    // 유저별 Dexcom Record ID 중복 체크 (샌드박스 격리용)
+    boolean existsByUser_UserIdAndDexcomRecordId(Long userId, String dexcomRecordId);
 
     void deleteAllByUser_UserId(Long userId);
 }

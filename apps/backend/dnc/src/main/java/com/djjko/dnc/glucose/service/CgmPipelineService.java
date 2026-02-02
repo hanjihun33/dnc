@@ -93,8 +93,8 @@ public class CgmPipelineService {
 
             if (egvResponse != null && egvResponse.getRecords() != null && !egvResponse.getRecords().isEmpty()) {
                 log.info("   -> [혈당] {}건 실시간 저장 시작 (User: {})", egvResponse.getRecords().size(), user.getNickname());
-                this.bufferCgmData(egvResponse);
-                this.syncBufferToDb(user.getDexcomUserId(), true);
+                this.bufferCgmData(user, egvResponse);
+                this.syncBufferToDb(user, true);
             }
         } catch (Exception e) {
             log.error("실시간 데이터 수집 중 사용자 {} 처리 실패: {}", user.getUserId(), e.getMessage());
@@ -134,8 +134,8 @@ public class CgmPipelineService {
                         (token) -> dexcomApiClient.getEgvs(token, currentRequestStart, currentRequestEnd));
 
                 if (egvResponse != null && egvResponse.getRecords() != null) {
-                    this.bufferCgmData(egvResponse);
-                    this.syncBufferToDb(user.getDexcomUserId(), false);
+                    this.bufferCgmData(user, egvResponse);
+                    this.syncBufferToDb(user, false);
                     totalEgvCount += egvResponse.getRecords().size();
                 }
 
@@ -157,10 +157,10 @@ public class CgmPipelineService {
     }
 
     /**
-     * 1. 덱스콤 API 데이터를 Redis 버퍼에 저장
+     * 1. 덱스콤 API 데이터를 Redis 버퍼에 저장 (User별 격리)
      */
-    public void bufferCgmData(DexcomResponse response) {
-        String userId = response.getUserId();
+    public void bufferCgmData(User user, DexcomResponse response) {
+        String userId = String.valueOf(user.getUserId()); // 내부 UserID 사용 (격리 핵심)
         List<DexcomResponse.Record> records = response.getRecords();
 
         if (records == null || records.isEmpty())
@@ -171,55 +171,53 @@ public class CgmPipelineService {
         for (DexcomResponse.Record record : records) {
             redisTemplate.opsForList().rightPush(redisKey, record);
         }
-        log.info("Redis 버퍼링 완료: User={}, Count={}건", userId, records.size());
+        log.info("Redis 버퍼링 완료: User(ID={}), Count={}건", userId, records.size());
     }
 
     /**
-     * 2. Redis -> MySQL 동기화 실행 (트랜잭션 관리)
+     * 2. Redis -> MySQL 동기화 실행 (트랜잭션 관리) - User별 큐 처리
      */
     @Transactional
-    public void syncBufferToDb(String dexcomUserId, boolean evaluateAlerts) {
-        String redisKey = "cgm:buffer:" + dexcomUserId;
+    public void syncBufferToDb(User user, boolean evaluateAlerts) {
+        String userId = String.valueOf(user.getUserId());
+        String redisKey = "cgm:buffer:" + userId;
         long count = 0;
+
         while (true) {
             Object data = redisTemplate.opsForList().leftPop(redisKey);
             if (data == null)
                 break;
 
             DexcomResponse.Record record = objectMapper.convertValue(data, DexcomResponse.Record.class);
-            saveOneRecordToDb(dexcomUserId, record, evaluateAlerts);
+            saveOneRecordToDb(user, record, evaluateAlerts);
             count++;
         }
         if (count > 0) {
-            log.info("DB 동기화 완료: {}건", count);
+            log.info("DB 동기화 완료 (User ID={}): {}건", user.getUserId(), count);
         }
     }
 
     /**
-     * 3. 단일 혈당 레코드 저장 (중복 체크 및 센서 매핑)
+     * 3. 단일 혈당 레코드 저장 (User 격리 저장)
      */
-    public void saveOneRecordToDb(String dexcomUserId, DexcomResponse.Record record, boolean evaluateAlerts) {
-        // 중복 데이터 방지 (dexcom_record_id 기반)
-        if (glucoseDataRepository.existsByDexcomRecordId(record.getRecordId())) {
-            // log.debug("중복 데이터 스킵: {}", record.getRecordId());
+    public void saveOneRecordToDb(User user, DexcomResponse.Record record, boolean evaluateAlerts) {
+        // 중복 데이터 방지 (User + RecordID 복합 체크)
+        if (glucoseDataRepository.existsByUser_UserIdAndDexcomRecordId(user.getUserId(), record.getRecordId())) {
             return;
         }
-
-        // 실제 가입 유저 확인 (미가입 유저 데이터는 무시)
-        User user = userRepository.findByDexcomUserId(dexcomUserId)
-                .orElseThrow(() -> new RuntimeException("가입되지 않은 유저의 데이터입니다: " + dexcomUserId));
 
         // 활성 센서 찾기 또는 교체 로직
         Sensor sensor = getOrRotateSensor(user, record);
 
-        // 엔티티 변환 및 저장 (Trend, TrendRate 필드 포함)
+        // 엔티티 변환 및 저장
         GlucoseData glucoseData = record.toEntity(user, sensor);
         glucoseDataRepository.save(glucoseData);
+
         if (evaluateAlerts) {
             try {
                 glucoseAlertService.evaluate(user, glucoseData);
             } catch (Exception e) {
-                log.warn("혈당 알림 처리 실패 (User: {}): {}", user.getUserId(), e.getMessage());
+                log.warn("혈당 알림 처리 실패 (User: {}): {}", user.getNickname(), e.getMessage());
             }
         }
     }
