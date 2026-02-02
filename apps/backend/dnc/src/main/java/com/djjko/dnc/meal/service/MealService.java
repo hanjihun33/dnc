@@ -126,6 +126,26 @@ public class MealService {
         });
     }
 
+    public Optional<MealResponse> updateImage(Long mealId, Long userId, MultipartFile image) {
+        return repository.findById(mealId).map(record -> {
+            if (image != null && !image.isEmpty()) {
+                record.setImageUrl(fileStorageService.save(image));
+                record.setUpdatedAt(LocalDateTime.now());
+                try {
+                    aiFoodService.analyzeAndPersist(
+                            userId,
+                            record.getFoodId(),
+                            record.getEatenAt(),
+                            image,
+                            null);
+                } catch (Exception ex) {
+                    log.warn("Failed to persist AI analysis for meal {}: {}", record.getFoodId(), ex.getMessage());
+                }
+            }
+            return buildMealResponse(record);
+        });
+    }
+
     public void delete(Long mealId) {
         repository.deleteById(mealId);
     }
@@ -167,35 +187,47 @@ public class MealService {
             record.setImageUrl(resolvedUrl);
         }
 
-        NutritionSummary nutrition = resolveNutrition(record.getFoodId());
+        NutritionSummary nutrition = resolveNutrition(record);
+        String resolvedFoodName = record.getFoodName();
+        if ((resolvedFoodName == null || resolvedFoodName.isBlank()) && nutrition != null) {
+            resolvedFoodName = nutrition.foodName();
+        }
         return MealResponse.from(
                 record,
                 nutrition == null ? null : nutrition.calories(),
                 nutrition == null ? null : nutrition.carbs(),
                 nutrition == null ? null : nutrition.protein(),
-                nutrition == null ? null : nutrition.fat());
+                nutrition == null ? null : nutrition.fat(),
+                resolvedFoodName);
     }
 
-    private NutritionSummary resolveNutrition(Long foodId) {
-        if (foodId == null) {
+    private NutritionSummary resolveNutrition(FoodRecord record) {
+        if (record == null || record.getFoodId() == null) {
             return null;
         }
         Optional<FoodAnalysis> analysis = foodAnalysisRepository
-                .findTopByFoodIdOrderByAnalyzedAtDesc(foodId);
-        if (analysis.isEmpty()) {
-            return null;
+                .findTopByFoodIdOrderByAnalyzedAtDesc(record.getFoodId());
+        Optional<FoodMetadata> metadata = Optional.empty();
+        if (analysis.isPresent()) {
+            Long foodCode = analysis.get().getFoodCode();
+            if (foodCode != null) {
+                metadata = foodMetadataRepository.findById(foodCode);
+            }
         }
-        Long foodCode = analysis.get().getFoodCode();
-        if (foodCode == null) {
-            return null;
+        if (metadata.isEmpty()) {
+            String foodName = record.getFoodName();
+            if (foodName != null && !foodName.isBlank()) {
+                metadata = foodMetadataRepository.findFirstByFoodNameIgnoreCase(foodName);
+            }
         }
-        Optional<FoodMetadata> metadata = foodMetadataRepository.findById(foodCode);
         if (metadata.isEmpty()) {
             return null;
         }
 
         FoodMetadata meta = metadata.get();
-        Double resolvedWeight = resolveWeight(meta.getBaseWeight(), analysis.get().getEstimatedWeight());
+        Double resolvedWeight = resolveWeight(
+                meta.getBaseWeight(),
+                analysis.map(FoodAnalysis::getEstimatedWeight).orElse(null));
         double ratio = resolveRatio(meta.getBaseWeight(), resolvedWeight);
 
         Integer calories = scale(meta.getCaloriesPerBase(), ratio);

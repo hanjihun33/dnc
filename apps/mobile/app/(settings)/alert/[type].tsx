@@ -11,14 +11,14 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { alertConfig, AlertType } from "./_config";
-import { updateAlertSetting } from "./_api";
+import { alertConfig, AlertType } from "@/alert-config";
+import { updateAlertSetting } from "@/alert-api";
 import {
   getAlertSetting,
   getAlertValue,
   setAlertSetting,
   setAlertValue,
-} from "./_store";
+} from "@/alert-store";
 
 const palette = {
   background: "#F8FAFC",

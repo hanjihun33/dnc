@@ -1,5 +1,5 @@
-import { loadAuthSession, getAuthHeaders } from "../../session";
-import { AlertKey, AlertSetting } from "./store";
+import { loadAuthSession, getAuthHeaders } from "./session";
+import { AlertKey, AlertSetting } from "./alert-store";
 
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:8080";

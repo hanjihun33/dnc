@@ -11,15 +11,15 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { alertConfig, AlertType } from "./alert/_config";
-import { fetchAlertSettings, updateAlertSetting } from "./alert/_api";
+import { alertConfig, AlertType } from "@/alert-config";
+import { fetchAlertSettings, updateAlertSetting } from "@/alert-api";
 import {
   AlertKey,
   AlertSetting,
   getAlertSettings,
   setAlertSetting,
   setAlertSettings,
-} from "./alert/_store";
+} from "@/alert-store";
 
 const palette = {
   background: "#F8FAFC",

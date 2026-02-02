@@ -1,6 +1,7 @@
-import React from "react";
+﻿import React from "react";
 import {
   Dimensions,
+  Image,
   Platform,
   Pressable,
   SafeAreaView,
@@ -14,7 +15,7 @@ import {
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import Svg, { Circle, Line, Path } from "react-native-svg";
-import { getAuthHeaders, loadAuthSession } from "../session";
+import { getAuthHeaders, loadAuthSession } from "@/session";
 
 const palette = {
   background: "#F8FAFC",
@@ -39,7 +40,22 @@ const pixelsPerHour = chartViewportWidth / hoursPerView;
 const loadMoreHours = 12;
 const maxPastDays = 7;
 
-const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
+const mealTypeLabels: Record<string, string> = {
+  BREAKFAST: "아침",
+  LUNCH: "점심",
+  DINNER: "저녁",
+  SNACK: "간식",
+};
+
+const weekdays = [
+  "일",
+  "월",
+  "화",
+  "수",
+  "목",
+  "금",
+  "토",
+];
 
 type GlucosePoint = {
   measuredAt: string | null;
@@ -63,6 +79,7 @@ type MealSummary = {
   mealId?: number;
   mealType?: string | null;
   eatenAt?: string | null;
+  recordedAt?: string | null;
   imageUrl?: string | null;
   memo?: string | null;
   aiGuide?: string | null;
@@ -182,17 +199,23 @@ const formatMinutesAgo = (date: Date | null) => {
   return `${minutes}분 전`;
 };
 
+const getMealTypeLabel = (value?: string | null) => {
+  if (!value) return "";
+  const key = value.toUpperCase();
+  return mealTypeLabels[key] ?? value;
+};
+
 const getTrendLabel = (trendRate?: number | null) => {
-  if (trendRate == null) return "안정적인 흐름";
+  if (trendRate == null) return "안정적인 추세";
   if (trendRate >= 1.0) return "상승 중";
-  if (trendRate <= -1.0) return "하강 중";
-  return "안정적인 흐름";
+  if (trendRate <= -1.0) return "하락 중";
+  return "안정적인 추세";
 };
 
 const getTrendArrow = (trendRate?: number | null) => {
-  if (trendRate == null) return "→";
-  if (trendRate >= 1.0) return "↗";
-  if (trendRate <= -1.0) return "↘";
+  if (trendRate == null) return "-";
+  if (trendRate >= 1.0) return "↑";
+  if (trendRate <= -1.0) return "↓";
   return "→";
 };
 
@@ -209,8 +232,10 @@ const softenColor = (color: string, alpha = 0.35) => {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = React.useState(new Date());
-  const [tempDate, setTempDate] = React.useState(new Date());
+  const [selectedDate, setSelectedDate] = React.useState(() =>
+    startOfDay(new Date())
+  );
+  const [tempDate, setTempDate] = React.useState(() => startOfDay(new Date()));
   const [calendarMonth, setCalendarMonth] = React.useState(() => new Date());
   const [showDatePicker, setShowDatePicker] = React.useState(false);
   const dateLabel = formatDateLabel(selectedDate);
@@ -228,7 +253,39 @@ export default function HomeScreen() {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [hasMore, setHasMore] = React.useState(true);
   const [didInitialScroll, setDidInitialScroll] = React.useState(false);
+  const [allMeals, setAllMeals] = React.useState<MealSummary[]>([]);
   const [todayMeals, setTodayMeals] = React.useState<MealSummary[]>([]);
+  const orderedMeals = React.useMemo(() => {
+    const orderMap: Record<string, number> = {
+      BREAKFAST: 0,
+      LUNCH: 1,
+      DINNER: 2,
+      SNACK: 3,
+    };
+    return [...todayMeals].sort((a, b) => {
+      const orderA = orderMap[(a.mealType ?? "").toUpperCase()] ?? 99;
+      const orderB = orderMap[(b.mealType ?? "").toUpperCase()] ?? 99;
+      if (orderA !== orderB) return orderA - orderB;
+      const timeA = parseLocalDateTime(a.eatenAt ?? null)?.getTime() ?? 0;
+      const timeB = parseLocalDateTime(b.eatenAt ?? null)?.getTime() ?? 0;
+      return timeA - timeB;
+    });
+  }, [todayMeals]);
+  const mealCountsByDate = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    allMeals.forEach((meal) => {
+      const parsed =
+        parseLocalDateTime(meal.eatenAt ?? null) ??
+        parseLocalDateTime(meal.recordedAt ?? null);
+      if (!parsed) return;
+      if (parsed.getFullYear() !== year || parsed.getMonth() !== month) return;
+      const key = formatDateKey(parsed);
+      counts[key] = (counts[key] ?? 0) + 1;
+    });
+    return counts;
+  }, [allMeals, calendarMonth]);
 
   const mergePoints = React.useCallback(
     (incoming: GlucosePoint[], mode: "replace" | "prepend") => {
@@ -253,7 +310,7 @@ export default function HomeScreen() {
   );
 
   const openDatePicker = () => {
-    setTempDate(selectedDate);
+    setTempDate(startOfDay(selectedDate));
     setCalendarMonth(
       new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
     );
@@ -274,13 +331,14 @@ export default function HomeScreen() {
       calendarMonth.getMonth(),
       day
     );
+    const nextDay = startOfDay(next);
     const today = startOfDay(new Date());
-    if (next > today) return;
-    setTempDate(next);
+    if (nextDay > today) return;
+    setTempDate(nextDay);
   };
 
   const confirmDate = () => {
-    setSelectedDate(tempDate);
+    setSelectedDate(startOfDay(tempDate));
     setShowDatePicker(false);
   };
 
@@ -301,17 +359,29 @@ export default function HomeScreen() {
   const shiftDate = (delta: number) => {
     const next = new Date(selectedDate);
     next.setDate(selectedDate.getDate() + delta);
+    const nextDay = startOfDay(next);
     const today = startOfDay(new Date());
-    if (next > today) return;
-    setSelectedDate(next);
+    if (nextDay > today) return;
+    setSelectedDate(nextDay);
   };
 
-  const openAllMeals = () => {
+  const openMealList = () => {
+    router.push("/(tabs)/meal-list");
+  };
+
+  const openMealRecord = () => {
     router.push("/(tabs)/meal");
   };
 
   const openMealDetail = (mealId?: number) => {
-    router.push("/(tabs)/meal");
+    if (!mealId) {
+      router.push("/(tabs)/meal");
+      return;
+    }
+    router.push({
+      pathname: "/(tabs)/meal-detail",
+      params: { mealId: String(mealId) },
+    });
   };
 
   const fetchRealtime = React.useCallback(
@@ -326,7 +396,7 @@ export default function HomeScreen() {
         { headers: getAuthHeaders() }
       );
       if (!response.ok) {
-        throw new Error("혈당 데이터를 불러오지 못했습니다.");
+        throw new Error("혈당 데이터를 불러오지 못했어요.");
       }
       const payload = (await response.json()) as RealtimeResponse;
       mergePoints(payload.points ?? [], mode);
@@ -376,8 +446,12 @@ export default function HomeScreen() {
     });
     if (!response.ok) return;
     const meals = (await response.json()) as MealSummary[];
+    setAllMeals(meals ?? []);
     const dateKey = formatDateKey(selectedDate);
-    const filtered = meals.filter((meal) => meal.eatenAt?.slice(0, 10) === dateKey);
+    const filtered = meals.filter((meal) => {
+      const parsed = parseLocalDateTime(meal.eatenAt ?? null);
+      return parsed ? formatDateKey(parsed) === dateKey : false;
+    });
     setTodayMeals(filtered);
   }, [selectedDate]);
 
@@ -863,7 +937,9 @@ export default function HomeScreen() {
               <Text style={styles.heroUnit}>mg/dL</Text>
             </View>
             <Text style={styles.heroHint}>
-              {latestMeasuredAt ? `마지막 측정 ${heroHint}` : "측정 데이터를 불러오는 중"}
+              {latestMeasuredAt
+                ? `마지막 측정 ${heroHint}`
+                : "측정 데이터를 불러오는 중"}
             </Text>
 
             <View style={styles.heroChart}>
@@ -944,7 +1020,7 @@ export default function HomeScreen() {
               </View>
               {validPointCount <= 2 && (
                 <Text style={styles.chartHint}>
-                  데이터가 더 쌓이면 추세선이 표시돼요.
+                  데이터가 부족하면 추세가 표시됩니다.
                 </Text>
               )}
             </View>
@@ -952,7 +1028,9 @@ export default function HomeScreen() {
 
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>적정 혈당 유지율</Text>
+              <Text style={styles.statLabel}>
+                적정 혈당 비율
+              </Text>
               <Text style={styles.statValue}>
                 {stats.tir == null ? "--" : `${stats.tir}%`}
               </Text>
@@ -961,7 +1039,9 @@ export default function HomeScreen() {
               </Text>
             </View>
             <View style={[styles.statCard, styles.statCardSpacing]}>
-              <Text style={styles.statLabel}>일일 피크</Text>
+              <Text style={styles.statLabel}>
+                최고 혈당
+              </Text>
               <Text style={styles.statValue}>
                 {stats.max == null ? "--" : stats.max}
               </Text>
@@ -975,62 +1055,157 @@ export default function HomeScreen() {
               </Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>평균 혈당</Text>
+              <Text style={styles.statLabel}>
+                평균 혈당
+              </Text>
               <Text style={styles.statValue}>
                 {stats.average == null ? "--" : stats.average}
               </Text>
-              <Text style={styles.statHint}>최근 24시간 평균</Text>
+              <Text style={styles.statHint}>
+                최근 24시간 평균
+              </Text>
             </View>
           </View>
 
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>기록</Text>
-            <Pressable style={styles.sectionLink} onPress={openAllMeals}>
-              <Text style={styles.sectionLinkText}>더보기</Text>
-              <Text style={styles.sectionLinkChevron}>›</Text>
-            </Pressable>
           </View>
 
-          {todayMeals.length === 0 ? (
+          {orderedMeals.length === 0 ? (
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>등록된 식단이 없어요</Text>
-              <Text style={styles.cardDesc}>
-                식단 탭에서 사진을 추가하고 혈당 변화를 확인해보세요.
+              <Text style={styles.cardTitle}>
+                기록된 식단이 없어요
               </Text>
-              <TouchableOpacity style={styles.callout} onPress={openAllMeals}>
-                <Text style={styles.calloutText}>식단 기록하러 가기 →</Text>
+              <Text style={styles.cardDesc}>
+                식단 기록을 추가하면
+                혈당 변화와 함께 확인할
+                수 있어요.
+              </Text>
+              <TouchableOpacity style={styles.callout} onPress={openMealRecord}>
+                <Text style={styles.calloutText}>
+                  식단 기록하러 가기
+                </Text>
               </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.mealCardList}>
-              {todayMeals.slice(0, 2).map((meal) => {
+              {orderedMeals.slice(0, 4).map((meal) => {
                 const eaten = parseLocalDateTime(meal.eatenAt ?? null);
                 const timeLabel = eaten ? formatMealTime(eaten) : "--:--";
-                const title = meal.memo || meal.foodName || "기록 완료";
+                const title = meal.foodName || meal.memo || "음식 이름 없음";
                 const caloriesText =
                   meal.calories != null ? `${meal.calories}kcal` : "--kcal";
+                const mealTypeLabel = getMealTypeLabel(meal.mealType);
                 const macroPercents = calcMacroPercents(
                   meal.carbs,
                   meal.protein,
                   meal.fat
                 );
-                const macroText = macroPercents
-                  ? `탄 ${macroPercents.carbPercent}% · 단 ${macroPercents.proteinPercent}% · 지 ${macroPercents.fatPercent}%`
-                  : "탄 --% · 단 --% · 지 --%";
+                const macroValues = macroPercents ?? {
+                  carbPercent: 0,
+                  proteinPercent: 0,
+                  fatPercent: 0,
+                };
+                const macroSum =
+                  macroValues.carbPercent +
+                  macroValues.proteinPercent +
+                  macroValues.fatPercent;
+                const macroFlex =
+                  macroSum > 0
+                    ? [
+                        macroValues.carbPercent,
+                        macroValues.proteinPercent,
+                        macroValues.fatPercent,
+                      ]
+                    : [1, 1, 1];
+                const macroLabels =
+                  macroSum > 0
+                    ? {
+                        carbs: `${macroValues.carbPercent}%`,
+                        protein: `${macroValues.proteinPercent}%`,
+                        fat: `${macroValues.fatPercent}%`,
+                      }
+                    : { carbs: "--%", protein: "--%", fat: "--%" };
+
                 return (
                   <Pressable
                     key={meal.mealId ?? `${meal.eatenAt}-${meal.mealType}`}
                     style={styles.mealCard}
                     onPress={() => openMealDetail(meal.mealId)}
                   >
-                    <View style={styles.mealCardHeader}>
-                      <Text style={styles.mealTitle} numberOfLines={1}>
-                        {title}
-                      </Text>
-                      <Text style={styles.mealCalories}>{caloriesText}</Text>
+                    <View style={styles.mealCardTopRow}>
+                      {meal.imageUrl ? (
+                        <Image
+                          source={{ uri: meal.imageUrl }}
+                          style={styles.mealImage}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={styles.mealImagePlaceholder}>
+                          <Text style={styles.mealImagePlaceholderText}>IMG</Text>
+                        </View>
+                      )}
+                      <View style={styles.mealInfo}>
+                        {!!mealTypeLabel && (
+                          <Text style={styles.mealTypeBadge}>{mealTypeLabel}</Text>
+                        )}
+                        <View style={styles.mealNameRow}>
+                          <Text style={styles.mealCaloriesLarge}>{caloriesText}</Text>
+                          <Text style={styles.mealNameDivider}>|</Text>
+                          <Text style={styles.mealFoodName} numberOfLines={1}>
+                            {title}
+                          </Text>
+                        </View>
+                        <Text style={styles.mealTimeLabel}>{timeLabel}</Text>
+                      </View>
+                      <Text style={styles.mealDetailLink}>상세 &gt;</Text>
                     </View>
-                    <Text style={styles.mealTimeLabel}>{timeLabel}</Text>
-                    <Text style={styles.mealMacroText}>{macroText}</Text>
+                    <View style={styles.mealMacroBar}>
+                      <View
+                        style={[
+                          styles.mealMacroSegment,
+                          { flex: macroFlex[0], backgroundColor: "#86EFAC" },
+                        ]}
+                      />
+                      <View
+                        style={[
+                          styles.mealMacroSegment,
+                          { flex: macroFlex[1], backgroundColor: "#FDE68A" },
+                        ]}
+                      />
+                      <View
+                        style={[
+                          styles.mealMacroSegment,
+                          { flex: macroFlex[2], backgroundColor: "#93C5FD" },
+                        ]}
+                      />
+                    </View>
+                    <View style={styles.mealMacroLegend}>
+                      <View style={styles.mealMacroItem}>
+                        <View
+                          style={[styles.mealMacroDot, { backgroundColor: "#86EFAC" }]}
+                        />
+                        <Text style={styles.mealMacroLabel}>
+                          탄 {macroLabels.carbs}
+                        </Text>
+                      </View>
+                      <View style={styles.mealMacroItem}>
+                        <View
+                          style={[styles.mealMacroDot, { backgroundColor: "#FDE68A" }]}
+                        />
+                        <Text style={styles.mealMacroLabel}>
+                          단 {macroLabels.protein}
+                        </Text>
+                      </View>
+                      <View style={styles.mealMacroItem}>
+                        <View
+                          style={[styles.mealMacroDot, { backgroundColor: "#93C5FD" }]}
+                        />
+                        <Text style={styles.mealMacroLabel}>
+                          지 {macroLabels.fat}
+                        </Text>
+                      </View>
+                    </View>
                   </Pressable>
                 );
               })}
@@ -1038,10 +1213,14 @@ export default function HomeScreen() {
           )}
 
           {isLoading && (
-            <Text style={styles.loadingText}>혈당 데이터를 불러오는 중...</Text>
+            <Text style={styles.loadingText}>
+              혈당 데이터를 불러오는 중..
+            </Text>
           )}
           {isLoadingMore && (
-            <Text style={styles.loadingText}>과거 데이터를 추가로 불러오는 중...</Text>
+            <Text style={styles.loadingText}>
+              과거 데이터를 추가로 불러오는 중..
+            </Text>
           )}
         </View>
       </ScrollView>
@@ -1049,7 +1228,9 @@ export default function HomeScreen() {
         <View style={styles.datePickerOverlay}>
           <Pressable style={styles.datePickerBackdrop} onPress={cancelDate} />
           <View style={styles.datePickerSheet}>
-            <Text style={styles.datePickerTitle}>날짜 선택</Text>
+            <Text style={styles.datePickerTitle}>
+              날짜 선택
+            </Text>
             <View style={styles.datePickerWeekdays}>
               {weekdays.map((day, index) => (
                 <Text
@@ -1099,6 +1280,9 @@ export default function HomeScreen() {
                     );
                     const isSelected = isSameDay(cellDate, tempDate);
                     const isFuture = cellDate > startOfDay(new Date());
+                    const dayKey = formatDateKey(cellDate);
+                    const mealCount = mealCountsByDate[dayKey] ?? 0;
+                    const dotCount = Math.min(mealCount, 4);
                     return (
                       <Pressable
                         key={`calendar-day-${dayIndex}`}
@@ -1120,6 +1304,19 @@ export default function HomeScreen() {
                         >
                           {day}
                         </Text>
+                        {dotCount > 0 && (
+                          <View style={styles.datePickerDotRow}>
+                            {Array.from({ length: dotCount }).map((_, index) => (
+                              <View
+                                key={`calendar-dot-${dayKey}-${index}`}
+                                style={[
+                                  styles.datePickerDot,
+                                  isSelected && styles.datePickerDotSelected,
+                                ]}
+                              />
+                            ))}
+                          </View>
+                        )}
                       </Pressable>
                     );
                   })}
@@ -1128,10 +1325,14 @@ export default function HomeScreen() {
             </View>
             <View style={styles.datePickerActions}>
               <Pressable style={styles.datePickerCancel} onPress={cancelDate}>
-                <Text style={styles.datePickerCancelText}>취소</Text>
+                <Text style={styles.datePickerCancelText}>
+                  취소
+                </Text>
               </Pressable>
               <Pressable style={styles.datePickerApply} onPress={confirmDate}>
-                <Text style={styles.datePickerApplyText}>적용</Text>
+                <Text style={styles.datePickerApplyText}>
+                  적용
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -1374,6 +1575,21 @@ const styles = StyleSheet.create({
   datePickerDayText: { color: "#E2E8F0", fontSize: 15 },
   datePickerDayTextSelected: { color: "#111827", fontWeight: "800" },
   datePickerDayTextDisabled: { color: "#94A3B8" },
+  datePickerDotRow: {
+    position: "absolute",
+    bottom: 4,
+    flexDirection: "row",
+    gap: 3,
+  },
+  datePickerDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#FACC15",
+  },
+  datePickerDotSelected: {
+    backgroundColor: "#111827",
+  },
   datePickerActions: {
     flexDirection: "row",
     alignItems: "center",
@@ -1511,11 +1727,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(148, 163, 184, 0.2)",
   },
+  mealCardTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
   mealCardHeader: {
     flexDirection: "row",
     alignItems: "baseline",
     justifyContent: "space-between",
     gap: 8,
+  },
+  mealNameRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+    marginTop: 4,
   },
   mealCardRow: {
     flexDirection: "row",
@@ -1558,15 +1785,57 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
   },
+  mealCaloriesLarge: {
+    color: "#FACC15",
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  mealFoodName: {
+    color: "#F8FAFC",
+    fontSize: 16,
+    fontWeight: "600",
+    flex: 1,
+  },
+  mealNameDivider: {
+    color: "rgba(226, 232, 240, 0.5)",
+    fontSize: 14,
+  },
   mealTimeLabel: {
     color: "rgba(226, 232, 240, 0.7)",
     fontSize: 12,
     marginTop: 6,
   },
-  mealMacroText: {
-    color: "rgba(226, 232, 240, 0.6)",
+  mealMacroBar: {
+    height: 8,
+    borderRadius: 999,
+    overflow: "hidden",
+    backgroundColor: "rgba(148, 163, 184, 0.25)",
+    flexDirection: "row",
+    marginTop: 14,
+  },
+  mealMacroSegment: {
+    height: "100%",
+  },
+  mealMacroLegend: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+  mealMacroItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  mealMacroDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  mealMacroLabel: {
+    color: "rgba(226, 232, 240, 0.8)",
     fontSize: 12,
-    marginTop: 8,
+    fontWeight: "600",
   },
   mealDetailLink: {
     color: "rgba(226, 232, 240, 0.8)",
@@ -1600,3 +1869,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 });
+
+
+
+
+
+
+
+
+

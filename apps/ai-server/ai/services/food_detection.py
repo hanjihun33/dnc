@@ -14,8 +14,12 @@ import os
 # RESNET_MODEL_PATH = r"C:\Users\SSAFY\Desktop\S14P11C105\ai\models\new_opencv_ckpt_b84_e200.pth"
 
 # ==============================================================================
-DEFAULT_YOLO_PATH = r"C:\Users\SSAFY\Desktop\2학기\01.C105_GitLab\S14P11C105\apps\ai-server\ai\models\best1to40.pt"
-DEFAULT_RESNET_PATH = r"C:\Users\SSAFY\Desktop\2학기\01.C105_GitLab\S14P11C105\apps\ai-server\ai\models\new_opencv_ckpt_b84_e200.pth"
+_HERE = os.path.dirname(__file__)
+_AI_DIR = os.path.abspath(os.path.join(_HERE, ".."))
+_MODELS_DIR = os.path.join(_AI_DIR, "models")
+
+DEFAULT_YOLO_PATH = os.path.join(_MODELS_DIR, "best1to40.pt")
+DEFAULT_RESNET_PATH = os.path.join(_MODELS_DIR, "new_opencv_ckpt_b84_e200.pth")
 
 
 class FoodDetection:

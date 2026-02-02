@@ -6,8 +6,8 @@ import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { loadAuthSession } from './session';
-import { registerPushTokenWithServer } from './push';
+import { loadAuthSession } from '@/session';
+import { registerPushTokenWithServer } from '@/push';
 
 export const unstable_settings = {
   anchor: '(auth)',
