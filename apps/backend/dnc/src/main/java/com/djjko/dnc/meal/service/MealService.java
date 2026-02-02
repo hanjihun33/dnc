@@ -158,6 +158,15 @@ public class MealService {
         if (record == null) {
             return null;
         }
+
+        // Resolve mapped URL (e.g., presigned URL for S3)
+        if (record.getImageUrl() != null) {
+            String originalUrl = record.getImageUrl();
+            String resolvedUrl = fileStorageService.resolveMappedUrl(originalUrl);
+            log.info("Image URL Resolution - Original: {}, Resolved: {}", originalUrl, resolvedUrl);
+            record.setImageUrl(resolvedUrl);
+        }
+
         NutritionSummary nutrition = resolveNutrition(record.getFoodId());
         return MealResponse.from(
                 record,

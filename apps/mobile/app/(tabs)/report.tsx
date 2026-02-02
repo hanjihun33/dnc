@@ -82,6 +82,14 @@ const getGlucoseStatus = (glucose?: number) => {
   return { label: '나쁨', color: '#991B1B', bg: '#FEE2E2' };
 };
 
+const getImageUrl = (url?: string) => {
+  if (!url) return undefined;
+  if (url.startsWith('/')) {
+    return `${API_BASE_URL}${url}`;
+  }
+  return url;
+};
+
 export default function ReportScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'MEALS' | 'REPORT'>('MEALS');
@@ -247,10 +255,11 @@ export default function ReportScreen() {
                 <Ionicons name="close" size={24} color={palette.textMuted} />
               </TouchableOpacity>
             </View>
+
             {modalMeal && (
               <View style={styles.mealPrevCard}>
                 {modalMeal.imageUrl ? (
-                  <Image source={{ uri: modalMeal.imageUrl }} style={styles.mealImage} />
+                  <Image source={{ uri: getImageUrl(modalMeal.imageUrl) }} style={styles.mealImage} />
                 ) : (
                   <View style={[styles.mealImage, { backgroundColor: '#f1f5f9' }]}>
                     <Ionicons name="fast-food-outline" size={32} color={palette.textMuted} />
@@ -263,7 +272,6 @@ export default function ReportScreen() {
 
                   {/* 중량 및 등급 */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                    <Text style={{ fontSize: 13, color: palette.text, marginRight: 8 }}>[임시] 200g</Text>
                     <View style={{ backgroundColor: getGlucoseStatus(modalMeal.peakGlucose).bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                       <Text style={{ fontSize: 11, color: getGlucoseStatus(modalMeal.peakGlucose).color, fontWeight: '700' }}>{getGlucoseStatus(modalMeal.peakGlucose).label}</Text>
                     </View>
@@ -329,26 +337,27 @@ const MealLogTab = ({ meals }: { meals: MealResponse[] }) => {
       {meals.map((meal) => (
         <View key={meal.mealId} style={styles.mealCard}>
           {meal.imageUrl ? (
-            <Image source={{ uri: meal.imageUrl }} style={styles.mealCardImage} />
+            <Image source={{ uri: getImageUrl(meal.imageUrl) }} style={styles.mealCardImage} />
           ) : (
             <View style={[styles.mealCardImage, { backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center' }]}>
               <Ionicons name="restaurant" size={24} color={palette.textMuted} />
             </View>
           )}
           <View style={styles.mealCardContent}>
-            {/* 이름 및 시간 */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
-              <Text style={styles.mealCardTitle}>[임시] {meal.foodName || "음식명"}</Text>
-              <Text style={styles.mealCardTime}>
-                {new Date(meal.eatenAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Text>
-            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+              {/* Left Column: Title */}
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={styles.mealCardTitle}>[임시] {meal.foodName || "음식명"}</Text>
+              </View>
 
-            {/* 중량 및 등급 (신규 컬럼 예정) */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-              <Text style={{ fontSize: 12, color: palette.text, marginRight: 8 }}>[임시] 200g</Text>
-              <View style={{ backgroundColor: getGlucoseStatus(meal.peakGlucose).bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                <Text style={{ fontSize: 11, color: getGlucoseStatus(meal.peakGlucose).color, fontWeight: '700' }}>{getGlucoseStatus(meal.peakGlucose).label}</Text>
+              {/* Right Column: Time & Grade */}
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.mealCardTime}>
+                  {new Date(meal.eatenAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+                <View style={{ marginTop: 4, backgroundColor: getGlucoseStatus(meal.peakGlucose).bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                  <Text style={{ fontSize: 11, color: getGlucoseStatus(meal.peakGlucose).color, fontWeight: '700' }}>{getGlucoseStatus(meal.peakGlucose).label}</Text>
+                </View>
               </View>
             </View>
 
