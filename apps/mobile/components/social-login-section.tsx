@@ -2,9 +2,12 @@ import React, { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useRouter } from "expo-router";
 
-import { registerPushTokenWithServer } from "@/push";
-import { setAuthSession } from "@/session";
-import { SocialProvider, startSocialLogin } from "@/lib/social-login";
+import {
+  SocialProvider,
+  setSocialLoginPending,
+  setSocialLoginProcessing,
+  startSocialLogin,
+} from "@/lib/social-login";
 
 const palette = {
   border: "#E5E7EB",
@@ -36,19 +39,26 @@ export default function SocialLoginSection() {
     setErrorMessage(null);
     setLoadingProvider(provider);
     try {
+      setSocialLoginPending(true);
       const data = await startSocialLogin(provider);
-      const tokenType = data.tokenType ?? "Bearer";
-      await setAuthSession({
-        accessToken: data.accessToken ?? null,
-        tokenType,
-        userId: data.userId ?? null,
+      setSocialLoginProcessing(true);
+
+      const params: Record<string, string> = {};
+      if (data.accessToken) params.accessToken = data.accessToken;
+      if (data.refreshToken) params.refreshToken = data.refreshToken;
+      if (data.tokenType) params.tokenType = data.tokenType;
+      if (typeof data.userId === "number") params.userId = String(data.userId);
+
+      router.replace({
+        pathname: "/auth",
+        params,
       });
-      await registerPushTokenWithServer();
-      router.replace("/(tabs)");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "소셜 로그인에 실패했습니다.";
       setErrorMessage(message);
+      setSocialLoginPending(false);
+      setSocialLoginProcessing(false);
     } finally {
       setLoadingProvider(null);
     }

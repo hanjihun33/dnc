@@ -32,11 +32,14 @@ export default function OAuthCallbackScreen() {
   const handledRef = useRef(false);
 
   useEffect(() => {
-    if (handledRef.current) return;
-    handledRef.current = true;
-
     const status = getParam(params.status);
     const error = safeDecode(getParam(params.error));
+
+    if (!status) {
+      return;
+    }
+    if (handledRef.current) return;
+    handledRef.current = true;
 
     if (status === "success") {
       bumpProfileRevision();
@@ -44,7 +47,10 @@ export default function OAuthCallbackScreen() {
       return;
     }
 
-    const message = error ?? "센서 연동에 실패했습니다.";
+    const message =
+      status === "cancel"
+        ? "연동이 취소되었습니다."
+        : error ?? "센서 연동에 실패했습니다.";
     Alert.alert("연동 실패", message, [
       {
         text: "확인",

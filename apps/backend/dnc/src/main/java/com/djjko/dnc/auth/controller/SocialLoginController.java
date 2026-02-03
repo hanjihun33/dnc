@@ -155,6 +155,7 @@ public class SocialLoginController {
         String tokenType = urlEncode(response.getTokenType());
         String userId = response.getUserId() == null ? "" : String.valueOf(response.getUserId());
         String expiresIn = String.valueOf(response.getExpiresIn());
+        String newUser = String.valueOf(response.isNewUser());
 
         String separator = appRedirectUri.contains("?") ? "&" : "?";
         return appRedirectUri
@@ -168,7 +169,9 @@ public class SocialLoginController {
             + "&userId="
             + userId
             + "&expiresIn="
-            + expiresIn;
+            + expiresIn
+            + "&newUser="
+            + newUser;
     }
 
     private String urlEncode(String value) {
