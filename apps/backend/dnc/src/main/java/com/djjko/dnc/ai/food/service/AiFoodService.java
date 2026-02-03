@@ -20,6 +20,9 @@ import com.djjko.dnc.user.model.DiabetesType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -52,6 +55,7 @@ public class AiFoodService {
     private static final String FOOD_MODEL_VERSION = "v1";
     private static final String PREDICTION_MODEL_NAME = "glucose-prediction";
     private static final String PREDICTION_MODEL_VERSION = "v1";
+    private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
     private final AiServerClient aiServerClient;
     private final FoodMetadataRepository foodMetadataRepository;
@@ -303,6 +307,10 @@ public class AiFoodService {
                 .orElse(null);
         double sysBg = latestGlucose != null ? latestGlucose : DEFAULT_SYS_BG;
 
+        long glucoseCount = glucoseDataRepository.countByUser_UserId(userId);
+        boolean hasEnoughData = glucoseCount > 0;
+        String timeStamp = OffsetDateTime.now(ZoneOffset.UTC).format(TIMESTAMP_FORMATTER);
+
         return Optional.of(new AiGlucosePredictionRequest(
                 nutrition.carbs(),
                 nutrition.protein(),
@@ -318,7 +326,10 @@ public class AiFoodService {
                 DEFAULT_FASTING_HOURS,
                 DEFAULT_TREND_SLOPE_UP,
                 DEFAULT_TREND_SLOPE_DOWN,
-                isT2d));
+                isT2d,
+                userId,
+                timeStamp,
+                hasEnoughData));
     }
 
     private List<Integer> mapPredictionValues(List<Double> values) {

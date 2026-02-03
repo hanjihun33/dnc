@@ -32,8 +32,8 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${DB_URL:jdbc:mysql://localhost:3306/dnc_db?serverTimezone=Asia/Seoul}
-    username: ${DB_USERNAME:ssafy}
-    password: ${DB_PASSWORD:ssafy}
+    username: ${DB_USERNAME:}
+    password: ${DB_PASSWORD:}
     hikari:
       idle-timeout: 300000
       minimum-idle: 3
@@ -72,8 +72,8 @@ jwt:
 oauth:
   providers:
     dexcom:
-      client-id: ${DEXCOM_CLIENT_ID:7KaRpwoqMFGyYsLFcmH0DSiiiGkLhsdX}
-      client-secret: ${DEXCOM_CLIENT_SECRET:bPQO4Ul2XDEqGKY9}
+      client-id: ${DEXCOM_CLIENT_ID:}
+      client-secret: ${DEXCOM_CLIENT_SECRET:}
       redirect-uri: ${DEXCOM_REDIRECT_URI:http://192.168.100.44:8080/api/v1/oauth/dexcom/callback}
       auth-uri: ${DEXCOM_AUTH_URI:https://sandbox-api.dexcom.com/v3/oauth2/login}
       token-uri: ${DEXCOM_TOKEN_URI:https://sandbox-api.dexcom.com/v3/oauth2/token}

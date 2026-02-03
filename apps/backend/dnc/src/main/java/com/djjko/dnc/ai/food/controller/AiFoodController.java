@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("/api/v1/ai/food")
+@RequestMapping("/api/v1/food")
 public class AiFoodController {
 
     private final AiFoodService aiFoodService;
@@ -24,8 +24,8 @@ public class AiFoodController {
         this.currentUserService = currentUserService;
     }
 
-    @PostMapping(value = "/analyze", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Analyze food image")
+    @PostMapping(value = "/predict", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Predict food from image")
     public AiFoodAnalyzeResponse analyze(
         @RequestPart("image") MultipartFile image,
         @RequestParam(value = "estimatedWeight", required = false) Double estimatedWeight
