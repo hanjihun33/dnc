@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  Image,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -19,6 +20,8 @@ const palette = {
   ink: "#111827",
 };
 
+const logoImage = require("@/assets/images/icon.png");
+
 export default function AuthEntryScreen() {
   const router = useRouter();
 
@@ -29,12 +32,13 @@ export default function AuthEntryScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.hero}>
-          <View style={styles.logoCard}>
-            <View style={styles.logoRing} />
-            <View style={styles.logoDot} />
-          </View>
-          <Text style={styles.appName}>당냥콩</Text>
-          <Text style={styles.tagline}>초개인화 혈당 코칭 가이드</Text>
+          <Image
+            source={logoImage}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+          <Text style={styles.appName}>당낭콩</Text>
+          <Text style={styles.tagline}>나만을 위한 식사 분석 혈당 코치</Text>
         </View>
 
         <View style={styles.buttonStack}>
@@ -69,30 +73,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   hero: { alignItems: "center", marginBottom: 48 },
-  logoCard: {
+  logoImage: {
     width: 84,
     height: 84,
     borderRadius: 24,
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "transparent",
     marginBottom: 18,
-  },
-  logoRing: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: "#F59E0B",
-  },
-  logoDot: {
-    position: "absolute",
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#F97316",
-    top: 18,
-    right: 22,
   },
   appName: { fontSize: 28, fontWeight: "800", color: palette.text },
   tagline: {
