@@ -19,6 +19,7 @@ import * as ImagePicker from "expo-image-picker";
 import { LineChart } from "react-native-chart-kit";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { getAuthHeaders, loadAuthSession } from "@/session";
+import AiGuideText from "@/components/ai-guide-text";
 
 const mealTypes = ["아침", "점심", "저녁", "간식"];
 const chartWidth = Dimensions.get("window").width - 48;
@@ -1206,10 +1207,24 @@ export default function MealScreen() {
             <Text
               style={[styles.sectionTitle, isEditMode && styles.sectionTitleEdit]}
             >
-              섭취 가이드
+              AI 섭취 가이드
             </Text>
-            <View style={styles.guideCard}>
-              <Text style={styles.guideText}>{predictionData.guide}</Text>
+            <View style={styles.aiGuideCard}>
+              <View style={styles.aiGuideHeader}>
+                <View style={styles.aiChip}>
+                  <View style={styles.aiChipDot} />
+                  <Text style={styles.aiChipText}>AI INSIGHT</Text>
+                </View>
+                <Text style={styles.aiMetaText}>이미지·영양·혈당 패턴 기반</Text>
+              </View>
+              <Text style={styles.aiGuideTitle}>AI가 가이드를 제공해요</Text>
+              <AiGuideText text={predictionData.guide} textStyle={styles.aiGuideText} />
+              <View style={styles.aiGuideFooter}>
+                <View style={styles.aiPulse} />
+                <Text style={styles.aiFooterText}>
+                  AI가 생성한 개인 맞춤 추천입니다.
+                </Text>
+              </View>
             </View>
 
             <Text
@@ -1269,10 +1284,24 @@ export default function MealScreen() {
             <Text
               style={[styles.sectionTitle, isEditMode && styles.sectionTitleEdit]}
             >
-              {"AI \uac00\uc774\ub4dc"}
+              AI 섭취 가이드
             </Text>
-            <View style={styles.guideCard}>
-              <Text style={styles.guideText}>{editAiGuide}</Text>
+            <View style={styles.aiGuideCard}>
+              <View style={styles.aiGuideHeader}>
+                <View style={styles.aiChip}>
+                  <View style={styles.aiChipDot} />
+                  <Text style={styles.aiChipText}>AI INSIGHT</Text>
+                </View>
+                <Text style={styles.aiMetaText}>이미지·영양·혈당 패턴 기반</Text>
+              </View>
+              <Text style={styles.aiGuideTitle}>AI가 가이드를 제공해요</Text>
+              <AiGuideText text={editAiGuide} textStyle={styles.aiGuideText} />
+              <View style={styles.aiGuideFooter}>
+                <View style={styles.aiPulse} />
+                <Text style={styles.aiFooterText}>
+                  AI가 생성한 개인 맞춤 추천입니다.
+                </Text>
+              </View>
             </View>
           </>
         ) : null}
@@ -1926,17 +1955,84 @@ const styles = StyleSheet.create({
   graphStyle: {
     borderRadius: 18,
   },
-  guideCard: {
-    backgroundColor: palette.card,
-    borderRadius: 18,
+  aiGuideCard: {
+    backgroundColor: "#0B1220",
+    borderRadius: 20,
     padding: 18,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: "rgba(148, 163, 184, 0.18)",
+    overflow: "hidden",
+    shadowColor: "#0B1220",
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
-  guideText: {
+  aiGuideHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  aiGuideTitle: {
+    marginTop: 12,
+    color: "#F8FAFC",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  aiChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(250, 204, 21, 0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(250, 204, 21, 0.4)",
+  },
+  aiChipDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: palette.accentDark,
+  },
+  aiChipText: {
+    color: "#FDE68A",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+  },
+  aiMetaText: {
+    color: "rgba(148, 163, 184, 0.8)",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  aiGuideText: {
+    marginTop: 10,
+    color: "rgba(226, 232, 240, 0.92)",
     fontSize: 14,
-    color: palette.text,
     lineHeight: 22,
+  },
+  aiGuideFooter: {
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  aiPulse: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#38BDF8",
+    shadowColor: "#38BDF8",
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  aiFooterText: {
+    color: "rgba(148, 163, 184, 0.9)",
+    fontSize: 12,
+    fontWeight: "600",
   },
   nutritionCard: {
     backgroundColor: palette.card,
