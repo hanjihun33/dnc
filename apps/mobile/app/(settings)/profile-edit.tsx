@@ -35,8 +35,8 @@ const API_BASE_URL =
 
 export default function ProfileEditScreen() {
   const router = useRouter();
-  const [nickname, setNickname] = React.useState("차지훈");
-  const [initialNickname, setInitialNickname] = React.useState("차지훈");
+  const [nickname, setNickname] = React.useState("");
+  const [initialNickname, setInitialNickname] = React.useState("");
   const [currentPassword, setCurrentPassword] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [passwordConfirm, setPasswordConfirm] = React.useState("");
@@ -45,9 +45,12 @@ export default function ProfileEditScreen() {
     null
   );
   const [isSaving, setIsSaving] = React.useState(false);
+  const [provider, setProvider] = React.useState<string | null>(null);
   const [avatarIndex, setAvatarIndex] = React.useState(0);
   const avatarColors = ["#E2E8F0", "#FDE68A", "#FECACA", "#BFDBFE"];
   const initials = nickname.trim().length > 0 ? nickname.trim()[0] : "U";
+  const normalizedProvider = provider?.trim().toLowerCase() ?? null;
+  const isSocialAccount = normalizedProvider != null && normalizedProvider !== "local";
   const passwordsMatch =
     password.length === 0 || (password.length > 0 && password === passwordConfirm);
   const passwordReady =
@@ -81,12 +84,20 @@ export default function ProfileEditScreen() {
         nickname?: string;
         email?: string;
         profileImageUrl?: string | null;
+        provider?: string | null;
       };
       const nextNickname = profile.nickname || profile.email || "";
       setNickname(nextNickname);
       setInitialNickname(nextNickname);
       setProfileImageUrl(profile.profileImageUrl ?? null);
       setAvatarUri(profile.profileImageUrl ?? null);
+      const nextProvider = profile.provider ?? null;
+      setProvider(nextProvider);
+      if (nextProvider && nextProvider.toLowerCase() !== "local") {
+        setCurrentPassword("");
+        setPassword("");
+        setPasswordConfirm("");
+      }
     } catch {
       // Ignore profile load errors.
     }
@@ -177,7 +188,7 @@ export default function ProfileEditScreen() {
         }
       }
 
-      if (password.length > 0) {
+      if (!isSocialAccount && password.length > 0) {
         const response = await fetch(`${API_BASE_URL}/api/v1/users/me/password`, {
           method: "PATCH",
           headers: {
@@ -254,7 +265,11 @@ export default function ProfileEditScreen() {
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
         <Text style={styles.title}>프로필 수정</Text>
-        <Text style={styles.subtitle}>닉네임, 비밀번호, 프로필 이미지를 수정하세요.</Text>
+        <Text style={styles.subtitle}>
+          {isSocialAccount
+            ? "닉네임과 프로필 이미지를 수정하세요."
+            : "닉네임, 비밀번호, 프로필 이미지를 수정하세요."}
+        </Text>
 
         <View style={styles.section}>
           <Pressable style={styles.avatarRow} onPress={openAvatarOptions}>
@@ -296,11 +311,16 @@ export default function ProfileEditScreen() {
             <TextInput
               value={currentPassword}
               onChangeText={setCurrentPassword}
-              placeholder="현재 비밀번호 입력"
+              placeholder={
+                isSocialAccount
+                  ? "소셜 로그인 계정은 비밀번호 변경 불가"
+                  : "현재 비밀번호 입력"
+              }
               placeholderTextColor="#94A3B8"
-              style={styles.input}
+              style={[styles.input, isSocialAccount && styles.inputDisabled]}
               secureTextEntry
               autoCapitalize="none"
+              editable={!isSocialAccount}
             />
           </View>
 
@@ -309,11 +329,16 @@ export default function ProfileEditScreen() {
             <TextInput
               value={password}
               onChangeText={setPassword}
-              placeholder="8자 이상 입력"
+              placeholder={
+                isSocialAccount
+                  ? "소셜 로그인 계정은 비밀번호 변경 불가"
+                  : "8자 이상 입력"
+              }
               placeholderTextColor="#94A3B8"
-              style={styles.input}
+              style={[styles.input, isSocialAccount && styles.inputDisabled]}
               secureTextEntry
               autoCapitalize="none"
+              editable={!isSocialAccount}
             />
           </View>
 
@@ -322,20 +347,36 @@ export default function ProfileEditScreen() {
             <TextInput
               value={passwordConfirm}
               onChangeText={setPasswordConfirm}
-              placeholder="비밀번호 다시 입력"
+              placeholder={
+                isSocialAccount
+                  ? "소셜 로그인 계정은 비밀번호 변경 불가"
+                  : "비밀번호 다시 입력"
+              }
               placeholderTextColor="#94A3B8"
-              style={styles.input}
+              style={[styles.input, isSocialAccount && styles.inputDisabled]}
               secureTextEntry
               autoCapitalize="none"
+              editable={!isSocialAccount}
             />
-            {password.length > 0 && passwordConfirm.length > 0 && !passwordsMatch && (
+            {!isSocialAccount &&
+              password.length > 0 &&
+              passwordConfirm.length > 0 &&
+              !passwordsMatch && (
               <Text style={styles.helperTextError}>비밀번호가 일치하지 않습니다.</Text>
             )}
-            {password.length > 0 && passwordConfirm.length > 0 && passwordsMatch && (
+            {!isSocialAccount &&
+              password.length > 0 &&
+              passwordConfirm.length > 0 &&
+              passwordsMatch && (
               <Text style={styles.helperTextSuccess}>비밀번호가 일치합니다.</Text>
             )}
-            {password.length > 0 && password.length < 8 && (
+            {!isSocialAccount && password.length > 0 && password.length < 8 && (
               <Text style={styles.helperTextError}>비밀번호는 8자 이상이어야 합니다.</Text>
+            )}
+            {isSocialAccount && (
+              <Text style={styles.helperTextMuted}>
+                소셜 로그인 계정은 비밀번호 변경이 불가합니다.
+              </Text>
             )}
           </View>
         </View>
@@ -428,6 +469,10 @@ const styles = StyleSheet.create({
     color: palette.text,
     backgroundColor: "#FFFFFF",
   },
+  inputDisabled: {
+    backgroundColor: "#F1F5F9",
+    color: "#94A3B8",
+  },
   helperTextError: {
     color: "#DC2626",
     fontSize: 12,
@@ -435,6 +480,11 @@ const styles = StyleSheet.create({
   },
   helperTextSuccess: {
     color: "#16A34A",
+    fontSize: 12,
+    marginTop: 8,
+  },
+  helperTextMuted: {
+    color: palette.textMuted,
     fontSize: 12,
     marginTop: 8,
   },

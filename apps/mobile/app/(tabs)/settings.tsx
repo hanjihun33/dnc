@@ -32,16 +32,21 @@ const API_BASE_URL =
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const [profileName, setProfileName] = React.useState("차지훈");
-  const [profileEmail, setProfileEmail] = React.useState("konichan7@kakao.com");
+  const [profileName, setProfileName] = React.useState("");
+  const [profileEmail, setProfileEmail] = React.useState("");
   const [profileImageUrl, setProfileImageUrl] = React.useState<string | null>(
     null
   );
+  const [isProfileLoading, setIsProfileLoading] = React.useState(true);
 
   const initials =
     profileName.trim().length > 0 ? profileName.trim()[0] : "U";
 
   const loadProfile = React.useCallback(async () => {
+    setIsProfileLoading(true);
+    setProfileName("");
+    setProfileEmail("");
+    setProfileImageUrl(null);
     try {
       await loadAuthSession();
       const response = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
@@ -69,6 +74,8 @@ export default function SettingsScreen() {
       setProfileImageUrl(profile.profileImageUrl ?? null);
     } catch {
       // Ignore profile load errors.
+    } finally {
+      setIsProfileLoading(false);
     }
   }, []);
 
@@ -112,8 +119,14 @@ export default function SettingsScreen() {
               )}
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{profileName}</Text>
-              <Text style={styles.profileEmail}>{profileEmail}</Text>
+              <Text style={styles.profileName}>
+                {isProfileLoading
+                  ? "계정 정보 불러오는 중"
+                  : profileName || "사용자"}
+              </Text>
+              <Text style={styles.profileEmail}>
+                {isProfileLoading ? "" : profileEmail}
+              </Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </Pressable>

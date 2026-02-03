@@ -28,24 +28,28 @@ public class SocialLoginController {
     private final OAuthService oAuthService;
     private final SocialLoginService socialLoginService;
     private final String appRedirectUri;
+    private final String webRedirectUri;
 
     public SocialLoginController(
         OAuthService oAuthService,
         SocialLoginService socialLoginService,
-        @Value("${app.social-login-redirect-uri:testapp://auth}") String appRedirectUri
+        @Value("${app.social-login-redirect-uri:testapp://auth}") String appRedirectUri,
+        @Value("${app.social-login-redirect-uri-web:http://localhost:3000/auth}") String webRedirectUri
     ) {
         this.oAuthService = oAuthService;
         this.socialLoginService = socialLoginService;
         this.appRedirectUri = appRedirectUri;
+        this.webRedirectUri = webRedirectUri;
     }
 
     @GetMapping("/{provider}/authorize")
     @Operation(summary = "소셜 로그인 인가 URL 요청")
     public ResponseEntity<Void> authorize(
         @PathVariable String provider,
-        @RequestParam(required = false) String state
+        @RequestParam(required = false) String state,
+        @RequestParam(required = false) String platform
     ) {
-        String resolvedState = (state == null || state.isBlank()) ? UUID.randomUUID().toString() : state;
+        String resolvedState = resolveState(state, platform);
         String authorizeUrl = oAuthService.buildAuthorizeUrl(provider, resolvedState);
 
         HttpHeaders headers = new HttpHeaders();
@@ -66,7 +70,7 @@ public class SocialLoginController {
         if (wantsJson(format, accept)) {
             return ResponseEntity.ok(response);
         }
-        String redirectUrl = buildAppRedirectUrl(response);
+        String redirectUrl = buildRedirectUrl(response, resolveRedirectBase(state));
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(URI.create(redirectUrl));
         return new ResponseEntity<>(headers, HttpStatus.FOUND);
@@ -149,7 +153,7 @@ public class SocialLoginController {
             """.formatted(appUrl);
     }
 
-    private String buildAppRedirectUrl(SocialLoginResponse response) {
+    private String buildRedirectUrl(SocialLoginResponse response, String baseRedirectUri) {
         String accessToken = urlEncode(response.getAccessToken());
         String refreshToken = urlEncode(response.getRefreshToken());
         String tokenType = urlEncode(response.getTokenType());
@@ -157,8 +161,8 @@ public class SocialLoginController {
         String expiresIn = String.valueOf(response.getExpiresIn());
         String newUser = String.valueOf(response.isNewUser());
 
-        String separator = appRedirectUri.contains("?") ? "&" : "?";
-        return appRedirectUri
+        String separator = baseRedirectUri.contains("?") ? "&" : "?";
+        return baseRedirectUri
             + separator
             + "accessToken="
             + accessToken
@@ -172,6 +176,47 @@ public class SocialLoginController {
             + expiresIn
             + "&newUser="
             + newUser;
+    }
+
+    private String resolveState(String state, String platform) {
+        String baseState = (state == null || state.isBlank())
+            ? UUID.randomUUID().toString()
+            : state;
+        String normalizedPlatform = normalizePlatform(platform);
+        if (baseState.startsWith("app:") || baseState.startsWith("web:")) {
+            return baseState;
+        }
+        return normalizedPlatform + ":" + baseState;
+    }
+
+    private String resolveRedirectBase(String state) {
+        String platform = extractPlatform(state);
+        if ("web".equals(platform)) {
+            return webRedirectUri;
+        }
+        return appRedirectUri;
+    }
+
+    private String extractPlatform(String state) {
+        if (state == null || state.isBlank()) {
+            return "app";
+        }
+        String normalized = state.trim().toLowerCase();
+        if (normalized.startsWith("web:")) {
+            return "web";
+        }
+        if (normalized.startsWith("app:")) {
+            return "app";
+        }
+        return "app";
+    }
+
+    private String normalizePlatform(String platform) {
+        if (platform == null || platform.isBlank()) {
+            return "app";
+        }
+        String normalized = platform.trim().toLowerCase();
+        return "web".equals(normalized) ? "web" : "app";
     }
 
     private String urlEncode(String value) {

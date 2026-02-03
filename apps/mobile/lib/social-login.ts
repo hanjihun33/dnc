@@ -89,7 +89,7 @@ const parseErrorMessage = async (response: Response) => {
 };
 
 export const startSocialLogin = async (provider: SocialProvider) => {
-  const authorizeUrl = `${API_BASE_URL}/api/v1/login/${provider}/authorize`;
+  const authorizeUrl = `${API_BASE_URL}/api/v1/login/${provider}/authorize?platform=app`;
   const callbackUrl = `${API_BASE_URL}/api/v1/login/${provider}/callback`;
   const redirectUrl = Linking.createURL("auth");
 
