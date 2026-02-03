@@ -771,6 +771,7 @@ export default function MealScreen() {
   const analyzeImage = async (asset: ImagePicker.ImagePickerAsset) => {
     setIsAnalyzing(true);
     try {
+      await loadAuthSession();
       const formData = new FormData();
       formData.append("image", {
         uri: asset.uri,

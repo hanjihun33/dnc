@@ -146,7 +146,7 @@ export default function ReportScreen() {
 
       // 2. Fetch Report
       const reportRes = await fetch(
-        `${API_BASE_URL}/api/v1/reports/glucose?startDate=${startDate}&endDate=${endDateIso}`,
+        `${API_BASE_URL}/api/v1/reports/glucose?startDate=${startDate}&endDate=${endDateIso}&sensorId=${targetSensor.sensorId}`,
         { headers }
       );
       if (reportRes.ok) setReport(await reportRes.json());

@@ -25,7 +25,8 @@ public class ReportController {
     public GlucoseReportDto getGlucoseReport(
             @RequestParam(value = "period", defaultValue = "weekly") String period,
             @RequestParam(value = "startDate", required = false) String startDate,
-            @RequestParam(value = "endDate", required = false) String endDate) {
+            @RequestParam(value = "endDate", required = false) String endDate,
+            @RequestParam(value = "sensorId", required = false) Long sensorId) {
 
         Long userId = currentUserService.getRequiredUserId();
 
@@ -34,7 +35,8 @@ public class ReportController {
                     userId,
                     parseDateTime(startDate),
                     parseDateTime(endDate),
-                    "CUSTOM");
+                    "CUSTOM",
+                    sensorId);
         }
 
         GlucoseReportDto report = reportService.generateGlucoseReport(userId, period);
