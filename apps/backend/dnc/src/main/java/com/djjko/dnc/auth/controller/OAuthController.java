@@ -117,11 +117,26 @@ public class OAuthController {
     @GetMapping("/{provider}/callback")
     @Operation(summary = "OAuth callback handler")
     public ResponseEntity<?> callback(
-            @PathVariable String provider,
-            @RequestParam String code,
-            @RequestParam(required = false) String state,
-            @RequestParam(required = false, name = "format") String format,
-            @RequestHeader(value = "Accept", required = false) String accept) {
+@PathVariable String provider,
+    @RequestParam(required = false) String code,
+    @RequestParam(required = false) String state,
+    @RequestParam(required = false) String error,
+    @RequestParam(required = false, name = "error_description") String errorDescription,
+    @RequestParam(required = false, name = "format") String format,
+    @RequestHeader(value = "Accept", required = false) String accept
+) {
+    // 1. 에러 발생 또는 인증 코드 누락 시 처리
+    if (error != null || code == null || code.isBlank()) {
+        String message = resolveOAuthFailureMessage(error, errorDescription, code);
+        String status = isCancelError(error) ? "cancel" : "error";
+        
+        // 2. 요청 포맷에 따라 앱 리다이렉트 또는 예외 발생
+        if (shouldRedirectToApp(format, accept)) {
+            return redirectToApp(provider, status, message, accept);
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+    }
+
         try {
             OAuthTokenResponse response = oAuthService.exchangeCodeForToken(provider, code, state);
             java.util.Optional<com.djjko.dnc.auth.entity.User> userOpt = resolveAuthenticatedUserOrState(state);
@@ -373,10 +388,18 @@ public class OAuthController {
     }
 
     private String buildHtmlResponse(String status, String appUrl) {
-        String title = "success".equalsIgnoreCase(status) ? "연동 완료" : "연동 실패";
-        String description = "success".equalsIgnoreCase(status)
-                ? "앱으로 돌아가 주세요."
-                : "잠시 후 다시 시도해주세요.";
+        String title;
+        String description;
+        if ("success".equalsIgnoreCase(status)) {
+            title = "연동 완료";
+            description = "앱으로 돌아가 주세요.";
+        } else if ("cancel".equalsIgnoreCase(status)) {
+            title = "연동 취소";
+            description = "연동이 취소되었습니다.";
+        } else {
+            title = "연동 실패";
+            description = "잠시 후 다시 시도해주세요.";
+        }
         String safeAppUrl = urlEncode(appUrl);
         return """
                 <!doctype html>
@@ -439,5 +462,32 @@ public class OAuthController {
             return "";
         }
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private String resolveOAuthFailureMessage(String error, String errorDescription, String code) {
+        if (errorDescription != null && !errorDescription.isBlank()) {
+            return errorDescription;
+        }
+        if (error != null && !error.isBlank()) {
+            if (isCancelError(error)) {
+                return "연동이 취소되었습니다.";
+            }
+            return error;
+        }
+        if (code == null || code.isBlank()) {
+            return "OAuth 승인 코드가 없습니다.";
+        }
+        return "OAuth 요청에 실패했습니다.";
+    }
+
+    private boolean isCancelError(String error) {
+        if (error == null) {
+            return false;
+        }
+        String normalized = error.toLowerCase();
+        return normalized.contains("access_denied")
+            || normalized.contains("cancel")
+            || normalized.contains("user_cancel")
+            || normalized.contains("consent_denied");
     }
 }

@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import {
   Alert,
+  BackHandler,
   Modal,
   SafeAreaView,
   ScrollView,
@@ -10,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   bumpProfileRevision,
@@ -62,6 +63,8 @@ const mapRequestType = (value: DiabetesStatus) => {
 
 export default function DiagnosisScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const isOnboarding = params.onboarding === "1";
   const now = new Date();
   const currentYear = now.getFullYear();
   const yearOptions = Array.from(
@@ -178,6 +181,38 @@ export default function DiagnosisScreen() {
     }, [loadProfile])
   );
 
+  const handleBack = React.useCallback(() => {
+    if (!isOnboarding) {
+      router.back();
+      return;
+    }
+    Alert.alert(
+      "건강 정보 입력",
+      "아직 필수 정보가 완료되지 않았어요. 나중에 입력하시겠어요?",
+      [
+        { text: "계속 입력", style: "cancel" },
+        { text: "나중에", onPress: () => router.replace("/(tabs)") },
+      ]
+    );
+  }, [isOnboarding, router]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!isOnboarding) {
+        return () => {};
+      }
+      const onBackPress = () => {
+        handleBack();
+        return true;
+      };
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress
+      );
+      return () => subscription.remove();
+    }, [handleBack, isOnboarding])
+  );
+
   const handleSave = async () => {
     if (isSaving) {
       return;
@@ -207,8 +242,21 @@ export default function DiagnosisScreen() {
         throw new Error("진단 유형 저장에 실패했습니다.");
       }
       bumpProfileRevision();
-      Alert.alert("저장 완료", "진단 유형이 저장되었습니다.");
-      router.back();
+      if (isOnboarding) {
+        Alert.alert("저장 완료", "진단 유형이 저장되었습니다.", [
+          {
+            text: "다음",
+            onPress: () =>
+              router.replace({
+                pathname: "/(settings)/body-info",
+                params: { onboarding: "1" },
+              }),
+          },
+        ]);
+      } else {
+        Alert.alert("저장 완료", "진단 유형이 저장되었습니다.");
+        router.back();
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "저장에 실패했습니다.";
@@ -228,7 +276,7 @@ export default function DiagnosisScreen() {
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={handleBack}
           >
             <Text style={styles.backText}>{"<"}</Text>
           </TouchableOpacity>

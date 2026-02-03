@@ -1,6 +1,8 @@
 ﻿import React from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   TouchableOpacity,
   SafeAreaView,
@@ -30,6 +32,7 @@ const palette = {
   accent: "#FACC15",
   danger: "#EF4444",
   dangerSoft: "#FEE2E2",
+  overlayBackdrop: "rgba(15, 23, 42, 0.25)",
 };
 
 const API_BASE_URL =
@@ -40,6 +43,8 @@ export default function SensorConnectScreen() {
   const [isConnecting, setIsConnecting] = React.useState(false);
   const [isDisconnecting, setIsDisconnecting] = React.useState(false);
   const [sensorConnected, setSensorConnected] = React.useState(false);
+  const isOverlayVisible = isDisconnecting;
+  const overlayTitle = "연동 해제 중";
 
   const loadProfile = React.useCallback(async () => {
     try {
@@ -82,6 +87,7 @@ export default function SensorConnectScreen() {
         Alert.alert("로그인 필요", "로그인 후 다시 시도해주세요.");
         return;
       }
+      router.push({ pathname: "/oauth", params: { pending: "1", provider: "dexcom" } });
       const response = await fetch(
         `${API_BASE_URL}/api/v1/oauth/dexcom/authorize-url`,
         { headers: getAuthHeaders() }
@@ -198,6 +204,22 @@ export default function SensorConnectScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
+      <Modal
+        transparent
+        animationType="fade"
+        visible={isOverlayVisible}
+        onRequestClose={() => {}}
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
+      >
+        <View style={styles.overlayBackdrop}>
+          <View style={styles.overlayCard}>
+            <ActivityIndicator size="large" color={palette.textMuted} />
+            <Text style={styles.overlayTitle}>{overlayTitle}</Text>
+            <Text style={styles.overlayText}>잠시만 기다려 주세요.</Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -308,5 +330,39 @@ const styles = StyleSheet.create({
     color: palette.danger,
     fontSize: 12,
     fontWeight: "700",
+  },
+  overlayBackdrop: {
+    flex: 1,
+    backgroundColor: palette.overlayBackdrop,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  overlayCard: {
+    backgroundColor: palette.card,
+    borderRadius: 20,
+    paddingVertical: 22,
+    paddingHorizontal: 24,
+    alignItems: "center",
+    width: "100%",
+    maxWidth: 280,
+    borderWidth: 1,
+    borderColor: palette.border,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  overlayTitle: {
+    marginTop: 14,
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  overlayText: {
+    marginTop: 6,
+    color: palette.textMuted,
+    fontSize: 13,
   },
 });

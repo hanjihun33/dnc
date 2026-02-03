@@ -17,6 +17,9 @@ public record AiGlucosePredictionRequest(
     @JsonProperty("fasting_hours") double fastingHours,
     @JsonProperty("trend_slope_up") double trendSlopeUp,
     @JsonProperty("trend_slope_down") double trendSlopeDown,
-    @JsonProperty("is_t2d") boolean isT2d
+    @JsonProperty("is_t2d") boolean isT2d,
+    @JsonProperty("user_id") long userId,
+    @JsonProperty("time_stamp") String timeStamp,
+    @JsonProperty("has_enough_data") boolean hasEnoughData
 ) {
 }
