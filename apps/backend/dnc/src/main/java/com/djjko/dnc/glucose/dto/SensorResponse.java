@@ -4,8 +4,6 @@ import com.djjko.dnc.glucose.entity.Sensor;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.time.LocalDateTime;
-
 @Getter
 @Builder
 public class SensorResponse {
@@ -13,8 +11,8 @@ public class SensorResponse {
     private String deviceId;
     private String provider;
     private String status;
-    private LocalDateTime startedAt;
-    private LocalDateTime endedAt;
+    private String startedAt;
+    private String endedAt;
 
     public static SensorResponse from(Sensor sensor) {
         return SensorResponse.builder()
@@ -22,8 +20,8 @@ public class SensorResponse {
                 .deviceId(sensor.getDeviceId())
                 .provider(sensor.getProvider())
                 .status(sensor.getStatus().name())
-                .startedAt(sensor.getStartedAt())
-                .endedAt(sensor.getEndedAt())
+                .startedAt(sensor.getStartedAt() != null ? sensor.getStartedAt().toString() : null)
+                .endedAt(sensor.getEndedAt() != null ? sensor.getEndedAt().toString() : null)
                 .build();
     }
 }
