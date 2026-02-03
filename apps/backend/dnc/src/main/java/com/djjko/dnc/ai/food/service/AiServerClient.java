@@ -32,16 +32,15 @@ public class AiServerClient {
     private final RestClient restClient;
 
     public AiServerClient(
-        RestClient.Builder restClientBuilder,
-        @Value("${ai.server.base-url}") String baseUrl
-    ) {
+            RestClient.Builder restClientBuilder,
+            @Value("${ai.server.base-url}") String baseUrl) {
         HttpClient httpClient = HttpClient.newBuilder()
-            .version(HttpClient.Version.HTTP_1_1)
-            .build();
+                .version(HttpClient.Version.HTTP_1_1)
+                .build();
         this.restClient = restClientBuilder
-            .requestFactory(new JdkClientHttpRequestFactory(httpClient))
-            .baseUrl(baseUrl)
-            .build();
+                .requestFactory(new JdkClientHttpRequestFactory(httpClient))
+                .baseUrl(baseUrl)
+                .build();
     }
 
     public Optional<AiFoodDetectResult> analyzeFood(MultipartFile image) {
@@ -60,19 +59,19 @@ public class AiServerClient {
             body.add("file", resource);
 
             AiFoodDetectResponse response = restClient
-                .post()
-                .uri("/api/v1/food/predict")
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(body)
-                .retrieve()
-                .body(AiFoodDetectResponse.class);
+                    .post()
+                    .uri("/api/v1/ai/food/analyze")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(body)
+                    .retrieve()
+                    .body(AiFoodDetectResponse.class);
 
             if (response == null || response.result() == null || response.result().isEmpty()) {
                 return Optional.empty();
             }
 
             return response.result().stream()
-                .max(Comparator.comparing(result -> result.confidence() == null ? 0.0 : result.confidence()));
+                    .max(Comparator.comparing(result -> result.confidence() == null ? 0.0 : result.confidence()));
         } catch (IOException | RestClientException ex) {
             log.warn("AI server analyze request failed: {}", ex.getMessage());
             return Optional.empty();
@@ -82,12 +81,12 @@ public class AiServerClient {
     public Optional<List<Double>> predictGlucose(AiGlucosePredictionRequest request) {
         try {
             AiGlucosePredictionResponse response = restClient
-                .post()
-                .uri("/api/v1/glucose/predict")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(request)
-                .retrieve()
-                .body(AiGlucosePredictionResponse.class);
+                    .post()
+                    .uri("/api/v1/predictions")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .body(AiGlucosePredictionResponse.class);
 
             if (response == null || response.forecast() == null || response.forecast().isEmpty()) {
                 return Optional.empty();
@@ -102,12 +101,12 @@ public class AiServerClient {
     public void updateModel(ModelUpdateRequest request) {
         try {
             restClient
-                .post()
-                .uri("/api/v1/glucose/train")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(request)
-                .retrieve()
-                .toBodilessEntity();
+                    .post()
+                    .uri("/api/v1/model/update")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .toBodilessEntity();
         } catch (RestClientException ex) {
             log.warn("AI server model update request failed: {}", ex.getMessage());
         }
