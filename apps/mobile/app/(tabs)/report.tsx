@@ -213,10 +213,15 @@ export default function ReportScreen() {
     // If active (index 0 and status active), show "Current Sensor"
     // Else show "Past Sensor (Date~Date)"
     const isCurrent = currentIndex === 0 && current.status === 'ACTIVE';
-    const mainTitle = isCurrent ? "현재 센서" : "이전 센서 리포트";
-    const subTitle = `${startStr} ~ ${endStr}`;
+    const isPending = currentIndex === 0 && current.status === 'PENDING';
 
-    return { title: mainTitle, subtitle: subTitle };
+    let mainTitle = "이전 센서 리포트";
+    if (isCurrent) mainTitle = "현재 센서";
+    else if (isPending) mainTitle = "센서 예열 중";
+
+    const subTitle = isPending ? "데이터 수집 대기 중..." : `${startStr} ~ ${endStr}`;
+
+    return { title: mainTitle, subtitle: subTitle, isPending };
   }, [sensors, currentIndex]);
 
   if (sensors.length === 0 && !loading) {
@@ -232,6 +237,32 @@ export default function ReportScreen() {
         </View>
       </SafeAreaView>
     )
+  }
+
+  // Check if current sensor is pending warm-up
+  if (headerInfo.isPending && !loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor={palette.background} />
+        <View style={styles.header}>
+          <View style={{ alignItems: 'center', width: '100%' }}>
+            <Text style={styles.headerTitle}>{headerInfo.title}</Text>
+            <Text style={styles.headerSubtitle}>{headerInfo.subtitle}</Text>
+          </View>
+        </View>
+        <View style={styles.emptyContainer}>
+          <ActivityIndicator size="large" color={palette.accent} style={{ marginBottom: 20 }} />
+          <Text style={styles.emptyTitle}>센서가 연결되었습니다!</Text>
+          <Text style={[styles.emptySubtitle, { maxWidth: '80%' }]}>
+            현재 첫 혈당 데이터를 수집하기 위해 대기 중입니다.{"\n"}
+            (최대 30분 ~ 2시간 소요)
+          </Text>
+          <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: palette.background, borderWidth: 1, borderColor: palette.border }]} onPress={onRefresh}>
+            <Text style={[styles.emptyBtnText, { color: palette.text }]}>새로고침</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (

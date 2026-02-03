@@ -243,6 +243,16 @@ public class CgmPipelineService {
                     return activeSensor;
                 })
                 .orElseGet(() -> {
+                    // [Added] PENDING 상태 센서가 있다면 활성화
+                    java.util.Optional<Sensor> pendingSensor = sensorRepository.findByUserAndStatus(user,
+                            Sensor.SensorStatus.PENDING);
+                    if (pendingSensor.isPresent()) {
+                        Sensor sensor = pendingSensor.get();
+                        log.info("PENDING 센서 활성화: User {}, Device {}", user.getUserId(), incomingDeviceId);
+                        sensor.activate(incomingDeviceId);
+                        return sensorRepository.save(sensor);
+                    }
+
                     log.info("새로운 센서 연결 또는 재연결 감지: {}", incomingDeviceId);
 
                     // 기존 활성 센서가 있다면 은퇴 처리 (기기 변경 등의 경우)

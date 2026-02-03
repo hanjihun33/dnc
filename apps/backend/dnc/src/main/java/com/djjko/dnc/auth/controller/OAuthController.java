@@ -52,6 +52,7 @@ public class OAuthController {
     private final OAuthTokenService oAuthTokenService;
     private final UserRepository userRepository;
     private final SensorRepository sensorRepository;
+    private final SensorService sensorService; // New dependency
     private final GlucoseDataRepository glucoseDataRepository;
     private final CgmPipelineService cgmPipelineService; // New dependency
     private final JwtUtil jwtUtil;
@@ -64,6 +65,7 @@ public class OAuthController {
             OAuthTokenService oAuthTokenService,
             UserRepository userRepository,
             SensorRepository sensorRepository,
+            SensorService sensorService,
             GlucoseDataRepository glucoseDataRepository,
             CgmPipelineService cgmPipelineService,
             JwtUtil jwtUtil,
@@ -74,6 +76,7 @@ public class OAuthController {
         this.oAuthTokenService = oAuthTokenService;
         this.userRepository = userRepository;
         this.sensorRepository = sensorRepository;
+        this.sensorService = sensorService;
         this.glucoseDataRepository = glucoseDataRepository;
         this.cgmPipelineService = cgmPipelineService;
         this.jwtUtil = jwtUtil;
@@ -117,25 +120,24 @@ public class OAuthController {
     @GetMapping("/{provider}/callback")
     @Operation(summary = "OAuth callback handler")
     public ResponseEntity<?> callback(
-@PathVariable String provider,
-    @RequestParam(required = false) String code,
-    @RequestParam(required = false) String state,
-    @RequestParam(required = false) String error,
-    @RequestParam(required = false, name = "error_description") String errorDescription,
-    @RequestParam(required = false, name = "format") String format,
-    @RequestHeader(value = "Accept", required = false) String accept
-) {
-    // 1. 에러 발생 또는 인증 코드 누락 시 처리
-    if (error != null || code == null || code.isBlank()) {
-        String message = resolveOAuthFailureMessage(error, errorDescription, code);
-        String status = isCancelError(error) ? "cancel" : "error";
-        
-        // 2. 요청 포맷에 따라 앱 리다이렉트 또는 예외 발생
-        if (shouldRedirectToApp(format, accept)) {
-            return redirectToApp(provider, status, message, accept);
+            @PathVariable String provider,
+            @RequestParam(required = false) String code,
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false) String error,
+            @RequestParam(required = false, name = "error_description") String errorDescription,
+            @RequestParam(required = false, name = "format") String format,
+            @RequestHeader(value = "Accept", required = false) String accept) {
+        // 1. 에러 발생 또는 인증 코드 누락 시 처리
+        if (error != null || code == null || code.isBlank()) {
+            String message = resolveOAuthFailureMessage(error, errorDescription, code);
+            String status = isCancelError(error) ? "cancel" : "error";
+
+            // 2. 요청 포맷에 따라 앱 리다이렉트 또는 예외 발생
+            if (shouldRedirectToApp(format, accept)) {
+                return redirectToApp(provider, status, message, accept);
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
         }
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
-    }
 
         try {
             OAuthTokenResponse response = oAuthService.exchangeCodeForToken(provider, code, state);
@@ -149,6 +151,15 @@ public class OAuthController {
 
                 // [추가] 연동 즉시 데이터 수집 실행 (지연 시간 제거)
                 if ("dexcom".equalsIgnoreCase(provider)) {
+                    // 1. PENDING 센서 생성 (예열 상태 표시용)
+                    try {
+                        sensorService.createPendingSensor(user);
+                        log.info("PENDING 상태 센서 생성 완료: User {}", user.getUserId());
+                    } catch (Exception e) {
+                        log.warn("PENDING 센서 생성 실패: {}", e.getMessage());
+                    }
+
+                    // 2. 즉시 데이터 동기화 시도
                     try {
                         cgmPipelineService.fetchLatestDataForUser(user);
                         log.info("Dexcom 연동 즉시 데이터 동기화 완료: User {}", user.getUserId());
@@ -486,8 +497,8 @@ public class OAuthController {
         }
         String normalized = error.toLowerCase();
         return normalized.contains("access_denied")
-            || normalized.contains("cancel")
-            || normalized.contains("user_cancel")
-            || normalized.contains("consent_denied");
+                || normalized.contains("cancel")
+                || normalized.contains("user_cancel")
+                || normalized.contains("consent_denied");
     }
 }

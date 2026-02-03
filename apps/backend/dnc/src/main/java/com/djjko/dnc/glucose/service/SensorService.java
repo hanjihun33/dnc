@@ -37,4 +37,21 @@ public class SensorService {
                 .map(SensorResponse::from)
                 .toList();
     }
+    @Transactional
+    public void createPendingSensor(User user) {
+        boolean hasActiveOrPending = sensorRepository.findByUserAndStatus(user, Sensor.SensorStatus.ACTIVE).isPresent()
+            || sensorRepository.findByUserAndStatus(user, Sensor.SensorStatus.PENDING).isPresent();
+        
+        if (hasActiveOrPending) {
+            return;
+        }
+
+        Sensor sensor = Sensor.builder()
+                .user(user)
+                .status(Sensor.SensorStatus.PENDING)
+                .provider("Dexcom")
+                .startedAt(java.time.LocalDateTime.now())
+                .build();
+        sensorRepository.save(sensor);
+    }
 }
