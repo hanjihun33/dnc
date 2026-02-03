@@ -16,7 +16,7 @@ import {
   Alert
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import { getAuthHeaders, loadAuthSession } from "../session";
+import { getAuthHeaders, loadAuthSession } from "../../session";
 import { MaterialIcons, Ionicons, FontAwesome5 } from "@expo/vector-icons";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
@@ -73,6 +73,10 @@ interface MealResponse {
   foodName?: string;
   memo?: string;
   peakGlucose?: number;
+  calories?: number;
+  carbs?: number;
+  protein?: number;
+  fat?: number;
 }
 
 const getGlucoseStatus = (glucose?: number) => {
@@ -97,7 +101,8 @@ export default function ReportScreen() {
   // Sensor State
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeSensor, setActiveSensor] = useState<SensorResponse | null>(null);
+  const [sensors, setSensors] = useState<SensorResponse[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   // Data State
   const [report, setReport] = useState<GlucoseReportDto | null>(null);
@@ -107,41 +112,53 @@ export default function ReportScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMeal, setModalMeal] = useState<MealResponse | null>(null);
 
-  const fetchAllData = useCallback(async () => {
+  const fetchSensorHistory = async () => {
+    try {
+      const headers = getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/api/v1/sensors/history`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setSensors(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch sensors", e);
+    }
+  };
+
+  const fetchReportData = useCallback(async () => {
+    if (sensors.length === 0) return;
     try {
       setLoading(true);
       await loadAuthSession();
       const headers = getAuthHeaders();
 
-      // 1. Get Active Sensor
-      const sensorRes = await fetch(`${API_BASE_URL}/api/v1/sensors/active`, { headers });
-      if (sensorRes.status === 204) {
-        setActiveSensor(null);
-        setLoading(false);
-        return;
+      const targetSensor = sensors[currentIndex];
+      const startDate = targetSensor.startedAt;
+
+      let endDateIso = "";
+      if (targetSensor.endedAt) {
+        endDateIso = targetSensor.endedAt;
+      } else {
+        const now = new Date();
+        const offset = now.getTimezoneOffset() * 60000;
+        endDateIso = new Date(now.getTime() - offset).toISOString().slice(0, -1);
       }
-      const sensorData = await sensorRes.json() as SensorResponse;
-      setActiveSensor(sensorData);
 
-      // Determine Date Range
-      const startDate = sensorData.startedAt;
-      const now = new Date();
-      const offset = now.getTimezoneOffset() * 60000;
-      const endDate = new Date(now.getTime() - offset).toISOString().slice(0, -1); // Local ISO String
-
-      // 2. Fetch Report (Custom Range)
+      // 2. Fetch Report
       const reportRes = await fetch(
-        `${API_BASE_URL}/api/v1/reports/glucose?startDate=${startDate}&endDate=${endDate}`,
+        `${API_BASE_URL}/api/v1/reports/glucose?startDate=${startDate}&endDate=${endDateIso}`,
         { headers }
       );
       if (reportRes.ok) setReport(await reportRes.json());
+      else setReport(null);
 
-      // 3. Fetch Meals (Custom Range)
+      // 3. Fetch Meals
       const mealsRes = await fetch(
-        `${API_BASE_URL}/api/v1/meals/search?startDate=${startDate}&endDate=${endDate}`,
+        `${API_BASE_URL}/api/v1/meals/search?startDate=${startDate}&endDate=${endDateIso}`,
         { headers }
       );
       if (mealsRes.ok) setMeals(await mealsRes.json());
+      else setMeals([]);
 
     } catch (e) {
       console.error(e);
@@ -149,24 +166,60 @@ export default function ReportScreen() {
       setLoading(false);
       setRefreshing(false);
     }
+  }, [sensors, currentIndex]);
+
+  // Initial load
+  useFocusEffect(useCallback(() => {
+    loadAuthSession().then(() => {
+      fetchSensorHistory();
+    });
+  }, []));
+
+  // Reload data when sensor selection changes or on refresh
+  React.useEffect(() => {
+    if (sensors.length > 0) {
+      fetchReportData();
+    }
+  }, [sensors, currentIndex, fetchReportData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchSensorHistory();
+    // fetchReportData will trigger via effect if sensors update
   }, []);
 
-  useFocusEffect(useCallback(() => { fetchAllData(); }, [fetchAllData]));
-  const onRefresh = useCallback(() => { setRefreshing(true); fetchAllData(); }, [fetchAllData]);
+  const shiftSensor = (direction: number) => {
+    const newIndex = currentIndex + direction;
+    if (newIndex >= 0 && newIndex < sensors.length) {
+      setCurrentIndex(newIndex);
+    }
+  };
 
   // Header Info
   const headerInfo = useMemo(() => {
-    if (!activeSensor) return { title: "센서 준비 필요", subtitle: "활성 센서가 없습니다." };
+    if (sensors.length === 0) return { title: "센서 준비 필요", subtitle: "활성 센서가 없습니다." };
+    const current = sensors[currentIndex];
 
-    const start = new Date(activeSensor.startedAt);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const start = new Date(current.startedAt);
+    const startStr = `${start.getMonth() + 1}.${start.getDate()}`;
 
-    return { title: `현재 센서 사용 중`, subtitle: `${diffDays}일차 (${start.getMonth() + 1}.${start.getDate()} ~)` };
-  }, [activeSensor]);
+    let endStr = "현재";
+    if (current.endedAt) {
+      const end = new Date(current.endedAt);
+      endStr = `${end.getMonth() + 1}.${end.getDate()}`;
+    }
 
-  if (!activeSensor && !loading) {
+    // Title: Sensor N or Period
+    // If active (index 0 and status active), show "Current Sensor"
+    // Else show "Past Sensor (Date~Date)"
+    const isCurrent = currentIndex === 0 && current.status === 'ACTIVE';
+    const mainTitle = isCurrent ? "현재 센서" : "이전 센서 리포트";
+    const subTitle = `${startStr} ~ ${endStr}`;
+
+    return { title: mainTitle, subtitle: subTitle };
+  }, [sensors, currentIndex]);
+
+  if (sensors.length === 0 && !loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.emptyContainer}>
@@ -185,14 +238,31 @@ export default function ReportScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={palette.background} />
 
-      {/* Header Section */}
+      {/* Header Section (Navigation Style) */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerSubtitle}>{headerInfo.subtitle}</Text>
-          <Text style={styles.headerTitle}>{headerInfo.title}</Text>
-        </View>
-        <View style={styles.sensorIcon}>
-          <MaterialIcons name="sensors" size={24} color={palette.accentDark} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          {/* Prev Button (Older) -> Index increases */}
+          <TouchableOpacity
+            onPress={() => shiftSensor(1)}
+            disabled={currentIndex >= sensors.length - 1}
+            style={[styles.headerNavButton, currentIndex >= sensors.length - 1 && styles.headerNavButtonDisabled]}
+          >
+            <Text style={[styles.headerNavText, currentIndex >= sensors.length - 1 && styles.headerNavTextDisabled]}>{"<"}</Text>
+          </TouchableOpacity>
+
+          <View style={{ alignItems: 'center' }}>
+            <Text style={styles.headerTitle}>{headerInfo.title}</Text>
+            <Text style={styles.headerSubtitle}>{headerInfo.subtitle}</Text>
+          </View>
+
+          {/* Next Button (Newer) -> Index decreases */}
+          <TouchableOpacity
+            onPress={() => shiftSensor(-1)}
+            disabled={currentIndex <= 0}
+            style={[styles.headerNavButton, currentIndex <= 0 && styles.headerNavButtonDisabled]}
+          >
+            <Text style={[styles.headerNavText, currentIndex <= 0 && styles.headerNavTextDisabled]}>{">"}</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -259,15 +329,15 @@ export default function ReportScreen() {
             {modalMeal && (
               <View style={styles.mealPrevCard}>
                 {modalMeal.imageUrl ? (
-                  <Image source={{ uri: getImageUrl(modalMeal.imageUrl) }} style={styles.mealImage} />
+                  <Image source={{ uri: getImageUrl(modalMeal.imageUrl) }} style={styles.modalMealImage} />
                 ) : (
-                  <View style={[styles.mealImage, { backgroundColor: '#f1f5f9' }]}>
+                  <View style={[styles.modalMealImage, { backgroundColor: '#f1f5f9' }]}>
                     <Ionicons name="fast-food-outline" size={32} color={palette.textMuted} />
                   </View>
                 )}
                 <View style={{ flex: 1 }}>
                   {/* 이름 및 시간 */}
-                  <Text style={styles.mealName}>[임시] {modalMeal.foodName || "음식명"}</Text>
+                  <Text style={styles.mealName}>{modalMeal.foodName || "음식명"}</Text>
                   <Text style={styles.mealTime}>{new Date(modalMeal.eatenAt).toLocaleString()}</Text>
 
                   {/* 중량 및 등급 */}
@@ -277,8 +347,10 @@ export default function ReportScreen() {
                     </View>
                     {/* 영양 정보 */}
                     <View style={{ marginTop: 4 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>[임시] 300 kcal</Text>
-                      <MacroBar />
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>
+                        {modalMeal.calories ? `${modalMeal.calories} kcal` : "- kcal"}
+                      </Text>
+                      <MacroBar c={modalMeal.carbs} p={modalMeal.protein} f={modalMeal.fat} />
                     </View>
                   </View>
                   <Text style={styles.modalDesc}>
@@ -295,32 +367,59 @@ export default function ReportScreen() {
   );
 }
 
-const MacroBar = () => {
-  // Mock Data: 5:3:2 Ratio
-  const ratio = { c: 5, p: 3, f: 2 };
-  const color = { c: '#3B82F6', p: '#10B981', f: '#F59E0B' }; // Blue, Green, Amber
+const calcMacroPercents = (
+  carbs?: number | null,
+  protein?: number | null,
+  fat?: number | null
+) => {
+  if (carbs == null || protein == null || fat == null) {
+    return null;
+  }
+  const safeCarbs = Math.max(0, carbs);
+  const safeProtein = Math.max(0, protein);
+  const safeFat = Math.max(0, fat);
+  const totalCalories = safeCarbs * 4 + safeProtein * 4 + safeFat * 9;
+  if (totalCalories <= 0) {
+    return null;
+  }
+  const carbPercent = Math.round((safeCarbs * 4 * 100) / totalCalories);
+  const proteinPercent = Math.round((safeProtein * 4 * 100) / totalCalories);
+  const fatPercent = Math.max(0, 100 - carbPercent - proteinPercent);
+  return { carbPercent, proteinPercent, fatPercent };
+};
+
+const MacroBar = ({ c = 0, p = 0, f = 0 }: { c?: number, p?: number, f?: number }) => {
+  const macros = calcMacroPercents(c, p, f);
+  // Default to 1:1:1 if null (placeholder)
+  const { carbPercent, proteinPercent, fatPercent } = macros || { carbPercent: 0, proteinPercent: 0, fatPercent: 0 };
+
+  const hasData = !!macros;
+  // If no data, render 1:1:1 segments in coloring (or gray?) - Index.tsx uses colors even for placeholder
+  const flexValues = hasData ? [carbPercent, proteinPercent, fatPercent] : [1, 1, 1];
+
+  const color = { c: '#86EFAC', p: '#FDE68A', f: '#93C5FD' };
 
   return (
     <View style={{ marginTop: 4, width: '100%' }}>
       {/* Bar */}
       <View style={{ flexDirection: 'row', height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#F1F5F9', marginBottom: 4 }}>
-        <View style={{ flex: ratio.c, backgroundColor: color.c }} />
-        <View style={{ flex: ratio.p, backgroundColor: color.p }} />
-        <View style={{ flex: ratio.f, backgroundColor: color.f }} />
+        <View style={{ flex: flexValues[0], backgroundColor: color.c }} />
+        <View style={{ flex: flexValues[1], backgroundColor: color.p }} />
+        <View style={{ flex: flexValues[2], backgroundColor: color.f }} />
       </View>
       {/* Legend */}
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color.c, marginRight: 4 }} />
-          <Text style={{ fontSize: 11, color: palette.textMuted }}>탄수 [임시]%</Text>
+          <Text style={{ fontSize: 11, color: palette.textMuted }}>탄 {hasData ? `${carbPercent}%` : '--%'}</Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color.p, marginRight: 4 }} />
-          <Text style={{ fontSize: 11, color: palette.textMuted }}>단백 [임시]%</Text>
+          <Text style={{ fontSize: 11, color: palette.textMuted }}>단 {hasData ? `${proteinPercent}%` : '--%'}</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color.f, marginRight: 4 }} />
-          <Text style={{ fontSize: 11, color: palette.textMuted }}>지방 [임시]%</Text>
+          <Text style={{ fontSize: 11, color: palette.textMuted }}>지 {hasData ? `${fatPercent}%` : '--%'}</Text>
         </View>
       </View>
     </View>
@@ -329,49 +428,89 @@ const MacroBar = () => {
 
 // --- Tab Components ---
 
+const mealTypeLabels: Record<string, string> = {
+  BREAKFAST: "아침",
+  LUNCH: "점심",
+  DINNER: "저녁",
+  SNACK: "간식",
+};
+
+const getMealTypeLabel = (value?: string | null) => {
+  if (!value) return "";
+  const key = value.toUpperCase();
+  return mealTypeLabels[key] ?? value;
+};
+
 const MealLogTab = ({ meals }: { meals: MealResponse[] }) => {
   if (meals.length === 0) return <Text style={styles.emptyText}>기록된 식사가 없습니다.</Text>;
 
   return (
-    <View>
-      {meals.map((meal) => (
-        <View key={meal.mealId} style={styles.mealCard}>
-          {meal.imageUrl ? (
-            <Image source={{ uri: getImageUrl(meal.imageUrl) }} style={styles.mealCardImage} />
-          ) : (
-            <View style={[styles.mealCardImage, { backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center' }]}>
-              <Ionicons name="restaurant" size={24} color={palette.textMuted} />
-            </View>
-          )}
-          <View style={styles.mealCardContent}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-              {/* Left Column: Title */}
-              <View style={{ flex: 1, paddingRight: 8 }}>
-                <Text style={styles.mealCardTitle}>[임시] {meal.foodName || "음식명"}</Text>
-              </View>
+    <View style={styles.mealCardList}>
+      {meals.map((meal) => {
+        const title = meal.foodName || meal.memo || "음식 이름 없음";
+        const caloriesText = meal.calories != null ? `${meal.calories}kcal` : "--kcal";
+        const mealTypeLabel = getMealTypeLabel(meal.mealType);
 
-              {/* Right Column: Time & Grade */}
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.mealCardTime}>
+        const macros = calcMacroPercents(meal.carbs, meal.protein, meal.fat);
+        const { carbPercent, proteinPercent, fatPercent } = macros || { carbPercent: 0, proteinPercent: 0, fatPercent: 0 };
+        const hasData = !!macros;
+
+        // Default to 1:1:1 for visual bar if no data
+        const flexValues = hasData ? [carbPercent, proteinPercent, fatPercent] : [1, 1, 1];
+        const macroLabels = hasData
+          ? { carbs: `${carbPercent}%`, protein: `${proteinPercent}%`, fat: `${fatPercent}%` }
+          : { carbs: "--%", protein: "--%", fat: "--%" };
+
+        return (
+          <View key={meal.mealId} style={styles.mealCard}>
+            <View style={styles.mealCardTopRow}>
+              {meal.imageUrl ? (
+                <Image source={{ uri: getImageUrl(meal.imageUrl) }} style={styles.mealImage} resizeMode="cover" />
+              ) : (
+                <View style={styles.mealImagePlaceholder}>
+                  <Ionicons name="restaurant" size={24} color="#94A3B8" />
+                </View>
+              )}
+              <View style={styles.mealInfo}>
+                {!!mealTypeLabel && (
+                  <Text style={styles.mealTypeBadge}>{mealTypeLabel}</Text>
+                )}
+                <View style={styles.mealNameRow}>
+                  <Text style={styles.mealCaloriesLarge}>{caloriesText}</Text>
+                  <Text style={styles.mealNameDivider}>|</Text>
+                  <Text style={styles.mealFoodName} numberOfLines={1}>{title}</Text>
+                </View>
+                <Text style={styles.mealTimeLabel}>
                   {new Date(meal.eatenAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </Text>
-                <View style={{ marginTop: 4, backgroundColor: getGlucoseStatus(meal.peakGlucose).bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                  <Text style={{ fontSize: 11, color: getGlucoseStatus(meal.peakGlucose).color, fontWeight: '700' }}>{getGlucoseStatus(meal.peakGlucose).label}</Text>
-                </View>
               </View>
             </View>
 
-            {/* 영양 정보 (신규 컬럼 예정) */}
-            <View>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>[임시] 300 kcal</Text>
-              <MacroBar />
+            {/* Macro Bar */}
+            <View style={styles.mealMacroBar}>
+              <View style={[styles.mealMacroSegment, { flex: flexValues[0], backgroundColor: "#86EFAC" }]} />
+              <View style={[styles.mealMacroSegment, { flex: flexValues[1], backgroundColor: "#FDE68A" }]} />
+              <View style={[styles.mealMacroSegment, { flex: flexValues[2], backgroundColor: "#93C5FD" }]} />
             </View>
 
-            {/* 식사 타입 배지 */}
-            <Text style={[styles.mealCardType, { marginTop: 6 }]}>{getMealTypeText(meal.mealType)}</Text>
+            {/* Legend */}
+            <View style={styles.mealMacroLegend}>
+              <View style={styles.mealMacroItem}>
+                <View style={[styles.mealMacroDot, { backgroundColor: "#86EFAC" }]} />
+                <Text style={styles.mealMacroLabel}>탄 {macroLabels.carbs}</Text>
+              </View>
+              <View style={styles.mealMacroItem}>
+                <View style={[styles.mealMacroDot, { backgroundColor: "#FDE68A" }]} />
+                <Text style={styles.mealMacroLabel}>단 {macroLabels.protein}</Text>
+              </View>
+              <View style={styles.mealMacroItem}>
+                <View style={[styles.mealMacroDot, { backgroundColor: "#93C5FD" }]} />
+                <Text style={styles.mealMacroLabel}>지 {macroLabels.fat}</Text>
+              </View>
+            </View>
           </View>
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 };
@@ -465,6 +604,22 @@ const styles = StyleSheet.create({
   header: { padding: 20, paddingBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerTitle: { fontSize: 24, fontWeight: '800', color: palette.text },
   headerSubtitle: { fontSize: 14, color: palette.textMuted, marginBottom: 4 },
+
+  // Header Navigation Styles
+  headerNavButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(148, 163, 184, 0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerNavButtonDisabled: {
+    opacity: 0.3,
+  },
+  headerNavText: { color: "#94A3B8", fontSize: 12, fontWeight: "700" },
+  headerNavTextDisabled: { color: "rgba(148, 163, 184, 0.4)" },
+
   sensorIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FEF3C7', justifyContent: 'center', alignItems: 'center' },
 
   tabContainer: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 10 },
@@ -483,13 +638,42 @@ const styles = StyleSheet.create({
   emptyBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   emptyText: { textAlign: 'center', color: palette.textMuted, marginTop: 40 },
 
-  // Meal Card
-  mealCard: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 16, padding: 12, marginBottom: 12, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 5, elevation: 1 },
-  mealCardImage: { width: 48, height: 48, borderRadius: 10, marginRight: 12 },
-  mealCardContent: { flex: 1, justifyContent: 'center' },
-  mealCardTitle: { fontSize: 16, fontWeight: '600', color: palette.text },
-  mealCardTime: { fontSize: 12, color: palette.textMuted },
-  mealCardType: { fontSize: 12, color: palette.accentDark, marginTop: 2, fontWeight: '500' },
+  // Meal Card (Dark Theme)
+  mealCardList: { gap: 14, marginBottom: 12 },
+  mealCard: {
+    backgroundColor: "#0F172A",
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.2)",
+    marginBottom: 0, // Handled by gap
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, elevation: 3
+  },
+  mealCardTopRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  mealImage: { width: 72, height: 72, borderRadius: 16, marginRight: 0, backgroundColor: "rgba(15, 23, 42, 0.6)" },
+  mealImagePlaceholder: {
+    width: 72, height: 72, borderRadius: 16, marginRight: 0,
+    alignItems: "center", justifyContent: "center", backgroundColor: "rgba(30, 41, 59, 0.8)"
+  },
+  mealInfo: { flex: 1 },
+  mealTypeBadge: { color: "#E2E8F0", fontSize: 16, fontWeight: "700" },
+  mealNameRow: { flexDirection: "row", alignItems: "baseline", gap: 6, marginTop: 4 },
+  mealCaloriesLarge: { color: "#FACC15", fontSize: 18, fontWeight: "800" },
+  mealNameDivider: { color: "rgba(226, 232, 240, 0.5)", fontSize: 14 },
+  mealFoodName: { color: "#F8FAFC", fontSize: 16, fontWeight: "600", flex: 1 },
+  mealTimeLabel: { color: "rgba(226, 232, 240, 0.7)", fontSize: 12, marginTop: 6 },
+
+  // Macro Bar Styles
+  mealMacroBar: {
+    height: 8, borderRadius: 999, overflow: "hidden",
+    backgroundColor: "rgba(148, 163, 184, 0.25)",
+    flexDirection: "row", marginTop: 14
+  },
+  mealMacroSegment: { height: "100%" },
+  mealMacroLegend: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 10 },
+  mealMacroItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+  mealMacroDot: { width: 8, height: 8, borderRadius: 4 },
+  mealMacroLabel: { color: "rgba(226, 232, 240, 0.8)", fontSize: 12, fontWeight: "600" },
 
   // Stats
   sectionTitle: { fontSize: 18, fontWeight: "700", color: palette.text, marginBottom: 12, marginTop: 8 },
@@ -516,7 +700,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 20, fontWeight: '700', color: palette.text },
   modalDesc: { fontSize: 14, color: palette.textMuted, textAlign: 'center', marginTop: 20 },
   mealPrevCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', padding: 16, borderRadius: 16, width: '100%' },
-  mealImage: { width: 60, height: 60, borderRadius: 12, marginRight: 16 },
+  modalMealImage: { width: 60, height: 60, borderRadius: 12, marginRight: 16 },
   mealName: { fontSize: 16, fontWeight: '700', color: palette.text, marginBottom: 4 },
   mealTime: { fontSize: 13, color: palette.textMuted },
 });

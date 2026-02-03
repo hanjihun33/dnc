@@ -16,6 +16,8 @@ import com.djjko.dnc.auth.security.JwtUtil;
 import com.djjko.dnc.glucose.entity.Sensor;
 import com.djjko.dnc.glucose.repository.SensorRepository;
 import com.djjko.dnc.report.repository.GlucoseDataRepository;
+import com.djjko.dnc.glucose.service.SensorService;
+import com.djjko.dnc.glucose.service.CgmPipelineService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,27 +53,29 @@ public class OAuthController {
     private final UserRepository userRepository;
     private final SensorRepository sensorRepository;
     private final GlucoseDataRepository glucoseDataRepository;
+    private final CgmPipelineService cgmPipelineService; // New dependency
     private final JwtUtil jwtUtil;
     private final ObjectMapper objectMapper;
     private final String appOauthRedirectUri;
 
     public OAuthController(
-        OAuthService oAuthService,
-        OAuthStateService oAuthStateService,
-        OAuthTokenService oAuthTokenService,
-        UserRepository userRepository,
-        SensorRepository sensorRepository,
-        GlucoseDataRepository glucoseDataRepository,
-        JwtUtil jwtUtil,
-        ObjectMapper objectMapper,
-        @Value("${app.oauth-redirect-uri:testapp://}") String appOauthRedirectUri
-    ) {
+            OAuthService oAuthService,
+            OAuthStateService oAuthStateService,
+            OAuthTokenService oAuthTokenService,
+            UserRepository userRepository,
+            SensorRepository sensorRepository,
+            GlucoseDataRepository glucoseDataRepository,
+            CgmPipelineService cgmPipelineService,
+            JwtUtil jwtUtil,
+            ObjectMapper objectMapper,
+            @Value("${app.oauth-redirect-uri:testapp://}") String appOauthRedirectUri) {
         this.oAuthService = oAuthService;
         this.oAuthStateService = oAuthStateService;
         this.oAuthTokenService = oAuthTokenService;
         this.userRepository = userRepository;
         this.sensorRepository = sensorRepository;
         this.glucoseDataRepository = glucoseDataRepository;
+        this.cgmPipelineService = cgmPipelineService;
         this.jwtUtil = jwtUtil;
         this.objectMapper = objectMapper;
         this.appOauthRedirectUri = appOauthRedirectUri;
@@ -80,14 +84,13 @@ public class OAuthController {
     @GetMapping("/{provider}/authorize")
     @Operation(summary = "OAuth authorize URL redirect")
     public ResponseEntity<Void> authorize(
-        @PathVariable String provider,
-        @RequestParam(required = false) String state,
-        HttpServletRequest request
-    ) {
+            @PathVariable String provider,
+            @RequestParam(required = false) String state,
+            HttpServletRequest request) {
         String clientState = (state == null || state.isBlank()) ? UUID.randomUUID().toString() : state;
         String resolvedState = resolveAuthenticatedUserOrHeader(request)
-            .map(user -> oAuthStateService.issueState(user, clientState))
-            .orElse(clientState);
+                .map(user -> oAuthStateService.issueState(user, clientState))
+                .orElse(clientState);
         String authorizeUrl = oAuthService.buildAuthorizeUrl(provider, resolvedState);
 
         log.info("Redirecting to {} auth URL: {}", provider, authorizeUrl);
@@ -100,14 +103,13 @@ public class OAuthController {
     @GetMapping("/{provider}/authorize-url")
     @Operation(summary = "OAuth authorize URL")
     public OAuthAuthorizeResponse authorizeUrl(
-        @PathVariable String provider,
-        @RequestParam(required = false) String state,
-        HttpServletRequest request
-    ) {
+            @PathVariable String provider,
+            @RequestParam(required = false) String state,
+            HttpServletRequest request) {
         String clientState = (state == null || state.isBlank()) ? UUID.randomUUID().toString() : state;
         String resolvedState = resolveAuthenticatedUserOrHeader(request)
-            .map(user -> oAuthStateService.issueState(user, clientState))
-            .orElse(clientState);
+                .map(user -> oAuthStateService.issueState(user, clientState))
+                .orElse(clientState);
         String authorizeUrl = oAuthService.buildAuthorizeUrl(provider, resolvedState);
         return new OAuthAuthorizeResponse(authorizeUrl);
     }
@@ -115,12 +117,11 @@ public class OAuthController {
     @GetMapping("/{provider}/callback")
     @Operation(summary = "OAuth callback handler")
     public ResponseEntity<?> callback(
-        @PathVariable String provider,
-        @RequestParam String code,
-        @RequestParam(required = false) String state,
-        @RequestParam(required = false, name = "format") String format,
-        @RequestHeader(value = "Accept", required = false) String accept
-    ) {
+            @PathVariable String provider,
+            @RequestParam String code,
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false, name = "format") String format,
+            @RequestHeader(value = "Accept", required = false) String accept) {
         try {
             OAuthTokenResponse response = oAuthService.exchangeCodeForToken(provider, code, state);
             java.util.Optional<com.djjko.dnc.auth.entity.User> userOpt = resolveAuthenticatedUserOrState(state);
@@ -130,8 +131,19 @@ public class OAuthController {
                 updateProviderIdIfDexcom(user, provider, response);
                 oAuthTokenService.saveToken(user, provider, response);
                 log.info("OAuth token saved for userId={} provider={}", user.getUserId(), provider);
+
+                // [추가] 연동 즉시 데이터 수집 실행 (지연 시간 제거)
+                if ("dexcom".equalsIgnoreCase(provider)) {
+                    try {
+                        cgmPipelineService.fetchLatestDataForUser(user);
+                        log.info("Dexcom 연동 즉시 데이터 동기화 완료: User {}", user.getUserId());
+                    } catch (Exception e) {
+                        log.warn("Dexcom 연동 후 즉시 동기화 실패 (스케줄러가 처리 예정): {}", e.getMessage());
+                    }
+                }
             } else {
-                log.warn("OAuth callback could not resolve user. provider={} statePresent={}", provider, state != null && !state.isBlank());
+                log.warn("OAuth callback could not resolve user. provider={} statePresent={}", provider,
+                        state != null && !state.isBlank());
             }
             if (shouldRedirectToApp(format, accept)) {
                 return redirectToApp(provider, "success", null, accept);
@@ -148,9 +160,8 @@ public class OAuthController {
     @PostMapping("/{provider}/token")
     @Operation(summary = "OAuth token exchange")
     public OAuthTokenResponse exchangeAndStore(
-        @PathVariable String provider,
-        @RequestParam String code
-    ) {
+            @PathVariable String provider,
+            @RequestParam String code) {
         OAuthTokenResponse response = oAuthService.exchangeCodeForToken(provider, code);
         User user = resolveRequiredUser();
         updateProviderIdIfDexcom(user, provider, response);
@@ -175,13 +186,12 @@ public class OAuthController {
     @Operation(summary = "OAuth disconnect")
     @Transactional
     public ResponseEntity<Void> disconnect(
-        @PathVariable String provider,
-        @RequestParam(defaultValue = "false") boolean deleteData
-    ) {
+            @PathVariable String provider,
+            @RequestParam(defaultValue = "false") boolean deleteData) {
         User user = resolveRequiredUser();
 
         oAuthTokenService.findToken(user, provider)
-            .ifPresent(token -> oAuthService.revokeToken(provider, token));
+                .ifPresent(token -> oAuthService.revokeToken(provider, token));
 
         oAuthTokenService.deleteToken(user, provider);
 
@@ -201,12 +211,9 @@ public class OAuthController {
     @GetMapping("/{provider}/egvs")
     @Operation(summary = "CGM EGV data")
     public ResponseEntity<String> fetchEgvs(
-        @PathVariable String provider,
-        @Parameter(description = "Start date (YYYY-MM-DDTHH:mm:ss)", example = "2026-01-27T00:00:00")
-        @RequestParam String startDate,
-        @Parameter(description = "End date (YYYY-MM-DDTHH:mm:ss)", example = "2026-01-27T23:59:59")
-        @RequestParam String endDate
-    ) {
+            @PathVariable String provider,
+            @Parameter(description = "Start date (YYYY-MM-DDTHH:mm:ss)", example = "2026-01-27T00:00:00") @RequestParam String startDate,
+            @Parameter(description = "End date (YYYY-MM-DDTHH:mm:ss)", example = "2026-01-27T23:59:59") @RequestParam String endDate) {
         com.djjko.dnc.auth.entity.User user = resolveRequiredUser();
         String accessToken = oAuthTokenService.getToken(user, provider).getAccessToken();
         String body = oAuthService.fetchEgvData(provider, accessToken, startDate, endDate);
@@ -216,9 +223,8 @@ public class OAuthController {
     @GetMapping("/{provider}/data-range")
     @Operation(summary = "CGM data range")
     public ResponseEntity<String> fetchDataRange(
-        @PathVariable String provider,
-        @RequestParam(required = false) String lastSyncTime
-    ) {
+            @PathVariable String provider,
+            @RequestParam(required = false) String lastSyncTime) {
         com.djjko.dnc.auth.entity.User user = resolveRequiredUser();
         String accessToken = oAuthTokenService.getToken(user, provider).getAccessToken();
         String body = oAuthService.fetchDataRange(provider, accessToken, lastSyncTime);
@@ -228,14 +234,15 @@ public class OAuthController {
     private java.util.Optional<com.djjko.dnc.auth.entity.User> resolveAuthenticatedUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null
-            || !authentication.isAuthenticated()
-            || authentication instanceof AnonymousAuthenticationToken) {
+                || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
             return java.util.Optional.empty();
         }
         return userRepository.findByEmail(authentication.getName());
     }
 
-    private java.util.Optional<com.djjko.dnc.auth.entity.User> resolveAuthenticatedUserOrHeader(HttpServletRequest request) {
+    private java.util.Optional<com.djjko.dnc.auth.entity.User> resolveAuthenticatedUserOrHeader(
+            HttpServletRequest request) {
         java.util.Optional<com.djjko.dnc.auth.entity.User> authenticatedUser = resolveAuthenticatedUser();
         if (authenticatedUser.isPresent()) {
             return authenticatedUser;
@@ -263,7 +270,7 @@ public class OAuthController {
             return authenticatedUser;
         }
         return oAuthStateService.resolveUserId(state)
-            .flatMap(userRepository::findById);
+                .flatMap(userRepository::findById);
     }
 
     private void updateProviderIdIfDexcom(User user, String provider, OAuthTokenResponse response) {
@@ -296,8 +303,8 @@ public class OAuthController {
     }
 
     private void deactivateSensors(User user) {
-        java.util.List<Sensor> activeSensors =
-            sensorRepository.findAllByUserAndStatus(user, Sensor.SensorStatus.ACTIVE);
+        java.util.List<Sensor> activeSensors = sensorRepository.findAllByUserAndStatus(user,
+                Sensor.SensorStatus.ACTIVE);
         if (activeSensors.isEmpty()) {
             return;
         }
@@ -311,7 +318,7 @@ public class OAuthController {
 
     private com.djjko.dnc.auth.entity.User resolveRequiredUser() {
         return resolveAuthenticatedUser()
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Login required"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Login required"));
     }
 
     private boolean shouldRedirectToApp(String format, String accept) {
@@ -335,8 +342,8 @@ public class OAuthController {
         String redirectUrl = buildAppRedirectUrl(provider, status, error);
         if (wantsHtml(accept)) {
             return ResponseEntity.ok()
-                .contentType(org.springframework.http.MediaType.TEXT_HTML)
-                .body(buildHtmlResponse(status, redirectUrl));
+                    .contentType(org.springframework.http.MediaType.TEXT_HTML)
+                    .body(buildHtmlResponse(status, redirectUrl));
         }
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(URI.create(redirectUrl));
@@ -368,63 +375,63 @@ public class OAuthController {
     private String buildHtmlResponse(String status, String appUrl) {
         String title = "success".equalsIgnoreCase(status) ? "연동 완료" : "연동 실패";
         String description = "success".equalsIgnoreCase(status)
-            ? "앱으로 돌아가 주세요."
-            : "잠시 후 다시 시도해주세요.";
+                ? "앱으로 돌아가 주세요."
+                : "잠시 후 다시 시도해주세요.";
         String safeAppUrl = urlEncode(appUrl);
         return """
-            <!doctype html>
-            <html lang="ko">
-              <head>
-                <meta charset="utf-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <title>%s</title>
-                <style>
-                  body {
-                    margin: 0;
-                    padding: 32px 20px;
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                    background: #f8fafc;
-                    color: #0f172a;
-                  }
-                  .card {
-                    max-width: 420px;
-                    margin: 0 auto;
-                    background: #ffffff;
-                    border-radius: 16px;
-                    padding: 24px;
-                    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-                    text-align: center;
-                  }
-                  .title { font-size: 18px; font-weight: 700; }
-                  .desc { margin-top: 8px; color: #475569; font-size: 14px; }
-                </style>
-              </head>
-              <body>
-                <div class="card">
-                  <div class="title">%s</div>
-                  <div class="desc">%s</div>
-                  <div class="link">
-                    앱이 열리지 않으면 <a id="open-app" href="#">여기를 눌러주세요</a>.
-                  </div>
-                </div>
-                <script>
-                  (function () {
-                    var appUrl = decodeURIComponent("%s");
-                    var anchor = document.getElementById("open-app");
-                    if (anchor) {
-                      anchor.setAttribute("href", appUrl);
-                    }
-                    setTimeout(function () {
-                      window.location.href = appUrl;
-                    }, 50);
-                    setTimeout(function () {
-                      window.close();
-                    }, 500);
-                  })();
-                </script>
-              </body>
-            </html>
-            """.formatted(title, title, description, safeAppUrl);
+                <!doctype html>
+                <html lang="ko">
+                  <head>
+                    <meta charset="utf-8" />
+                    <meta name="viewport" content="width=device-width, initial-scale=1" />
+                    <title>%s</title>
+                    <style>
+                      body {
+                        margin: 0;
+                        padding: 32px 20px;
+                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                        background: #f8fafc;
+                        color: #0f172a;
+                      }
+                      .card {
+                        max-width: 420px;
+                        margin: 0 auto;
+                        background: #ffffff;
+                        border-radius: 16px;
+                        padding: 24px;
+                        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+                        text-align: center;
+                      }
+                      .title { font-size: 18px; font-weight: 700; }
+                      .desc { margin-top: 8px; color: #475569; font-size: 14px; }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="card">
+                      <div class="title">%s</div>
+                      <div class="desc">%s</div>
+                      <div class="link">
+                        앱이 열리지 않으면 <a id="open-app" href="#">여기를 눌러주세요</a>.
+                      </div>
+                    </div>
+                    <script>
+                      (function () {
+                        var appUrl = decodeURIComponent("%s");
+                        var anchor = document.getElementById("open-app");
+                        if (anchor) {
+                          anchor.setAttribute("href", appUrl);
+                        }
+                        setTimeout(function () {
+                          window.location.href = appUrl;
+                        }, 50);
+                        setTimeout(function () {
+                          window.close();
+                        }, 500);
+                      })();
+                    </script>
+                  </body>
+                </html>
+                """.formatted(title, title, description, safeAppUrl);
     }
 
     private String urlEncode(String value) {

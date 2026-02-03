@@ -26,4 +26,15 @@ public class SensorService {
         return sensorRepository.findByUserAndStatus(user, Sensor.SensorStatus.ACTIVE)
                 .map(SensorResponse::from);
     }
+
+    @Transactional(readOnly = true)
+    public java.util.List<SensorResponse> getSensorHistory(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        return sensorRepository.findAllByUserOrderByStartedAtDesc(user)
+                .stream()
+                .map(SensorResponse::from)
+                .toList();
+    }
 }

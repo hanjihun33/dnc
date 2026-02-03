@@ -26,4 +26,12 @@ public class SensorController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.noContent().build());
     }
+
+    @GetMapping("/history")
+    @Operation(summary = "센서 이력 조회 (최신순)")
+    public ResponseEntity<java.util.List<SensorResponse>> getSensorHistory() {
+        Long userId = currentUserService.getRequiredUserId();
+        java.util.List<SensorResponse> sensors = sensorService.getSensorHistory(userId);
+        return ResponseEntity.ok(sensors);
+    }
 }

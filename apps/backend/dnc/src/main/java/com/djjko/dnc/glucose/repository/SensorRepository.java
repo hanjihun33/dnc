@@ -22,4 +22,6 @@ public interface SensorRepository extends JpaRepository<Sensor, Long> {
     List<Sensor> findAllByUser(User user);
 
     void deleteAllByUser_UserId(Long userId);
+
+    List<Sensor> findAllByUserOrderByStartedAtDesc(User user);
 }

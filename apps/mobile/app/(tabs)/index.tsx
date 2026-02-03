@@ -230,6 +230,14 @@ const softenColor = (color: string, alpha = 0.35) => {
   return `rgba(${match[1]}, ${match[2]}, ${match[3]}, ${alpha})`;
 };
 
+const getImageUrl = (url?: string | null) => {
+  if (!url) return undefined;
+  if (url.startsWith('/')) {
+    return `${API_BASE_URL}${url}`;
+  }
+  return url;
+};
+
 export default function HomeScreen() {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = React.useState(() =>
@@ -1113,18 +1121,18 @@ export default function HomeScreen() {
                 const macroFlex =
                   macroSum > 0
                     ? [
-                        macroValues.carbPercent,
-                        macroValues.proteinPercent,
-                        macroValues.fatPercent,
-                      ]
+                      macroValues.carbPercent,
+                      macroValues.proteinPercent,
+                      macroValues.fatPercent,
+                    ]
                     : [1, 1, 1];
                 const macroLabels =
                   macroSum > 0
                     ? {
-                        carbs: `${macroValues.carbPercent}%`,
-                        protein: `${macroValues.proteinPercent}%`,
-                        fat: `${macroValues.fatPercent}%`,
-                      }
+                      carbs: `${macroValues.carbPercent}%`,
+                      protein: `${macroValues.proteinPercent}%`,
+                      fat: `${macroValues.fatPercent}%`,
+                    }
                     : { carbs: "--%", protein: "--%", fat: "--%" };
 
                 return (
@@ -1136,7 +1144,7 @@ export default function HomeScreen() {
                     <View style={styles.mealCardTopRow}>
                       {meal.imageUrl ? (
                         <Image
-                          source={{ uri: meal.imageUrl }}
+                          source={{ uri: getImageUrl(meal.imageUrl) }}
                           style={styles.mealImage}
                           resizeMode="cover"
                         />

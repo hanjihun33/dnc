@@ -41,11 +41,14 @@ public class MealController {
             @RequestParam(value = "carbsGrams", required = false) Double carbsGrams,
             @RequestParam(value = "mealType", required = false) String mealType,
             @RequestParam(value = "eatenAt", required = false) String eatenAt,
-            @RequestParam(value = "memo", required = false) String memo) {
+            @RequestParam(value = "memo", required = false) String memo,
+            @RequestParam(value = "aiGuide", required = false) String aiGuide) {
         Long userId = currentUserService.getRequiredUserId();
-        return mealService.create(userId, image, foodName, carbsGrams, mealType, eatenAt, memo);
+        return mealService.create(userId, image, foodName, carbsGrams, mealType, eatenAt, memo, aiGuide);
     }
 
+    @GetMapping
+    @Operation(summary = "전체 식사 기록 조회")
     public List<MealResponse> list() {
         Long userId = currentUserService.getRequiredUserId();
         return mealService.findAll(userId);
