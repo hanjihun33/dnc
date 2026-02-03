@@ -36,22 +36,46 @@ public class MealController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "식사 기록 생성")
     public MealResponse create(
-        @RequestPart(value = "image", required = false) MultipartFile image,
-        @RequestParam(value = "foodName", required = false) String foodName,
-        @RequestParam(value = "carbsGrams", required = false) Double carbsGrams,
-        @RequestParam(value = "mealType", required = false) String mealType,
-        @RequestParam(value = "eatenAt", required = false) String eatenAt,
-        @RequestParam(value = "memo", required = false) String memo
-    ) {
+            @RequestPart(value = "image", required = false) MultipartFile image,
+            @RequestParam(value = "foodName", required = false) String foodName,
+            @RequestParam(value = "carbsGrams", required = false) Double carbsGrams,
+            @RequestParam(value = "mealType", required = false) String mealType,
+            @RequestParam(value = "eatenAt", required = false) String eatenAt,
+            @RequestParam(value = "memo", required = false) String memo,
+            @RequestParam(value = "aiGuide", required = false) String aiGuide) {
         Long userId = currentUserService.getRequiredUserId();
-        return mealService.create(userId, image, foodName, carbsGrams, mealType, eatenAt, memo);
+        return mealService.create(userId, image, foodName, carbsGrams, mealType, eatenAt, memo, aiGuide);
     }
 
     @GetMapping
-    @Operation(summary = "식사 기록 목록 조회")
+    @Operation(summary = "전체 식사 기록 조회")
     public List<MealResponse> list() {
         Long userId = currentUserService.getRequiredUserId();
         return mealService.findAll(userId);
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "기간별 식사 기록 조회")
+    public List<MealResponse> search(
+            @RequestParam("startDate") String startDate,
+            @RequestParam("endDate") String endDate) {
+        Long userId = currentUserService.getRequiredUserId();
+        return mealService.getMealsByRange(userId, parseDateTime(startDate),
+                parseDateTime(endDate));
+    }
+
+    private java.time.LocalDateTime parseDateTime(String dateTimeStr) {
+        try {
+            if (dateTimeStr.endsWith("Z")) {
+                return java.time.Instant.parse(dateTimeStr)
+                        .atZone(java.time.ZoneId.systemDefault())
+                        .toLocalDateTime();
+            }
+            String normalized = dateTimeStr.replace(" ", "T");
+            return java.time.LocalDateTime.parse(normalized);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid date format: " + dateTimeStr);
+        }
     }
 
     @GetMapping("/{mealId}")
@@ -65,23 +89,19 @@ public class MealController {
     @PatchMapping("/{mealId}")
     @Operation(summary = "식사 기록 수정")
     public ResponseEntity<MealResponse> update(
-        @PathVariable Long mealId,
-        @RequestBody MealUpdateRequest request
-    ) {
+            @PathVariable Long mealId,
+            @RequestBody MealUpdateRequest request) {
         return mealService.update(mealId, request)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @RequestMapping(
-        value = "/{mealId}/image",
-        method = {RequestMethod.PATCH, RequestMethod.POST},
-        consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RequestMapping(value = "/{mealId}/image", method = { RequestMethod.PATCH,
+            RequestMethod.POST }, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Update meal image")
     public ResponseEntity<MealResponse> updateImage(
-        @PathVariable Long mealId,
-        @RequestPart(value = "image") MultipartFile image
-    ) {
+            @PathVariable Long mealId,
+            @RequestPart(value = "image") MultipartFile image) {
         if (image == null || image.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }

@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { ActivityIndicator, AppState, StyleSheet, Text, View } from 'react-native';
 import 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadAuthSession } from '@/session';
@@ -86,27 +87,30 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <ThemeProvider value={theme}>
-      {isBootstrapped ? (
-        <>
-          <Stack>
-            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="(settings)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-          </Stack>
-          {(showAuthOverlay || showProcessingOverlay) && (
-            <View style={styles.authOverlay} pointerEvents="auto">
-              <ActivityIndicator size="large" color="#F59E0B" />
-              <Text style={styles.authOverlayText}>로그인 처리 중입니다</Text>
-            </View>
-          )}
-        </>
-      ) : (
-        <View style={styles.bootSplash} />
-      )}
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider value={theme}>
+        {isBootstrapped ? (
+          <>
+            <Stack>
+              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="(settings)" options={{ headerShown: false }} />
+              <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+            </Stack>
+            
+            {(showAuthOverlay || showProcessingOverlay) && (
+              <View style={styles.authOverlay} pointerEvents="auto">
+                <ActivityIndicator size="large" color="#F59E0B" />
+                <Text style={styles.authOverlayText}>로그인 처리 중입니다</Text>
+              </View>
+            )}
+          </>
+        ) : (
+          <View style={styles.bootSplash} />
+        )}
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
 

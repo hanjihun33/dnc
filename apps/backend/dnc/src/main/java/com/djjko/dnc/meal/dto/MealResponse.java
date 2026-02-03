@@ -33,7 +33,7 @@ public record MealResponse(
             Integer carbs,
             Integer protein,
             Integer fat) {
-        return from(record, calories, carbs, protein, fat, null);
+        return from(record, calories, carbs, protein, fat, null, null);
     }
 
     public static MealResponse from(
@@ -42,18 +42,24 @@ public record MealResponse(
             Integer carbs,
             Integer protein,
             Integer fat,
-            String foodNameOverride) {
+            String foodNameOverride,
+            String imageUrlOverride) {
         String resolvedFoodName = record == null ? null : record.getFoodName();
         if (foodNameOverride != null && !foodNameOverride.isBlank()) {
             resolvedFoodName = foodNameOverride;
         }
+        String finalImageUrl = record != null ? record.getImageUrl() : null;
+        if (imageUrlOverride != null) {
+            finalImageUrl = imageUrlOverride;
+        }
+
         return new MealResponse(
                 record.getFoodId(),
                 record.getUserId(),
                 resolvedFoodName,
                 record.getCarbsGrams(),
                 record.getPeakGlucose(),
-                record.getImageUrl(),
+                finalImageUrl,
                 record.getMealType() == null ? null : record.getMealType().name(),
                 formatDate(record.getEatenAt()),
                 record.getMemo(),

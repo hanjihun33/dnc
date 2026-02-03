@@ -1,695 +1,706 @@
-﻿import React, { useMemo, useState } from "react";
+﻿import React, { useMemo, useState, useCallback } from "react";
 import {
   Dimensions,
-  Pressable,
   SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   View,
+  ActivityIndicator,
+  RefreshControl,
+  TouchableOpacity,
+  Pressable,
+  Image,
+  Modal,
+  Alert
 } from "react-native";
-import { LineChart } from "react-native-chart-kit";
+import { useFocusEffect, useRouter } from "expo-router";
+import { getAuthHeaders, loadAuthSession } from "../../session";
+import { MaterialIcons, Ionicons, FontAwesome5 } from "@expo/vector-icons";
 
-type ReportMode = "daily" | "weekly";
-
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 const { width } = Dimensions.get("window");
-const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
-const dayNames = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
 
-function pad2(value: number) {
-  return String(value).padStart(2, "0");
+const palette = {
+  background: "#F8FAFC",
+  card: "#FFFFFF",
+  text: "#0F172A",
+  textMuted: "#64748B",
+  navy: "#0F172A",
+  accent: "#FACC15",
+  danger: "#EF4444",
+  warning: "#F59E0B",
+  success: "#22C55E",
+  border: "#E2E8F0",
+  chartLow: "#EF4444",
+  chartNormal: "#22C55E",
+  chartHigh: "#F59E0B",
+  primaryBtn: "#0F172A",
+  successBg: "#DCFCE7",
+  accentDark: "#B45309"
+};
+
+interface SensorResponse {
+  sensorId: number;
+  status: string;
+  startedAt: string;
+  endedAt?: string;
 }
 
-function formatDayLabel(date: Date) {
-  return `${pad2(date.getMonth() + 1)}.${pad2(date.getDate())} | ${
-    dayNames[date.getDay()]
-  }`;
+interface GlucoseReportDto {
+  userId: number;
+  period: string;
+  averageGlucose: number;
+  maxGlucose: number;
+  maxGlucoseDateTime?: string;
+  minGlucose: number;
+  standardDeviation: number;
+  timeInRange?: {
+    veryLowPercent: number;
+    lowPercent: number;
+    inRangePercent: number;
+    highPercent: number;
+    veryHighPercent: number;
+  };
 }
 
-function formatMonthNumeric(date: Date) {
-  return `${date.getFullYear()}.${pad2(date.getMonth() + 1)}`;
+interface MealResponse {
+  mealId: number;
+  mealType: string;
+  eatenAt: string;
+  imageUrl?: string;
+  foodName?: string;
+  memo?: string;
+  peakGlucose?: number;
+  calories?: number;
+  carbs?: number;
+  protein?: number;
+  fat?: number;
 }
 
-function getWeekOfMonth(date: Date, startOnSunday = true) {
-  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
-  const offset = startOnSunday ? firstDay.getDay() : (firstDay.getDay() + 6) % 7;
-  return Math.ceil((date.getDate() + offset) / 7);
-}
+const getGlucoseStatus = (glucose?: number) => {
+  if (glucose === undefined || glucose === null) return { label: '분석중', color: palette.textMuted, bg: '#f1f5f9' };
+  if (glucose < 140) return { label: '좋음', color: '#166534', bg: '#DCFCE7' };
+  if (glucose < 180) return { label: '보통', color: '#854D0E', bg: '#FEF9C3' };
+  return { label: '나쁨', color: '#991B1B', bg: '#FEE2E2' };
+};
 
-function formatWeek(date: Date) {
-  const week = getWeekOfMonth(date, true);
-  return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${week}주차`;
-}
-
-function getMonthMatrix(year: number, month: number, startOnSunday = true) {
-  const first = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0).getDate();
-  const startOffset = startOnSunday ? first.getDay() : (first.getDay() + 6) % 7;
-
-  const cells: Array<number | null> = [];
-  for (let i = 0; i < startOffset; i += 1) {
-    cells.push(null);
+const getImageUrl = (url?: string) => {
+  if (!url) return undefined;
+  if (url.startsWith('/')) {
+    return `${API_BASE_URL}${url}`;
   }
-  for (let day = 1; day <= lastDay; day += 1) {
-    cells.push(day);
-  }
-  while (cells.length % 7 !== 0) {
-    cells.push(null);
-  }
-
-  const weeks: Array<Array<number | null>> = [];
-  for (let i = 0; i < cells.length; i += 7) {
-    weeks.push(cells.slice(i, i + 7));
-  }
-  return weeks;
-}
-
-function getWeekIndexForDate(
-  year: number,
-  month: number,
-  day: number,
-  startOnSunday = true
-) {
-  const matrix = getMonthMatrix(year, month, startOnSunday);
-  return matrix.findIndex((week) => week.includes(day));
-}
+  return url;
+};
 
 export default function ReportScreen() {
-  const [mode, setMode] = useState<ReportMode>("daily");
-  const [selectedDate, setSelectedDate] = useState(() => new Date());
-  const [viewMonth, setViewMonth] = useState(() => new Date());
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'MEALS' | 'REPORT'>('MEALS');
 
-  const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const [draftMode, setDraftMode] = useState<ReportMode>("daily");
-  const [draftDate, setDraftDate] = useState(() => new Date());
-  const [draftMonth, setDraftMonth] = useState(() => new Date());
+  // Sensor State
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [sensors, setSensors] = useState<SensorResponse[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-  const periodLabel = useMemo(() => {
-    return mode === "daily" ? formatDayLabel(selectedDate) : formatWeek(selectedDate);
-  }, [mode, selectedDate]);
+  // Data State
+  const [report, setReport] = useState<GlucoseReportDto | null>(null);
+  const [meals, setMeals] = useState<MealResponse[]>([]);
 
-  const openPicker = () => {
-    setDraftMode(mode);
-    setDraftDate(new Date(selectedDate));
-    setDraftMonth(new Date(viewMonth));
-    setIsPickerOpen(true);
-  };
+  // Modal State for Analysis (Tab 2 interaction)
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalMeal, setModalMeal] = useState<MealResponse | null>(null);
 
-  const closePicker = () => {
-    setIsPickerOpen(false);
-  };
-
-  const applyPicker = () => {
-    setMode(draftMode);
-    setSelectedDate(new Date(draftDate));
-    setViewMonth(new Date(draftMonth));
-    setIsPickerOpen(false);
-  };
-
-  const moveDate = (direction: "prev" | "next") => {
-    const delta = mode === "daily" ? 1 : 7;
-    const next = new Date(selectedDate);
-    next.setDate(selectedDate.getDate() + (direction === "prev" ? -delta : delta));
-    setSelectedDate(next);
-    setViewMonth(new Date(next));
-  };
-
-  const moveDraftMonth = (direction: "prev" | "next") => {
-    const next = new Date(draftMonth);
-    next.setMonth(draftMonth.getMonth() + (direction === "prev" ? -1 : 1));
-    setDraftMonth(next);
-  };
-
-  const changeDraftMode = (nextMode: ReportMode) => {
-    setDraftMode(nextMode);
-  };
-
-  const selectDraftDay = (day: number) => {
-    const next = new Date(draftMonth.getFullYear(), draftMonth.getMonth(), day);
-    setDraftDate(next);
-  };
-
-  const selectDraftWeek = (week: Array<number | null>) => {
-    const firstDay = week.find((day) => day !== null);
-    if (!firstDay) {
-      return;
+  const fetchSensorHistory = async () => {
+    try {
+      const headers = getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/api/v1/sensors/history`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setSensors(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch sensors", e);
     }
-    const next = new Date(draftMonth.getFullYear(), draftMonth.getMonth(), firstDay);
-    setDraftDate(next);
   };
 
-  const chartData = useMemo(() => {
-    const glucose = [92, 114, 126, 118, 134, 122, 128];
-    return {
-      labels: ["", "", "", "", "", "", ""],
-      datasets: [
-        {
-          data: glucose,
-        },
-      ],
-    };
+  const fetchReportData = useCallback(async () => {
+    if (sensors.length === 0) return;
+    try {
+      setLoading(true);
+      await loadAuthSession();
+      const headers = getAuthHeaders();
+
+      const targetSensor = sensors[currentIndex];
+      const startDate = targetSensor.startedAt;
+
+      let endDateIso = "";
+      if (targetSensor.endedAt) {
+        endDateIso = targetSensor.endedAt;
+      } else {
+        const now = new Date();
+        const offset = now.getTimezoneOffset() * 60000;
+        endDateIso = new Date(now.getTime() - offset).toISOString().slice(0, -1);
+      }
+
+      // 2. Fetch Report
+      const reportRes = await fetch(
+        `${API_BASE_URL}/api/v1/reports/glucose?startDate=${startDate}&endDate=${endDateIso}`,
+        { headers }
+      );
+      if (reportRes.ok) setReport(await reportRes.json());
+      else setReport(null);
+
+      // 3. Fetch Meals
+      const mealsRes = await fetch(
+        `${API_BASE_URL}/api/v1/meals/search?startDate=${startDate}&endDate=${endDateIso}`,
+        { headers }
+      );
+      if (mealsRes.ok) setMeals(await mealsRes.json());
+      else setMeals([]);
+
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [sensors, currentIndex]);
+
+  // Initial load
+  useFocusEffect(useCallback(() => {
+    loadAuthSession().then(() => {
+      fetchSensorHistory();
+    });
+  }, []));
+
+  // Reload data when sensor selection changes or on refresh
+  React.useEffect(() => {
+    if (sensors.length > 0) {
+      fetchReportData();
+    }
+  }, [sensors, currentIndex, fetchReportData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchSensorHistory();
+    // fetchReportData will trigger via effect if sensors update
   }, []);
 
-  const statPrimary = { title: "혈당 변동성(GV)", value: "46%", delta: "23.1%", scale: "안정 - 위험" };
+  const shiftSensor = (direction: number) => {
+    const newIndex = currentIndex + direction;
+    if (newIndex >= 0 && newIndex < sensors.length) {
+      setCurrentIndex(newIndex);
+    }
+  };
 
-  const statSecondary = { title: "평균 혈당", value: "104", unit: "mg/dL", trend: "권장", hint: "주의" };
+  // Header Info
+  const headerInfo = useMemo(() => {
+    if (sensors.length === 0) return { title: "센서 준비 필요", subtitle: "활성 센서가 없습니다." };
+    const current = sensors[currentIndex];
 
-  const chartWidth = Math.max(width - 72, 240);
+    const start = new Date(current.startedAt);
+    const startStr = `${start.getMonth() + 1}.${start.getDate()}`;
 
-  const pickerMonthMatrix = useMemo(
-    () => getMonthMatrix(draftMonth.getFullYear(), draftMonth.getMonth(), true),
-    [draftMonth]
-  );
-  const isDraftInMonth =
-    draftDate.getFullYear() === draftMonth.getFullYear() &&
-    draftDate.getMonth() === draftMonth.getMonth();
-  const selectedWeekIndex = isDraftInMonth
-    ? getWeekIndexForDate(
-        draftMonth.getFullYear(),
-        draftMonth.getMonth(),
-        draftDate.getDate(),
-        true
-      )
-    : -1;
+    let endStr = "현재";
+    if (current.endedAt) {
+      const end = new Date(current.endedAt);
+      endStr = `${end.getMonth() + 1}.${end.getDate()}`;
+    }
+
+    // Title: Sensor N or Period
+    // If active (index 0 and status active), show "Current Sensor"
+    // Else show "Past Sensor (Date~Date)"
+    const isCurrent = currentIndex === 0 && current.status === 'ACTIVE';
+    const mainTitle = isCurrent ? "현재 센서" : "이전 센서 리포트";
+    const subTitle = `${startStr} ~ ${endStr}`;
+
+    return { title: mainTitle, subtitle: subTitle };
+  }, [sensors, currentIndex]);
+
+  if (sensors.length === 0 && !loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.emptyContainer}>
+          <MaterialIcons name="sensors-off" size={64} color={palette.textMuted} />
+          <Text style={styles.emptyTitle}>연동된 센서가 없습니다</Text>
+          <Text style={styles.emptySubtitle}>새로운 센서를 연동하여 관리를 시작해보세요.</Text>
+          <TouchableOpacity style={styles.emptyBtn} onPress={() => Alert.alert("준비 중", "센서 연동 화면으로 이동")}>
+            <Text style={styles.emptyBtnText}>센서 연동하기</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.header}>
-          <Pressable style={styles.modeButton} onPress={openPicker}>
-            <Text style={styles.modeButtonText}>
-              {mode === "daily" ? "일간 리포트" : "주간 리포트"}
-            </Text>
-            <Text style={styles.modeChevron}>v</Text>
-          </Pressable>
+      <StatusBar barStyle="dark-content" backgroundColor={palette.background} />
 
-          <View style={styles.dateRow}>
-            <Text style={styles.dateIcon}>📅</Text>
-            <Text style={styles.dateText}>{periodLabel}</Text>
+      {/* Header Section (Navigation Style) */}
+      <View style={styles.header}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          {/* Prev Button (Older) -> Index increases */}
+          <TouchableOpacity
+            onPress={() => shiftSensor(1)}
+            disabled={currentIndex >= sensors.length - 1}
+            style={[styles.headerNavButton, currentIndex >= sensors.length - 1 && styles.headerNavButtonDisabled]}
+          >
+            <Text style={[styles.headerNavText, currentIndex >= sensors.length - 1 && styles.headerNavTextDisabled]}>{"<"}</Text>
+          </TouchableOpacity>
+
+          <View style={{ alignItems: 'center' }}>
+            <Text style={styles.headerTitle}>{headerInfo.title}</Text>
+            <Text style={styles.headerSubtitle}>{headerInfo.subtitle}</Text>
           </View>
 
-          <View style={styles.navRow}>
-            <Pressable style={styles.navButton} onPress={() => moveDate("prev")}>
-              <Text style={styles.navText}>{"<"}</Text>
-            </Pressable>
-            <Pressable style={styles.navButton} onPress={() => moveDate("next")}>
-              <Text style={styles.navText}>{">"}</Text>
-            </Pressable>
-          </View>
+          {/* Next Button (Newer) -> Index decreases */}
+          <TouchableOpacity
+            onPress={() => shiftSensor(-1)}
+            disabled={currentIndex <= 0}
+            style={[styles.headerNavButton, currentIndex <= 0 && styles.headerNavButtonDisabled]}
+          >
+            <Text style={[styles.headerNavText, currentIndex <= 0 && styles.headerNavTextDisabled]}>{">"}</Text>
+          </TouchableOpacity>
         </View>
-        <View style={styles.chartCard}>
-          <View style={styles.chartHeader}>
-            <Text style={styles.chartTitle}>혈당 트렌드</Text>
-            <View style={styles.chartBadge}>
-              <Text style={styles.chartBadgeText}>안정</Text>
-            </View>
-          </View>
+      </View>
 
-          <LineChart
-            data={chartData}
-            width={chartWidth}
-            height={200}
-            withDots
-            withInnerLines={false}
-            withOuterLines={false}
-            withHorizontalLabels={false}
-            withVerticalLabels={false}
-            chartConfig={{
-              backgroundGradientFrom: "#0B1220",
-              backgroundGradientTo: "#111827",
-              decimalPlaces: 0,
-              color: () => "#F472B6",
-              labelColor: () => "#94A3B8",
-              propsForDots: {
-                r: "4",
-                strokeWidth: "2",
-                stroke: "#E2E8F0",
-              },
-            }}
-            bezier
-            style={styles.chart}
-          />
+      {/* Tab Switcher */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'MEALS' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('MEALS')}
+        >
+          <Text style={[styles.tabText, activeTab === 'MEALS' && styles.tabTextActive]}>식사 기록</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'REPORT' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('REPORT')}
+        >
+          <Text style={[styles.tabText, activeTab === 'REPORT' && styles.tabTextActive]}>건강 리포트</Text>
+        </TouchableOpacity>
+      </View>
 
-          <View style={styles.statStack}>
-            <View style={styles.statCard}>
-              <View style={styles.statRow}>
-                <Text style={styles.statTitle}>{statPrimary.title}</Text>
-              </View>
-              <View style={styles.statMainRow}>
-                <Text style={styles.statValue}>{statPrimary.value}</Text>
-                <Text style={styles.statDelta}>{statPrimary.delta}</Text>
-              </View>
-              <View style={styles.statScale}>
-                <View style={styles.statTrack} />
-                <View style={styles.statIndicator} />
-                <Text style={styles.statScaleText}>{statPrimary.scale}</Text>
-              </View>
-            </View>
+      {/* Content Area */}
+      <ScrollView contentContainerStyle={styles.contentContainer} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+        {loading ? (
+          <ActivityIndicator size="large" color={palette.accent} style={{ marginTop: 40 }} />
+        ) : activeTab === 'MEALS' ? (
+          <MealLogTab meals={meals} />
+        ) : (
+          <ReportTab report={report} onMaxGlucosePress={() => {
+            // Find meal before max glucose
+            if (!report?.maxGlucoseDateTime) return;
+            const maxTime = new Date(report.maxGlucoseDateTime);
+            // Find closest meal before maxTime within 2 hours
+            const targetMeal = meals.find(m => {
+              const mealTime = new Date(m.eatenAt);
+              const diff = maxTime.getTime() - mealTime.getTime();
+              return diff > 0 && diff <= 2 * 60 * 60 * 1000;
+            });
 
-            <View style={[styles.statCard, styles.statCardSecondary]}>
-              <Text style={styles.statTitle}>{statSecondary.title}</Text>
-              <View style={styles.statMainRow}>
-                <Text style={styles.statValue}>{statSecondary.value}</Text>
-                <Text style={styles.statUnit}>{statSecondary.unit}</Text>
-              </View>
-              <View style={styles.statScale}>
-                <View style={[styles.statTrack, styles.statTrackSoft]} />
-                <View style={[styles.statIndicator, styles.statIndicatorSoft]} />
-                <View style={styles.statScaleRow}>
-                  <Text style={styles.statScaleHint}>{statSecondary.trend}</Text>
-                  <Text style={styles.statScaleHint}>{statSecondary.hint}</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.ctaCard}>
-          <Text style={styles.ctaTitle}>건강 리포트를 관리해보세요</Text>
-          <Text style={styles.ctaDesc}>식사와 운동 패턴을 분석하면 혈당 변화에 미리 대비할 수 있어요.</Text>
-          <Pressable style={styles.ctaButton}>
-            <Text style={styles.ctaButtonText}>리포트 구매하기</Text>
-          </Pressable>
-        </View>
+            if (targetMeal) {
+              setModalMeal(targetMeal);
+              setModalVisible(true);
+            } else {
+              Alert.alert("알림", "해당 시간 2시간 전의 식사 기록을 찾을 수 없습니다.");
+            }
+          }} />
+        )}
       </ScrollView>
 
-      {isPickerOpen && (
-        <View style={styles.pickerOverlay}>
-          <Pressable style={styles.pickerBackdrop} onPress={closePicker} />
-          <View style={styles.pickerSheet}>
-            <Text style={styles.pickerTitle}>
-              {draftMode === "daily" ? "일간 리포트" : "주간 리포트"}
-            </Text>
-
-            <View style={styles.pickerToggle}>
-              <Pressable
-                style={[
-                  styles.pickerToggleButton,
-                  draftMode === "daily" && styles.pickerToggleActive,
-                ]}
-                onPress={() => changeDraftMode("daily")}
-              >
-                <Text
-                  style={[
-                    styles.pickerToggleText,
-                    draftMode === "daily" && styles.pickerToggleTextActive,
-                  ]}
-                >
-                  일간
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.pickerToggleButton,
-                  draftMode === "weekly" && styles.pickerToggleActive,
-                ]}
-                onPress={() => changeDraftMode("weekly")}
-              >
-                <Text
-                  style={[
-                    styles.pickerToggleText,
-                    draftMode === "weekly" && styles.pickerToggleTextActive,
-                  ]}
-                >
-                  주간
-                </Text>
-              </Pressable>
+      {/* Interaction Modal (Reused) */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>혈당 스파이크 원인</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Ionicons name="close" size={24} color={palette.textMuted} />
+              </TouchableOpacity>
             </View>
 
-            <View style={styles.pickerWeekdays}>
-              {weekdays.map((day, index) => (
-                <Text
-                  key={day}
-                  style={[
-                    styles.pickerWeekday,
-                    index === 0 && styles.pickerSundayText,
-                  ]}
-                >
-                  {day}
-                </Text>
-              ))}
-            </View>
-
-            <View style={styles.pickerMonthRow}>
-              <Pressable
-                style={styles.pickerMonthArrow}
-                onPress={() => moveDraftMonth("prev")}
-              >
-                <Text style={styles.pickerMonthArrowText}>{"<"}</Text>
-              </Pressable>
-              <Text style={styles.pickerMonthText}>{formatMonthNumeric(draftMonth)}</Text>
-              <Pressable
-                style={styles.pickerMonthArrow}
-                onPress={() => moveDraftMonth("next")}
-              >
-                <Text style={styles.pickerMonthArrowText}>{">"}</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.pickerCalendar}>
-              {pickerMonthMatrix.map((week, weekIndex) => {
-                const isWeekSelected =
-                  draftMode === "weekly" && weekIndex === selectedWeekIndex;
-                return (
-                  <View key={`picker-week-${weekIndex}`} style={styles.pickerWeekRow}>
-                    {week.map((day, dayIndex) => {
-                      if (!day) {
-                        return (
-                          <View
-                            key={`picker-empty-${dayIndex}`}
-                            style={styles.pickerDayCell}
-                          />
-                        );
-                      }
-                      const isSelected =
-                        draftMode === "daily" &&
-                        isDraftInMonth &&
-                        day === draftDate.getDate();
-                      const isSunday = dayIndex === 0;
-                      return (
-                        <Pressable
-                          key={`picker-day-${dayIndex}`}
-                          style={[
-                            styles.pickerDayCell,
-                            isSelected && styles.pickerDaySelected,
-                            isWeekSelected && styles.pickerWeekSelected,
-                          ]}
-                          onPress={() =>
-                            draftMode === "daily"
-                              ? selectDraftDay(day)
-                              : selectDraftWeek(week)
-                          }
-                        >
-                          <Text
-                            style={[
-                              styles.pickerDayText,
-                              isSunday && styles.pickerSundayText,
-                              isSelected && styles.pickerDayTextSelected,
-                              isWeekSelected && styles.pickerWeekTextSelected,
-                            ]}
-                          >
-                            {day}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
+            {modalMeal && (
+              <View style={styles.mealPrevCard}>
+                {modalMeal.imageUrl ? (
+                  <Image source={{ uri: getImageUrl(modalMeal.imageUrl) }} style={styles.modalMealImage} />
+                ) : (
+                  <View style={[styles.modalMealImage, { backgroundColor: '#f1f5f9' }]}>
+                    <Ionicons name="fast-food-outline" size={32} color={palette.textMuted} />
                   </View>
-                );
-              })}
-            </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  {/* 이름 및 시간 */}
+                  <Text style={styles.mealName}>{modalMeal.foodName || "음식명"}</Text>
+                  <Text style={styles.mealTime}>{new Date(modalMeal.eatenAt).toLocaleString()}</Text>
 
-            <View style={styles.pickerActions}>
-              <Pressable style={styles.pickerCancel} onPress={closePicker}>
-                <Text style={styles.pickerCancelText}>취소</Text>
-              </Pressable>
-              <Pressable style={styles.pickerApply} onPress={applyPicker}>
-                <Text style={styles.pickerApplyText}>적용</Text>
-              </Pressable>
-            </View>
+                  {/* 중량 및 등급 */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                    <View style={{ backgroundColor: getGlucoseStatus(modalMeal.peakGlucose).bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ fontSize: 11, color: getGlucoseStatus(modalMeal.peakGlucose).color, fontWeight: '700' }}>{getGlucoseStatus(modalMeal.peakGlucose).label}</Text>
+                    </View>
+                    {/* 영양 정보 */}
+                    <View style={{ marginTop: 4 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>
+                        {modalMeal.calories ? `${modalMeal.calories} kcal` : "- kcal"}
+                      </Text>
+                      <MacroBar c={modalMeal.carbs} p={modalMeal.protein} f={modalMeal.fat} />
+                    </View>
+                  </View>
+                  <Text style={styles.modalDesc}>
+                    최고 혈당 발생 약 2시간 전에 섭취한 음식입니다.
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         </View>
-      )}
+      </Modal>
+
     </SafeAreaView>
   );
 }
 
+const calcMacroPercents = (
+  carbs?: number | null,
+  protein?: number | null,
+  fat?: number | null
+) => {
+  if (carbs == null || protein == null || fat == null) {
+    return null;
+  }
+  const safeCarbs = Math.max(0, carbs);
+  const safeProtein = Math.max(0, protein);
+  const safeFat = Math.max(0, fat);
+  const totalCalories = safeCarbs * 4 + safeProtein * 4 + safeFat * 9;
+  if (totalCalories <= 0) {
+    return null;
+  }
+  const carbPercent = Math.round((safeCarbs * 4 * 100) / totalCalories);
+  const proteinPercent = Math.round((safeProtein * 4 * 100) / totalCalories);
+  const fatPercent = Math.max(0, 100 - carbPercent - proteinPercent);
+  return { carbPercent, proteinPercent, fatPercent };
+};
+
+const MacroBar = ({ c = 0, p = 0, f = 0 }: { c?: number, p?: number, f?: number }) => {
+  const macros = calcMacroPercents(c, p, f);
+  // Default to 1:1:1 if null (placeholder)
+  const { carbPercent, proteinPercent, fatPercent } = macros || { carbPercent: 0, proteinPercent: 0, fatPercent: 0 };
+
+  const hasData = !!macros;
+  // If no data, render 1:1:1 segments in coloring (or gray?) - Index.tsx uses colors even for placeholder
+  const flexValues = hasData ? [carbPercent, proteinPercent, fatPercent] : [1, 1, 1];
+
+  const color = { c: '#86EFAC', p: '#FDE68A', f: '#93C5FD' };
+
+  return (
+    <View style={{ marginTop: 4, width: '100%' }}>
+      {/* Bar */}
+      <View style={{ flexDirection: 'row', height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#F1F5F9', marginBottom: 4 }}>
+        <View style={{ flex: flexValues[0], backgroundColor: color.c }} />
+        <View style={{ flex: flexValues[1], backgroundColor: color.p }} />
+        <View style={{ flex: flexValues[2], backgroundColor: color.f }} />
+      </View>
+      {/* Legend */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color.c, marginRight: 4 }} />
+          <Text style={{ fontSize: 11, color: palette.textMuted }}>탄 {hasData ? `${carbPercent}%` : '--%'}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color.p, marginRight: 4 }} />
+          <Text style={{ fontSize: 11, color: palette.textMuted }}>단 {hasData ? `${proteinPercent}%` : '--%'}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color.f, marginRight: 4 }} />
+          <Text style={{ fontSize: 11, color: palette.textMuted }}>지 {hasData ? `${fatPercent}%` : '--%'}</Text>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+// --- Tab Components ---
+
+const mealTypeLabels: Record<string, string> = {
+  BREAKFAST: "아침",
+  LUNCH: "점심",
+  DINNER: "저녁",
+  SNACK: "간식",
+};
+
+const getMealTypeLabel = (value?: string | null) => {
+  if (!value) return "";
+  const key = value.toUpperCase();
+  return mealTypeLabels[key] ?? value;
+};
+
+const MealLogTab = ({ meals }: { meals: MealResponse[] }) => {
+  if (meals.length === 0) return <Text style={styles.emptyText}>기록된 식사가 없습니다.</Text>;
+
+  return (
+    <View style={styles.mealCardList}>
+      {meals.map((meal) => {
+        const title = meal.foodName || meal.memo || "음식 이름 없음";
+        const caloriesText = meal.calories != null ? `${meal.calories}kcal` : "--kcal";
+        const mealTypeLabel = getMealTypeLabel(meal.mealType);
+
+        const macros = calcMacroPercents(meal.carbs, meal.protein, meal.fat);
+        const { carbPercent, proteinPercent, fatPercent } = macros || { carbPercent: 0, proteinPercent: 0, fatPercent: 0 };
+        const hasData = !!macros;
+
+        // Default to 1:1:1 for visual bar if no data
+        const flexValues = hasData ? [carbPercent, proteinPercent, fatPercent] : [1, 1, 1];
+        const macroLabels = hasData
+          ? { carbs: `${carbPercent}%`, protein: `${proteinPercent}%`, fat: `${fatPercent}%` }
+          : { carbs: "--%", protein: "--%", fat: "--%" };
+
+        return (
+          <View key={meal.mealId} style={styles.mealCard}>
+            <View style={styles.mealCardTopRow}>
+              {meal.imageUrl ? (
+                <Image source={{ uri: getImageUrl(meal.imageUrl) }} style={styles.mealImage} resizeMode="cover" />
+              ) : (
+                <View style={styles.mealImagePlaceholder}>
+                  <Ionicons name="restaurant" size={24} color="#94A3B8" />
+                </View>
+              )}
+              <View style={styles.mealInfo}>
+                {!!mealTypeLabel && (
+                  <Text style={styles.mealTypeBadge}>{mealTypeLabel}</Text>
+                )}
+                <View style={styles.mealNameRow}>
+                  <Text style={styles.mealCaloriesLarge}>{caloriesText}</Text>
+                  <Text style={styles.mealNameDivider}>|</Text>
+                  <Text style={styles.mealFoodName} numberOfLines={1}>{title}</Text>
+                </View>
+                <Text style={styles.mealTimeLabel}>
+                  {new Date(meal.eatenAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </View>
+            </View>
+
+            {/* Macro Bar */}
+            <View style={styles.mealMacroBar}>
+              <View style={[styles.mealMacroSegment, { flex: flexValues[0], backgroundColor: "#86EFAC" }]} />
+              <View style={[styles.mealMacroSegment, { flex: flexValues[1], backgroundColor: "#FDE68A" }]} />
+              <View style={[styles.mealMacroSegment, { flex: flexValues[2], backgroundColor: "#93C5FD" }]} />
+            </View>
+
+            {/* Legend */}
+            <View style={styles.mealMacroLegend}>
+              <View style={styles.mealMacroItem}>
+                <View style={[styles.mealMacroDot, { backgroundColor: "#86EFAC" }]} />
+                <Text style={styles.mealMacroLabel}>탄 {macroLabels.carbs}</Text>
+              </View>
+              <View style={styles.mealMacroItem}>
+                <View style={[styles.mealMacroDot, { backgroundColor: "#FDE68A" }]} />
+                <Text style={styles.mealMacroLabel}>단 {macroLabels.protein}</Text>
+              </View>
+              <View style={styles.mealMacroItem}>
+                <View style={[styles.mealMacroDot, { backgroundColor: "#93C5FD" }]} />
+                <Text style={styles.mealMacroLabel}>지 {macroLabels.fat}</Text>
+              </View>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+};
+
+const ReportTab = ({ report, onMaxGlucosePress }: { report: GlucoseReportDto | null, onMaxGlucosePress: () => void }) => {
+  if (!report) return <Text style={styles.emptyText}>리포트 데이터가 없습니다.</Text>;
+
+  // TIR Logic
+  const tir = report.timeInRange;
+  const tirData = tir ? {
+    low: tir.veryLowPercent + tir.lowPercent,
+    normal: tir.inRangePercent,
+    high: tir.highPercent + tir.veryHighPercent
+  } : { low: 0, normal: 0, high: 0 };
+
+  return (
+    <View>
+      {/* Stats Grid */}
+      <Text style={styles.sectionTitle}>핵심 수치</Text>
+      <View style={styles.gridContainer}>
+        <StatBox label="평균 혈당" value={report.averageGlucose} unit="mg/dL" />
+        <StatBox label="변동성" value={report.standardDeviation?.toFixed(1)} unit="SD" />
+
+        <TouchableOpacity
+          style={[styles.statCard, { borderColor: palette.warning, borderWidth: 1 }]}
+          onPress={onMaxGlucosePress}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.statLabel, { color: palette.warning }]}>최고 혈당</Text>
+          <View style={styles.valueRow}>
+            <Text style={[styles.statValue, { color: palette.warning }]}>{report.maxGlucose}</Text>
+            <Text style={styles.statUnit}>mg/dL</Text>
+          </View>
+          <View style={{ position: 'absolute', right: 10, top: 10 }}>
+            <MaterialIcons name="touch-app" size={16} color={palette.warning} />
+          </View>
+        </TouchableOpacity>
+
+        <StatBox label="최저 혈당" value={report.minGlucose} unit="mg/dL" highlight={report.minGlucose < 70} tone="danger" />
+      </View>
+
+      {/* TIR Bar */}
+      <Text style={styles.sectionTitle}>범위 내 비율 (TIR)</Text>
+      <View style={styles.card}>
+        <View style={styles.tirBarContainer}>
+          {tirData.low > 0 && <View style={[styles.tirSegment, { flex: tirData.low, backgroundColor: palette.chartLow, borderTopLeftRadius: 8, borderBottomLeftRadius: 8 }]} />}
+          {tirData.normal > 0 && <View style={[styles.tirSegment, { flex: tirData.normal, backgroundColor: palette.chartNormal }]} />}
+          {tirData.high > 0 && <View style={[styles.tirSegment, { flex: tirData.high, backgroundColor: palette.chartHigh, borderTopRightRadius: 8, borderBottomRightRadius: 8 }]} />}
+        </View>
+        <View style={styles.tirLegendContainer}>
+          <View style={styles.legendItem}>
+            <View style={[styles.dot, { backgroundColor: palette.chartLow }]} />
+            <Text style={styles.legendText}>저혈당 {tirData.low.toFixed(0)}%</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.dot, { backgroundColor: palette.chartNormal }]} />
+            <Text style={styles.legendText}>정상 {tirData.normal.toFixed(0)}%</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.dot, { backgroundColor: palette.chartHigh }]} />
+            <Text style={styles.legendText}>고혈당 {tirData.high.toFixed(0)}%</Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const StatBox = ({ label, value, unit, highlight, tone }: any) => (
+  <View style={[styles.statCard, highlight && { borderColor: tone === 'danger' ? palette.danger : palette.warning, borderWidth: 1 }]}>
+    <Text style={[styles.statLabel, highlight && { color: tone === 'danger' ? palette.danger : palette.warning }]}>{label}</Text>
+    <View style={styles.valueRow}>
+      <Text style={[styles.statValue, highlight && { color: tone === 'danger' ? palette.danger : palette.warning }]}>{value}</Text>
+      <Text style={styles.statUnit}>{unit}</Text>
+    </View>
+  </View>
+);
+
+const getMealTypeText = (type: string) => {
+  switch (type) {
+    case 'BREAKFAST': return '아침';
+    case 'LUNCH': return '점심';
+    case 'DINNER': return '저녁';
+    case 'SNACK': return '간식';
+    default: return type;
+  }
+};
+
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F8FAFC" },
-  container: { padding: 20, paddingBottom: 40 },
+  safeArea: { flex: 1, backgroundColor: palette.background },
+  header: { padding: 20, paddingBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: palette.text },
+  headerSubtitle: { fontSize: 14, color: palette.textMuted, marginBottom: 4 },
 
-  header: {
-    marginBottom: 18,
-  },
-  modeButton: {
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+  // Header Navigation Styles
+  headerNavButton: {
+    width: 28,
+    height: 28,
     borderRadius: 14,
-    backgroundColor: "#EEF2FF",
-  },
-  modeButtonText: { fontSize: 18, fontWeight: "800", color: "#1E293B" },
-  modeChevron: { fontSize: 16, marginLeft: 6, color: "#64748B" },
-  dateRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 10,
-  },
-  dateIcon: { fontSize: 16, marginRight: 6 },
-  dateText: { fontSize: 14, color: "#64748B" },
-  navRow: {
-    position: "absolute",
-    right: 0,
-    top: 6,
-    flexDirection: "row",
-  },
-  navButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#E2E8F0",
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 8,
-  },
-  navText: { fontSize: 14, color: "#1E293B" },
-
-  chartCard: {
-    borderRadius: 26,
-    padding: 18,
-    backgroundColor: "#0B1220",
-    marginBottom: 20,
-  },
-  chartHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  chartTitle: { color: "#E2E8F0", fontSize: 16, fontWeight: "700" },
-  chartBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: "rgba(148, 163, 184, 0.2)",
-  },
-  chartBadgeText: { color: "#CBD5F5", fontSize: 11, fontWeight: "600" },
-  chart: {
-    borderRadius: 16,
-  },
-
-  statStack: {
-    marginTop: -16,
-  },
-  statCard: {
-    backgroundColor: "rgba(15, 23, 42, 0.9)",
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.2)",
-    marginBottom: 10,
-  },
-  statCardSecondary: {
-    backgroundColor: "rgba(15, 23, 42, 0.78)",
-  },
-  statRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  statTitle: { color: "#CBD5F5", fontSize: 12, marginBottom: 6 },
-  statMainRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-  },
-  statValue: { color: "#F8FAFC", fontSize: 28, fontWeight: "800" },
-  statDelta: { color: "#F472B6", fontSize: 12, marginLeft: 8 },
-  statUnit: { color: "#CBD5F5", fontSize: 12, marginLeft: 6 },
-  statScale: { marginTop: 10 },
-  statTrack: {
-    height: 4,
-    backgroundColor: "rgba(244, 114, 182, 0.3)",
-    borderRadius: 999,
-  },
-  statTrackSoft: {
-    backgroundColor: "rgba(96, 165, 250, 0.3)",
-  },
-  statIndicator: {
-    position: "absolute",
-    left: "45%",
-    top: -3,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#F472B6",
-  },
-  statIndicatorSoft: {
-    backgroundColor: "#60A5FA",
-  },
-  statScaleText: { color: "#94A3B8", fontSize: 11, marginTop: 6 },
-  statScaleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 6,
-  },
-  statScaleHint: { color: "#94A3B8", fontSize: 11 },
-
-  ctaCard: {
-    borderRadius: 20,
-    padding: 18,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  ctaTitle: { fontSize: 16, fontWeight: "700", color: "#1E293B" },
-  ctaDesc: {
-    fontSize: 13,
-    color: "#64748B",
-    marginTop: 8,
-    marginBottom: 14,
-    lineHeight: 18,
-  },
-  ctaButton: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: "#4F46E5",
-  },
-  ctaButtonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
-
-  pickerOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(3, 7, 18, 0.72)",
-    justifyContent: "flex-end",
-  },
-  pickerBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  pickerSheet: {
-    margin: 16,
-    borderRadius: 28,
-    padding: 18,
-    backgroundColor: "#0B1220",
-    borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.2)",
-  },
-  pickerTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#E2E8F0",
-    marginBottom: 14,
-  },
-  pickerToggle: {
-    flexDirection: "row",
-    padding: 4,
-    borderRadius: 18,
-    backgroundColor: "rgba(15, 23, 42, 0.85)",
-    alignSelf: "flex-start",
-    marginBottom: 16,
-  },
-  pickerToggleButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-  },
-  pickerToggleActive: {
-    borderWidth: 1,
-    borderColor: "rgba(226, 232, 240, 0.8)",
-    backgroundColor: "rgba(30, 41, 59, 0.9)",
-  },
-  pickerToggleText: { color: "#94A3B8", fontSize: 14, fontWeight: "600" },
-  pickerToggleTextActive: { color: "#E2E8F0" },
-  pickerWeekdays: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  pickerWeekday: {
-    width: 36,
-    textAlign: "center",
-    color: "#94A3B8",
-    fontSize: 12,
-  },
-  pickerSundayText: {
-    color: "#F87171",
-  },
-  pickerMonthRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  pickerMonthText: { fontSize: 18, fontWeight: "700", color: "#E2E8F0" },
-  pickerMonthArrow: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
     backgroundColor: "rgba(148, 163, 184, 0.18)",
     alignItems: "center",
     justifyContent: "center",
   },
-  pickerMonthArrowText: { color: "#E2E8F0", fontSize: 12 },
-  pickerCalendar: {
-    marginBottom: 18,
+  headerNavButtonDisabled: {
+    opacity: 0.3,
   },
-  pickerWeekRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  pickerDayCell: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pickerDaySelected: {
-    backgroundColor: "#FACC15",
-  },
-  pickerWeekSelected: {
-    backgroundColor: "rgba(250, 204, 21, 0.12)",
-  },
-  pickerDayText: { color: "#E2E8F0", fontSize: 15 },
-  pickerDayTextSelected: { color: "#111827", fontWeight: "800" },
-  pickerWeekTextSelected: { color: "#FDE68A" },
-  pickerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  pickerCancel: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 16,
+  headerNavText: { color: "#94A3B8", fontSize: 12, fontWeight: "700" },
+  headerNavTextDisabled: { color: "rgba(148, 163, 184, 0.4)" },
+
+  sensorIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FEF3C7', justifyContent: 'center', alignItems: 'center' },
+
+  tabContainer: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 10 },
+  tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: palette.border },
+  tabBtnActive: { borderBottomColor: palette.navy },
+  tabText: { fontSize: 16, color: palette.textMuted, fontWeight: '600' },
+  tabTextActive: { color: palette.navy, fontWeight: '700' },
+
+  contentContainer: { padding: 20 },
+
+  // Empty State
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  emptyTitle: { fontSize: 20, fontWeight: '700', color: palette.text, marginTop: 20, marginBottom: 10 },
+  emptySubtitle: { fontSize: 14, color: palette.textMuted, textAlign: 'center', marginBottom: 30 },
+  emptyBtn: { backgroundColor: palette.navy, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 12 },
+  emptyBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  emptyText: { textAlign: 'center', color: palette.textMuted, marginTop: 40 },
+
+  // Meal Card (Dark Theme)
+  mealCardList: { gap: 14, marginBottom: 12 },
+  mealCard: {
+    backgroundColor: "#0F172A",
+    borderRadius: 22,
+    padding: 16,
     borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.4)",
-    alignItems: "center",
-    backgroundColor: "rgba(15, 23, 42, 0.7)",
-    marginRight: 10,
+    borderColor: "rgba(148, 163, 184, 0.2)",
+    marginBottom: 0, // Handled by gap
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, elevation: 3
   },
-  pickerCancelText: { color: "#CBD5F5", fontSize: 16, fontWeight: "700" },
-  pickerApply: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 16,
-    alignItems: "center",
-    backgroundColor: "#FACC15",
+  mealCardTopRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  mealImage: { width: 72, height: 72, borderRadius: 16, marginRight: 0, backgroundColor: "rgba(15, 23, 42, 0.6)" },
+  mealImagePlaceholder: {
+    width: 72, height: 72, borderRadius: 16, marginRight: 0,
+    alignItems: "center", justifyContent: "center", backgroundColor: "rgba(30, 41, 59, 0.8)"
   },
-  pickerApplyText: { color: "#111827", fontSize: 16, fontWeight: "800" },
+  mealInfo: { flex: 1 },
+  mealTypeBadge: { color: "#E2E8F0", fontSize: 16, fontWeight: "700" },
+  mealNameRow: { flexDirection: "row", alignItems: "baseline", gap: 6, marginTop: 4 },
+  mealCaloriesLarge: { color: "#FACC15", fontSize: 18, fontWeight: "800" },
+  mealNameDivider: { color: "rgba(226, 232, 240, 0.5)", fontSize: 14 },
+  mealFoodName: { color: "#F8FAFC", fontSize: 16, fontWeight: "600", flex: 1 },
+  mealTimeLabel: { color: "rgba(226, 232, 240, 0.7)", fontSize: 12, marginTop: 6 },
+
+  // Macro Bar Styles
+  mealMacroBar: {
+    height: 8, borderRadius: 999, overflow: "hidden",
+    backgroundColor: "rgba(148, 163, 184, 0.25)",
+    flexDirection: "row", marginTop: 14
+  },
+  mealMacroSegment: { height: "100%" },
+  mealMacroLegend: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 10 },
+  mealMacroItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+  mealMacroDot: { width: 8, height: 8, borderRadius: 4 },
+  mealMacroLabel: { color: "rgba(226, 232, 240, 0.8)", fontSize: 12, fontWeight: "600" },
+
+  // Stats
+  sectionTitle: { fontSize: 18, fontWeight: "700", color: palette.text, marginBottom: 12, marginTop: 8 },
+  gridContainer: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginBottom: 10 },
+  statCard: { width: "48%", backgroundColor: palette.card, borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: palette.border },
+  statLabel: { fontSize: 12, color: palette.textMuted, marginBottom: 8, fontWeight: "600" },
+  valueRow: { flexDirection: "row", alignItems: "baseline" },
+  statValue: { fontSize: 24, fontWeight: "800", color: palette.text, marginRight: 4 },
+  statUnit: { fontSize: 12, color: palette.textMuted },
+
+  // TIR
+  card: { backgroundColor: palette.card, borderRadius: 20, padding: 20, marginBottom: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2, borderWidth: 1, borderColor: palette.border },
+  tirBarContainer: { flexDirection: 'row', height: 24, width: '100%', borderRadius: 8, overflow: 'hidden', backgroundColor: '#f1f5f9' },
+  tirSegment: { height: '100%' },
+  tirLegendContainer: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 12 },
+  legendItem: { flexDirection: 'row', alignItems: 'center' },
+  dot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+  legendText: { fontSize: 12, color: palette.textMuted, fontWeight: '600' },
+
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, minHeight: 300 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: palette.text },
+  modalDesc: { fontSize: 14, color: palette.textMuted, textAlign: 'center', marginTop: 20 },
+  mealPrevCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', padding: 16, borderRadius: 16, width: '100%' },
+  modalMealImage: { width: 60, height: 60, borderRadius: 12, marginRight: 16 },
+  mealName: { fontSize: 16, fontWeight: '700', color: palette.text, marginBottom: 4 },
+  mealTime: { fontSize: 13, color: palette.textMuted },
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -243,9 +243,9 @@ public class CgmPipelineService {
                     return activeSensor;
                 })
                 .orElseGet(() -> {
-                    log.info("센서 상태 변경 감지: {}", incomingDeviceId);
+                    log.info("새로운 센서 연결 또는 재연결 감지: {}", incomingDeviceId);
 
-                    // 기존 활성 센서 은퇴 처리
+                    // 기존 활성 센서가 있다면 은퇴 처리 (기기 변경 등의 경우)
                     sensorRepository.findByUserAndStatus(user, Sensor.SensorStatus.ACTIVE)
                             .ifPresent(oldSensor -> {
                                 oldSensor.changeStatus(Sensor.SensorStatus.INACTIVE);
@@ -253,14 +253,8 @@ public class CgmPipelineService {
                                 sensorRepository.saveAndFlush(oldSensor);
                             });
 
-                    // 기존 이력이 있다면 재활성화, 없으면 신규 생성
-                    return sensorRepository.findByUserAndDeviceId(user, incomingDeviceId)
-                            .map(existing -> {
-                                existing.changeStatus(Sensor.SensorStatus.ACTIVE);
-                                existing.updatePeriod(now, endsAt);
-                                return sensorRepository.save(existing);
-                            })
-                            .orElseGet(() -> createNewSensor(user, record));
+                    // [변경] 기존 센서를 재활용하지 않고, 항상 새로운 센서 이력을 생성합니다.
+                    return createNewSensor(user, record);
                 });
     }
 

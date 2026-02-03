@@ -28,6 +28,7 @@ public class ReportService {
     private final MonthlyReportRepository monthlyReportRepository;
     private final WeeklyReportRepository weeklyReportRepository;
     private final UserRepository userRepository;
+    private final com.djjko.dnc.glucose.repository.SensorRepository sensorRepository;
 
     private static final TirThresholds DEFAULT_TIR = new TirThresholds(54, 69, 180, 250);
     // 임의 값: 프로젝트 요구에 맞게 이 숫자만 수정해서 기준치를 조정하세요.
@@ -53,7 +54,8 @@ public class ReportService {
     }
 
     private double calculatePercent(long part, long total) {
-        if (total == 0) return 0.0;
+        if (total == 0)
+            return 0.0;
         return (double) part / total * 100.0;
     }
 
@@ -90,23 +92,23 @@ public class ReportService {
             saveWeeklyReport(userId, weekStart, report);
 
             weeks.add(MonthlyWeeklyGlucoseReportDto.WeeklyGlucoseReportDto.builder()
-                .weekIndex(weekIndex)
-                .weekStartDate(weekStart)
-                .weekEndDate(weekEnd)
-                .rangeStart(rangeStart)
-                .rangeEnd(rangeEnd)
-                .report(report)
-                .build());
+                    .weekIndex(weekIndex)
+                    .weekStartDate(weekStart)
+                    .weekEndDate(weekEnd)
+                    .rangeStart(rangeStart)
+                    .rangeEnd(rangeEnd)
+                    .report(report)
+                    .build());
 
             cursor = cursor.plusWeeks(1);
             weekIndex++;
         }
 
         return MonthlyWeeklyGlucoseReportDto.builder()
-            .year(year)
-            .month(month)
-            .weeks(weeks)
-            .build();
+                .year(year)
+                .month(month)
+                .weeks(weeks)
+                .build();
     }
 
     public GlucoseReportDto generateMonthlyReportAndSave(Long userId, int year, int month) {
@@ -125,75 +127,80 @@ public class ReportService {
         return report;
     }
 
-    private GlucoseReportDto generateGlucoseReport(Long userId, LocalDateTime start, LocalDateTime end, String period) {
+    public GlucoseReportDto generateGlucoseReport(Long userId, LocalDateTime start, LocalDateTime end, String period) {
         List<GlucoseData> data = glucoseDataRepository.findAllByUser_UserIdAndMeasuredAtBetween(userId, start, end);
         return buildGlucoseReport(userId, data, start, end, period);
     }
 
     private GlucoseReportDto buildGlucoseReport(
-        Long userId,
-        List<GlucoseData> data,
-        LocalDateTime start,
-        LocalDateTime end,
-        String period
-    ) {
+            Long userId,
+            List<GlucoseData> data,
+            LocalDateTime start,
+            LocalDateTime end,
+            String period) {
         if (data.isEmpty()) {
             return GlucoseReportDto.builder()
-                .userId(userId)
-                .period(period)
-                .startDate(start)
-                .endDate(end)
-                .recordCount(0)
-                .build();
+                    .userId(userId)
+                    .period(period)
+                    .startDate(start)
+                    .endDate(end)
+                    .recordCount(0)
+                    .build();
         }
 
         IntSummaryStatistics stats = data.stream()
-            .mapToInt(GlucoseData::getValue)
-            .summaryStatistics();
+                .mapToInt(GlucoseData::getValue)
+                .summaryStatistics();
 
         double average = stats.getAverage();
         long count = stats.getCount();
 
         double standardDeviation = Math.sqrt(data.stream()
-            .mapToDouble(d -> Math.pow(d.getValue() - average, 2))
-            .sum() / count);
+                .mapToDouble(d -> Math.pow(d.getValue() - average, 2))
+                .sum() / count);
 
         TirThresholds thresholds = resolveTirThresholds(userId);
         long veryLowCount = data.stream().filter(d -> d.getValue() < thresholds.veryLowUpperExclusive).count();
         long lowCount = data.stream().filter(d -> d.getValue() >= thresholds.veryLowUpperExclusive
-            && d.getValue() <= thresholds.lowUpperInclusive).count();
+                && d.getValue() <= thresholds.lowUpperInclusive).count();
         long inRangeCount = data.stream().filter(d -> d.getValue() > thresholds.lowUpperInclusive
-            && d.getValue() <= thresholds.inRangeUpperInclusive).count();
+                && d.getValue() <= thresholds.inRangeUpperInclusive).count();
         long highCount = data.stream().filter(d -> d.getValue() > thresholds.inRangeUpperInclusive
-            && d.getValue() <= thresholds.highUpperInclusive).count();
+                && d.getValue() <= thresholds.highUpperInclusive).count();
         long veryHighCount = data.stream().filter(d -> d.getValue() > thresholds.highUpperInclusive).count();
 
+        GlucoseData maxData = data.stream()
+                .max((d1, d2) -> Integer.compare(d1.getValue(), d2.getValue()))
+                .orElse(null);
+
         GlucoseReportDto.TimeInRangeDto tirDto = GlucoseReportDto.TimeInRangeDto.builder()
-            .veryLowPercent(calculatePercent(veryLowCount, count))
-            .lowPercent(calculatePercent(lowCount, count))
-            .inRangePercent(calculatePercent(inRangeCount, count))
-            .highPercent(calculatePercent(highCount, count))
-            .veryHighPercent(calculatePercent(veryHighCount, count))
-            .build();
+                .veryLowPercent(calculatePercent(veryLowCount, count))
+                .lowPercent(calculatePercent(lowCount, count))
+                .inRangePercent(calculatePercent(inRangeCount, count))
+                .highPercent(calculatePercent(highCount, count))
+                .veryHighPercent(calculatePercent(veryHighCount, count))
+                .build();
 
         return GlucoseReportDto.builder()
-            .userId(userId)
-            .period(period)
-            .startDate(start)
-            .endDate(end)
-            .recordCount((int) count)
-            .averageGlucose((int) average)
-            .maxGlucose(stats.getMax())
-            .minGlucose(stats.getMin())
-            .standardDeviation(standardDeviation)
-            .timeInRange(tirDto)
-            .build();
+                .userId(userId)
+                .period(period)
+                .startDate(start)
+                .endDate(end)
+                .recordCount((int) count)
+                .averageGlucose((int) average)
+                .maxGlucose(stats.getMax())
+                .maxGlucoseDateTime(maxData != null ? maxData.getMeasuredAt() : null)
+                .minGlucose(stats.getMin())
+                .standardDeviation(standardDeviation)
+                .timeInRange(tirDto)
+                .sensorUsagePercent(calculateSensorUsagePercent(userId, start, end, count))
+                .build();
     }
 
     private void saveMonthlyReport(Long userId, int year, int month, GlucoseReportDto report) {
         MonthlyReport entity = monthlyReportRepository
-            .findByUserIdAndYearAndMonth(userId, year, month)
-            .orElseGet(MonthlyReport::new);
+                .findByUserIdAndYearAndMonth(userId, year, month)
+                .orElseGet(MonthlyReport::new);
 
         entity.setUserId(userId);
         entity.setYear(year);
@@ -211,8 +218,8 @@ public class ReportService {
 
     private void saveWeeklyReport(Long userId, LocalDate weekStartDate, GlucoseReportDto report) {
         WeeklyReport entity = weeklyReportRepository
-            .findByUserIdAndWeekStartDate(userId, weekStartDate)
-            .orElseGet(WeeklyReport::new);
+                .findByUserIdAndWeekStartDate(userId, weekStartDate)
+                .orElseGet(WeeklyReport::new);
 
         entity.setUserId(userId);
         entity.setWeekStartDate(weekStartDate);
@@ -229,8 +236,8 @@ public class ReportService {
 
     private TirThresholds resolveTirThresholds(Long userId) {
         DiabetesType diabetesType = userRepository.findById(userId)
-            .map(user -> user.getDiabetesType())
-            .orElse(null);
+                .map(user -> user.getDiabetesType())
+                .orElse(null);
 
         if (diabetesType == null) {
             return DEFAULT_TIR;
@@ -290,11 +297,54 @@ public class ReportService {
         private final int inRangeUpperInclusive;
         private final int highUpperInclusive;
 
-        private TirThresholds(int veryLowUpperExclusive, int lowUpperInclusive, int inRangeUpperInclusive, int highUpperInclusive) {
+        private TirThresholds(int veryLowUpperExclusive, int lowUpperInclusive, int inRangeUpperInclusive,
+                int highUpperInclusive) {
             this.veryLowUpperExclusive = veryLowUpperExclusive;
             this.lowUpperInclusive = lowUpperInclusive;
             this.inRangeUpperInclusive = inRangeUpperInclusive;
             this.highUpperInclusive = highUpperInclusive;
         }
+    }
+
+    private double calculateSensorUsagePercent(Long userId, java.time.LocalDateTime start, java.time.LocalDateTime end,
+            long recordCount) {
+        List<com.djjko.dnc.glucose.entity.Sensor> sensors = sensorRepository
+                .findAllByUser(userRepository.getReferenceById(userId));
+
+        long totalActiveMinutes = 0;
+
+        for (com.djjko.dnc.glucose.entity.Sensor sensor : sensors) {
+            java.time.LocalDateTime sensorStart = sensor.getStartedAt();
+            java.time.LocalDateTime sensorEnd = sensor.getEndedAt();
+
+            if (sensorStart == null)
+                continue;
+
+            if (sensor.getStatus() == com.djjko.dnc.glucose.entity.Sensor.SensorStatus.ACTIVE && sensorEnd == null) {
+                sensorEnd = java.time.LocalDateTime.now();
+            }
+            if (sensorEnd == null)
+                continue;
+
+            // Calculate overlap with report period
+            java.time.LocalDateTime overlapStart = sensorStart.isAfter(start) ? sensorStart : start;
+            java.time.LocalDateTime overlapEnd = sensorEnd.isBefore(end) ? sensorEnd : end;
+
+            if (overlapStart.isBefore(overlapEnd)) {
+                totalActiveMinutes += java.time.temporal.ChronoUnit.MINUTES.between(overlapStart, overlapEnd);
+            }
+        }
+
+        if (totalActiveMinutes == 0)
+            return 0.0;
+
+        // Assuming 5 minutes interval (Dexcom/CareSens standard)
+        long expectedRecords = totalActiveMinutes / 5;
+
+        if (expectedRecords == 0)
+            return 0.0;
+
+        double usage = (double) recordCount / expectedRecords * 100.0;
+        return Math.min(usage, 100.0); // Cap at 100%
     }
 }

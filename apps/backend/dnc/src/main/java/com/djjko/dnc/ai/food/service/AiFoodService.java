@@ -176,19 +176,38 @@ public class AiFoodService {
             LocalDateTime eatenAt,
             MultipartFile image,
             Double estimatedWeight) {
-        if (foodId == null || image == null || image.isEmpty()) {
+        if (foodId == null) {
             return;
         }
 
-        Optional<AiFoodDetectResult> detection = aiServerClient.analyzeFood(image);
-        String detectedName = detection.map(AiFoodDetectResult::foodName)
-                .filter(name -> name != null && !name.isBlank())
-                .orElse(null);
+        FoodRecord record = foodRecordRepository.findById(foodId).orElse(null);
+        if (record == null) {
+            return;
+        }
+
+        String detectedName = null;
+        String detectedQuantity = null;
+        Optional<AiFoodDetectResult> detection = Optional.empty();
+
+        // If foodName is already provided (by user or client), skip duplicate AI
+        // detection
+        if (record.getFoodName() != null && !record.getFoodName().isBlank()) {
+            detectedName = record.getFoodName();
+            log.info("Skipping AI detection for foodId: {} as name '{}' is provided.", foodId, detectedName);
+        } else if (image != null && !image.isEmpty()) {
+            // Only run AI if image exists and no name provided
+            detection = aiServerClient.analyzeFood(image);
+            detectedName = detection.map(AiFoodDetectResult::foodName)
+                    .filter(name -> name != null && !name.isBlank())
+                    .orElse(null);
+            detectedQuantity = detection.map(AiFoodDetectResult::quantity).orElse(null);
+        }
+
+        final String finalDetectedQuantity = detectedQuantity;
         Optional<FoodMetadata> metadata = resolveMetadata(detectedName);
-        String detectedQuantity = detection.map(AiFoodDetectResult::quantity).orElse(null);
 
         Double resolvedWeight = metadata
-                .map(result -> resolveWeight(result.getBaseWeight(), estimatedWeight, detectedQuantity))
+                .map(result -> resolveWeight(result.getBaseWeight(), estimatedWeight, finalDetectedQuantity))
                 .orElse(estimatedWeight);
 
         FoodAnalysis analysis = new FoodAnalysis();
@@ -204,8 +223,13 @@ public class AiFoodService {
         foodAnalysisRepository.save(analysis);
 
         AiFoodNutrition nutrition = metadata
-                .map(result -> toNutrition(result, estimatedWeight, detectedQuantity))
+                .map(result -> toNutrition(result, estimatedWeight, finalDetectedQuantity))
                 .orElse(null);
+
+        // If user provided specific carbs, use it for prediction (optional enhancement)
+        // For now, we rely on resolved nutrition from metadata to generate consistency
+        // in guide/prediction.
+
         Optional<List<Double>> predictionValues = fetchGlucosePrediction(userId, nutrition);
         if (predictionValues.isPresent()) {
             persistPredictions(userId, foodId, eatenAt, predictionValues.get());
@@ -214,21 +238,27 @@ public class AiFoodService {
         // Persist AI Guide
         try {
             com.djjko.dnc.auth.entity.User user = userRepository.findById(userId).orElse(null);
-            FoodRecord record = foodRecordRepository.findById(foodId).orElse(null);
+            // FoodRecord record = foodRecordRepository.findById(foodId).orElse(null); //
+            // Already fetched above
 
             if (user != null && record != null) {
-                String nutritionSummary = nutrition != null ? String.format(
-                        "- 칼로리: %d kcal\n- 탄수화물: %d g\n- 단백질: %d g\n- 지방: %d g\n- 당류: %d g\n- 나트륨: %d mg",
-                        nutrition.calories(), nutrition.carbs(), nutrition.protein(), nutrition.fat(),
-                        nutrition.sugar(), nutrition.sodium()) : "영양 성분 정보 없음";
+                // If AI Guide was provided by client, skip generation
+                if (record.getAiGuide() != null && !record.getAiGuide().isBlank()) {
+                    log.info("Skipping AI guide generation for foodId: {} as it is already provided.", foodId);
+                } else {
+                    String nutritionSummary = nutrition != null ? String.format(
+                            "- 칼로리: %d kcal\n- 탄수화물: %d g\n- 단백질: %d g\n- 지방: %d g\n- 당류: %d g\n- 나트륨: %d mg",
+                            nutrition.calories(), nutrition.carbs(), nutrition.protein(), nutrition.fat(),
+                            nutrition.sugar(), nutrition.sodium()) : "영양 성분 정보 없음";
 
-                String foodName = metadata.map(FoodMetadata::getFoodName).orElse(detectedName);
-                String foodListString = (foodName != null ? foodName : "알 수 없는 음식")
-                        + (resolvedWeight != null ? String.format(" (%.0fg)", resolvedWeight) : "");
+                    String foodName = metadata.map(FoodMetadata::getFoodName).orElse(detectedName);
+                    String foodListString = (foodName != null ? foodName : "알 수 없는 음식")
+                            + (resolvedWeight != null ? String.format(" (%.0fg)", resolvedWeight) : "");
 
-                String aiGuide = aiFoodGuideService.generateGuide(user, record, foodListString, nutritionSummary);
-                record.setAiGuide(aiGuide);
-                foodRecordRepository.save(record);
+                    String aiGuide = aiFoodGuideService.generateGuide(user, record, foodListString, nutritionSummary);
+                    record.setAiGuide(aiGuide);
+                    foodRecordRepository.save(record);
+                }
             }
         } catch (Exception e) {
             log.warn("Failed to persist AI guide: {}", e.getMessage());

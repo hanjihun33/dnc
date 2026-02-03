@@ -17,13 +17,8 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Entity
-@Table(
-    name = "monthly_reports",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uk_monthly_reports_user_month",
-        columnNames = {"user_id", "year", "month"}
-    )
-)
+@Table(name = "monthly_reports", uniqueConstraints = @UniqueConstraint(name = "uk_monthly_reports_user_month", columnNames = {
+        "user_id", "year", "month" }))
 public class MonthlyReport {
 
     @Id

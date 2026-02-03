@@ -9,8 +9,7 @@ public interface FoodRecordRepository extends JpaRepository<FoodRecord, Long> {
     List<FoodRecord> findByUserIdOrderByRecordedAtDesc(Long userId);
 
     List<FoodRecord> findAllByUserIdAndEatenAtBetween(
-        Long userId,
-        LocalDateTime start,
-        LocalDateTime end
-    );
+            Long userId,
+            LocalDateTime start,
+            LocalDateTime end);
 }

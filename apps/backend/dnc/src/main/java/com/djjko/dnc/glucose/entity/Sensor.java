@@ -29,7 +29,6 @@ public class Sensor {
 
     @Column(name = "started_at")
     private LocalDateTime startedAt;
-
     @Column(name = "ended_at")
     private LocalDateTime endedAt;
 

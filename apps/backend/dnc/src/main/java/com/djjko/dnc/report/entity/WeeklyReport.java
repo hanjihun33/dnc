@@ -18,13 +18,8 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Entity
-@Table(
-    name = "weekly_reports",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uk_weekly_reports",
-        columnNames = {"user_id", "week_start_date"}
-    )
-)
+@Table(name = "weekly_reports", uniqueConstraints = @UniqueConstraint(name = "uk_weekly_reports", columnNames = {
+        "user_id", "week_start_date" }))
 public class WeeklyReport {
 
     @Id

@@ -24,16 +24,17 @@ public class FileStorageService {
     private final String region;
     private final String publicUrl;
     private final S3Client s3Client;
+    private final software.amazon.awssdk.services.s3.presigner.S3Presigner s3Presigner;
 
     public FileStorageService(
-        @Value("${storage.type:local}") String storageType,
-        @Value("${file.upload.dir}") String uploadDir,
-        @Value("${file.upload.url-path}") String urlPath,
-        @Value("${storage.s3.bucket:}") String bucket,
-        @Value("${storage.s3.region:}") String region,
-        @Value("${storage.s3.public-url:}") String publicUrl,
-        ObjectProvider<S3Client> s3ClientProvider
-    ) {
+            @Value("${storage.type:local}") String storageType,
+            @Value("${file.upload.dir}") String uploadDir,
+            @Value("${file.upload.url-path}") String urlPath,
+            @Value("${storage.s3.bucket:}") String bucket,
+            @Value("${storage.s3.region:}") String region,
+            @Value("${storage.s3.public-url:}") String publicUrl,
+            ObjectProvider<S3Client> s3ClientProvider,
+            ObjectProvider<software.amazon.awssdk.services.s3.presigner.S3Presigner> s3PresignerProvider) {
         this.storageType = storageType;
         this.uploadDir = uploadDir;
         this.urlPath = urlPath;
@@ -41,6 +42,7 @@ public class FileStorageService {
         this.region = region;
         this.publicUrl = publicUrl;
         this.s3Client = s3ClientProvider.getIfAvailable();
+        this.s3Presigner = s3PresignerProvider.getIfAvailable();
     }
 
     public String save(MultipartFile file) {
@@ -57,6 +59,55 @@ public class FileStorageService {
         }
 
         return saveToLocal(file, prefix);
+    }
+
+    public String resolveMappedUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return null;
+        }
+
+        if ("s3".equalsIgnoreCase(storageType)) {
+            return resolveS3Url(url);
+        }
+        return url;
+    }
+
+    private String resolveS3Url(String url) {
+        if (s3Presigner == null) {
+            return url;
+        }
+
+        // Check if it's already a presigned URL or something else
+        // We only want to sign if it matches our public URL pattern
+        String baseUrl = buildPublicUrl("");
+        if (!url.startsWith(baseUrl)) {
+            // Not our managed S3 URL, return as is
+            return url;
+        }
+
+        try {
+            String key = url.substring(baseUrl.length());
+            // Generate presigned URL
+            software.amazon.awssdk.services.s3.model.GetObjectRequest getObjectRequest = software.amazon.awssdk.services.s3.model.GetObjectRequest
+                    .builder()
+                    .bucket(bucket)
+                    .key(key)
+                    .build();
+
+            software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest presignRequest = software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest
+                    .builder()
+                    .signatureDuration(java.time.Duration.ofHours(1))
+                    .getObjectRequest(getObjectRequest)
+                    .build();
+
+            software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest presignedRequest = s3Presigner
+                    .presignGetObject(presignRequest);
+
+            return presignedRequest.url().toString();
+        } catch (Exception e) {
+            // If signing fails, return original URL (fallback)
+            return url;
+        }
     }
 
     public void deleteByUrl(String url) {
@@ -106,10 +157,10 @@ public class FileStorageService {
         }
         String key = keyPrefix + UUID.randomUUID() + resolveExtension(file);
         PutObjectRequest request = PutObjectRequest.builder()
-            .bucket(bucket)
-            .key(key)
-            .contentType(file.getContentType())
-            .build();
+                .bucket(bucket)
+                .key(key)
+                .contentType(file.getContentType())
+                .build();
 
         try (InputStream inputStream = file.getInputStream()) {
             s3Client.putObject(request, RequestBody.fromInputStream(inputStream, file.getSize()));

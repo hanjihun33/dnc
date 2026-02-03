@@ -35,9 +35,11 @@ public class GeminiResponse {
     }
 
     public String getText() {
-        if (candidates == null || candidates.isEmpty()) return "";
+        if (candidates == null || candidates.isEmpty())
+            return "";
         Candidate first = candidates.get(0);
-        if (first.getContent() == null || first.getContent().getParts() == null || first.getContent().getParts().isEmpty()) {
+        if (first.getContent() == null || first.getContent().getParts() == null
+                || first.getContent().getParts().isEmpty()) {
             return "";
         }
         return first.getContent().getParts().get(0).getText();

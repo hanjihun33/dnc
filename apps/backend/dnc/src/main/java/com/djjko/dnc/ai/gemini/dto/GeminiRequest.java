@@ -26,8 +26,7 @@ public class GeminiRequest {
                 .contents(List.of(
                         Content.builder()
                                 .parts(List.of(Part.builder().text(prompt).build()))
-                                .build()
-                ))
+                                .build()))
                 .build();
     }
 }

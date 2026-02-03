@@ -24,8 +24,11 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE"
-      ]
+      ],
+      "package": "com.anonymous.testapp"
     },
     "web": {
       "output": "static",

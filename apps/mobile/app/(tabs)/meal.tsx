@@ -625,6 +625,10 @@ export default function MealScreen() {
       if (analysisSnapshot?.nutrition?.carbs != null) {
         formData.append("carbsGrams", String(analysisSnapshot.nutrition.carbs));
       }
+      // Send AI guide if available to skip re-generation on server
+      if (predictionData?.guide || editAiGuide) {
+        formData.append("aiGuide", (predictionData?.guide ?? editAiGuide ?? "").trim());
+      }
       formData.append("mealType", mealTypeMap[mealType] ?? "SNACK");
       formData.append("eatenAt", eatenAt.toISOString());
       if (memo.trim()) {
@@ -937,20 +941,20 @@ export default function MealScreen() {
       >
         <View style={[styles.headerRow, isEditMode && styles.headerRowEdit]}>
           <View style={styles.headerLeft}>
-          {isEditMode && (
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => router.back()}
-            >
-              <Text style={styles.backButtonText}>{"<"}</Text>
-            </TouchableOpacity>
-          )}
-          {isEditMode ? (
-            <Text style={styles.pageTitle}>{"\uae30\ub85d \uc218\uc815"}</Text>
-          ) : (
-            <Text style={styles.pageTitle}>{"\uc2dd\ub2e8 \uae30\ub85d"}</Text>
-          )}
-          {/*
+            {isEditMode && (
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => router.back()}
+              >
+                <Text style={styles.backButtonText}>{"<"}</Text>
+              </TouchableOpacity>
+            )}
+            {isEditMode ? (
+              <Text style={styles.pageTitle}>{"\uae30\ub85d \uc218\uc815"}</Text>
+            ) : (
+              <Text style={styles.pageTitle}>{"\uc2dd\ub2e8 \uae30\ub85d"}</Text>
+            )}
+            {/*
           <Text style={styles.pageTitle}>식사기록</Text>
           */}
           </View>
@@ -1083,16 +1087,16 @@ export default function MealScreen() {
                     predictionData.foodBox.x_min != null &&
                     predictionData.foodBox.y_min != null
                     ? {
-                        left: Math.max(
-                          8,
-                          predictionData.foodBox.x_min * imageLayout.width
-                        ),
-                        top: Math.max(
-                          8,
-                          predictionData.foodBox.y_min * imageLayout.height
-                        ),
-                        bottom: "auto",
-                      }
+                      left: Math.max(
+                        8,
+                        predictionData.foodBox.x_min * imageLayout.width
+                      ),
+                      top: Math.max(
+                        8,
+                        predictionData.foodBox.y_min * imageLayout.height
+                      ),
+                      bottom: "auto",
+                    }
                     : null,
                 ]}
               >
@@ -1176,7 +1180,7 @@ export default function MealScreen() {
                     <Text style={styles.predictionValue}>
                       {Math.round(
                         predictionData.graphData.datasets[0].data[
-                          predictionData.graphData.datasets[0].data.length - 1
+                        predictionData.graphData.datasets[0].data.length - 1
                         ]
                       )}
                     </Text>
@@ -1404,9 +1408,8 @@ export default function MealScreen() {
                       <Text style={styles.calendarNavText}>{"<"}</Text>
                     </TouchableOpacity>
                     <Text style={styles.calendarTitle}>
-                      {`${calendarMonth.getFullYear()}년 ${
-                        calendarMonth.getMonth() + 1
-                      }월`}
+                      {`${calendarMonth.getFullYear()}년 ${calendarMonth.getMonth() + 1
+                        }월`}
                     </Text>
                     <TouchableOpacity
                       style={styles.calendarNavButton}
@@ -1584,7 +1587,7 @@ export default function MealScreen() {
                             style={[
                               styles.timeItemText,
                               timeMinute === minute &&
-                                styles.timeItemTextActive,
+                              styles.timeItemTextActive,
                             ]}
                           >
                             {`${minute}`.padStart(2, "0")}

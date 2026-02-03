@@ -54,7 +54,8 @@ public class MealService {
             Double carbsGrams,
             String mealType,
             String eatenAt,
-            String memo) {
+            String memo,
+            String aiGuide) {
         FoodRecord record = new FoodRecord();
         record.setUserId(userId);
         record.setFoodName(foodName);
@@ -62,6 +63,7 @@ public class MealService {
         record.setMealType(MealType.from(mealType));
         record.setEatenAt(parseDateTime(eatenAt));
         record.setMemo(memo);
+        record.setAiGuide(aiGuide);
 
         if (image != null && !image.isEmpty()) {
             record.setImageUrl(fileStorageService.save(image));
@@ -150,6 +152,13 @@ public class MealService {
         repository.deleteById(mealId);
     }
 
+    @Transactional(readOnly = true)
+    public List<MealResponse> getMealsByRange(Long userId, LocalDateTime start, LocalDateTime end) {
+        return repository.findAllByUserIdAndEatenAtBetween(userId, start, end).stream()
+                .map(this::buildMealResponse)
+                .toList();
+    }
+
     private LocalDateTime parseDateTime(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -158,7 +167,9 @@ public class MealService {
             return LocalDateTime.parse(value);
         } catch (DateTimeParseException ex) {
             try {
-                return OffsetDateTime.parse(value).toLocalDateTime();
+                return OffsetDateTime.parse(value)
+                        .atZoneSameInstant(java.time.ZoneId.systemDefault())
+                        .toLocalDateTime();
             } catch (DateTimeParseException ignored) {
                 return null;
             }
@@ -169,6 +180,18 @@ public class MealService {
         if (record == null) {
             return null;
         }
+
+        // Resolve mapped URL (e.g., presigned URL for S3)
+        // Resolve mapped URL (e.g., presigned URL for S3)
+        String resolvedImageUrl = null;
+        if (record.getImageUrl() != null) {
+            String originalUrl = record.getImageUrl();
+            resolvedImageUrl = fileStorageService.resolveMappedUrl(originalUrl);
+            log.info("Image URL Resolution - Original: {}, Resolved: {}", originalUrl, resolvedImageUrl);
+            // record.setImageUrl(resolvedUrl); // DO NOT MODIFY ENTITY - Causes dirty check
+            // update!
+        }
+
         NutritionSummary nutrition = resolveNutrition(record);
         String resolvedFoodName = record.getFoodName();
         if ((resolvedFoodName == null || resolvedFoodName.isBlank()) && nutrition != null) {
@@ -180,7 +203,8 @@ public class MealService {
                 nutrition == null ? null : nutrition.carbs(),
                 nutrition == null ? null : nutrition.protein(),
                 nutrition == null ? null : nutrition.fat(),
-                resolvedFoodName);
+                resolvedFoodName,
+                resolvedImageUrl);
     }
 
     private NutritionSummary resolveNutrition(FoodRecord record) {
