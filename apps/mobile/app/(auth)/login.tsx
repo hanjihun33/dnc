@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadAuthSession, setAuthSession } from "@/session";
 import { registerPushTokenWithServer } from "@/push";
 import SocialLoginSection from "@/components/social-login-section";
@@ -42,6 +43,11 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // 로그인 페이지에 도착했다 = 온보딩은 이미 본 것으로 간주
+  useEffect(() => {
+    AsyncStorage.setItem('onboarding_completed', 'true');
+  }, []);
 
   const handleLogin = async () => {
     if (isSubmitting) {
