@@ -26,4 +26,6 @@ public interface GlucoseDataRepository extends JpaRepository<GlucoseData, Long> 
     boolean existsByUser_UserIdAndDexcomRecordId(Long userId, String dexcomRecordId);
 
     void deleteAllByUser_UserId(Long userId);
+
+    long countByUser_UserId(Long userId);
 }

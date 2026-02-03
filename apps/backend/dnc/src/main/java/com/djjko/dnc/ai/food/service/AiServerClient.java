@@ -61,7 +61,7 @@ public class AiServerClient {
 
             AiFoodDetectResponse response = restClient
                 .post()
-                .uri("/api/v1/ai/food/analyze")
+                .uri("/api/v1/food/predict")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(body)
                 .retrieve()
@@ -83,16 +83,16 @@ public class AiServerClient {
         try {
             AiGlucosePredictionResponse response = restClient
                 .post()
-                .uri("/api/v1/predictions")
+                .uri("/api/v1/glucose/predict")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(request)
                 .retrieve()
                 .body(AiGlucosePredictionResponse.class);
 
-            if (response == null || response.result() == null || response.result().isEmpty()) {
+            if (response == null || response.forecast() == null || response.forecast().isEmpty()) {
                 return Optional.empty();
             }
-            return Optional.of(response.result());
+            return Optional.of(response.forecast());
         } catch (RestClientException ex) {
             log.warn("AI server prediction request failed: {}", ex.getMessage());
             return Optional.empty();
@@ -103,7 +103,7 @@ public class AiServerClient {
         try {
             restClient
                 .post()
-                .uri("/api/v1/model/update")
+                .uri("/api/v1/glucose/train")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(request)
                 .retrieve()
