@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import {
   Alert,
+  BackHandler,
   Modal,
   SafeAreaView,
   ScrollView,
@@ -180,6 +181,38 @@ export default function DiagnosisScreen() {
     }, [loadProfile])
   );
 
+  const handleBack = React.useCallback(() => {
+    if (!isOnboarding) {
+      router.back();
+      return;
+    }
+    Alert.alert(
+      "건강 정보 입력",
+      "아직 필수 정보가 완료되지 않았어요. 나중에 입력하시겠어요?",
+      [
+        { text: "계속 입력", style: "cancel" },
+        { text: "나중에", onPress: () => router.replace("/(tabs)") },
+      ]
+    );
+  }, [isOnboarding, router]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!isOnboarding) {
+        return () => {};
+      }
+      const onBackPress = () => {
+        handleBack();
+        return true;
+      };
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress
+      );
+      return () => subscription.remove();
+    }, [handleBack, isOnboarding])
+  );
+
   const handleSave = async () => {
     if (isSaving) {
       return;
@@ -243,7 +276,7 @@ export default function DiagnosisScreen() {
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={handleBack}
           >
             <Text style={styles.backText}>{"<"}</Text>
           </TouchableOpacity>

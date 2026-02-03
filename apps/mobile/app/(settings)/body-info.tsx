@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import {
   Alert,
+  BackHandler,
   Modal,
   Pressable,
   SafeAreaView,
@@ -172,6 +173,38 @@ export default function BodyInfoScreen() {
     }, [loadProfile])
   );
 
+  const handleBack = React.useCallback(() => {
+    if (!isOnboarding) {
+      router.back();
+      return;
+    }
+    Alert.alert(
+      "건강 정보 입력",
+      "아직 필수 정보가 완료되지 않았어요. 나중에 입력하시겠어요?",
+      [
+        { text: "계속 입력", style: "cancel" },
+        { text: "나중에", onPress: () => router.replace("/(tabs)") },
+      ]
+    );
+  }, [isOnboarding, router]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!isOnboarding) {
+        return () => {};
+      }
+      const onBackPress = () => {
+        handleBack();
+        return true;
+      };
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress
+      );
+      return () => subscription.remove();
+    }, [handleBack, isOnboarding])
+  );
+
   const handleSave = async () => {
     if (isSaving) {
       return;
@@ -261,7 +294,7 @@ export default function BodyInfoScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.headerRow}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <Pressable style={styles.backButton} onPress={handleBack}>
             <Text style={styles.backText}>{"<"}</Text>
           </Pressable>
           <Text style={styles.pageTitle}>신체 정보 설정</Text>
