@@ -47,13 +47,12 @@ export default function LoginScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-<<<<<<< HEAD
-  // 로그인 페이지에 도착했다 = 온보딩은 이미 본 것으로 간주
+  // Mark onboarding completed once the login screen is reached.
   useEffect(() => {
-    AsyncStorage.setItem('onboarding_completed', 'true');
+    AsyncStorage.setItem("onboarding_completed", "true");
   }, []);
-=======
-  React.useEffect(() => {
+
+  useEffect(() => {
     if (!isLogoutFlow) {
       return;
     }
@@ -63,7 +62,6 @@ export default function LoginScreen() {
     );
     return () => subscription.remove();
   }, [isLogoutFlow]);
->>>>>>> develop
 
   const handleLogin = async () => {
     if (isSubmitting) {
