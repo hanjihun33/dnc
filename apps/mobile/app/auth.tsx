@@ -45,6 +45,12 @@ export default function AuthCallbackScreen() {
       setSocialLoginPending(false);
       setSocialLoginProcessing(false);
     };
+    const navigateAndClear = (target: Parameters<typeof router.replace>[0]) => {
+      router.replace(target);
+      setTimeout(() => {
+        clearSocialState();
+      }, 0);
+    };
 
     const accessToken = getParam(params.accessToken);
     const code = getParam(params.code);
@@ -133,22 +139,21 @@ export default function AuthCallbackScreen() {
       void registerPushTokenWithServer();
       const profile = await fetchProfile(tokenType, accessTokenValue);
       const target = resolveOnboardingTarget(profile);
-      clearSocialState();
       if (target === "diagnosis") {
-        router.replace({
+        navigateAndClear({
           pathname: "/(settings)/diagnosis",
           params: { onboarding: "1" },
         });
         return;
       }
       if (target === "body-info") {
-        router.replace({
+        navigateAndClear({
           pathname: "/(settings)/body-info",
           params: { onboarding: "1" },
         });
         return;
       }
-      router.replace("/(tabs)");
+      navigateAndClear("/(tabs)");
     };
 
     const completeLogin = async () => {

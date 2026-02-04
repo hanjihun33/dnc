@@ -56,9 +56,7 @@ export default function RootLayout() {
   React.useEffect(() => {
     return subscribeSocialLoginPending((value) => {
       pendingRef.current = value;
-      if (!value) {
-        setShowAuthOverlay(false);
-      }
+      setShowAuthOverlay(value);
     });
   }, []);
 

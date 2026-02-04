@@ -21,13 +21,13 @@ import {
 } from "@/alert-store";
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  border: "#E2E8F0",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  accent: "#FACC15",
-  accentInk: "#111827",
+  background: "#FAF8F0",
+  card: "#F6F1E3",
+  border: "#E7E0CC",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  accent: "#7FAF7B",
+  accentInk: "#1F2A1F",
 };
 
 const ITEM_HEIGHT = 52;
@@ -109,8 +109,8 @@ export default function AlertDetailScreen() {
               setAlertSetting(routeType, { enabled: next });
               void updateAlertSetting(routeType, { enabled: next });
             }}
-            trackColor={{ false: "#E2E8F0", true: palette.accent }}
-            thumbColor={enabled ? palette.accentInk : "#FFFFFF"}
+            trackColor={{ false: "#E7E0CC", true: palette.accent }}
+            thumbColor={enabled ? palette.accentInk : "#F6F1E3"}
           />
         </View>
 
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   pickerText: {
-    color: "#94A3B8",
+    color: "#9BA28F",
     fontSize: 18,
     fontWeight: "600",
   },
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     top: ITEM_HEIGHT * 2,
     height: ITEM_HEIGHT,
     borderRadius: 16,
-    backgroundColor: "rgba(15, 23, 42, 0.08)",
+    backgroundColor: "rgba(31, 36, 31, 0.08)",
   },
 
   listCard: {

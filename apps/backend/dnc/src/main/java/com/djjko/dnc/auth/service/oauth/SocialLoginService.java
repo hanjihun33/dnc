@@ -103,28 +103,22 @@ public class SocialLoginService {
     }
 
     private UserResolution findByEmailOrCreateAndLink(String provider, SocialUserInfo info) {
-        String email = info.email();
-        boolean hasRealEmail = email != null && !email.endsWith(".local");
-
-        if (hasRealEmail) {
-            return userRepository.findByEmail(email)
-                .map(existing -> {
-                    if (existing.getProfileImageUrl() == null || existing.getProfileImageUrl().isBlank()) {
-                        existing.setProfileImageUrl(info.profileImageUrl());
-                    }
-                    User saved = userRepository.save(existing);
-                    linkSocialAccount(saved, provider, info);
-                    return new UserResolution(saved, false);
-                })
-                .orElseGet(() -> createUser(provider, info));
-        }
-
-        return createUser(provider, info);
+        String userEmail = info.userEmail();
+        return userRepository.findByEmail(userEmail)
+            .map(existing -> {
+                if (existing.getProfileImageUrl() == null || existing.getProfileImageUrl().isBlank()) {
+                    existing.setProfileImageUrl(info.profileImageUrl());
+                }
+                User saved = userRepository.save(existing);
+                linkSocialAccount(saved, provider, info);
+                return new UserResolution(saved, false);
+            })
+            .orElseGet(() -> createUser(provider, info));
     }
 
     private UserResolution createUser(String provider, SocialUserInfo info) {
         User user = User.builder()
-            .email(info.email())
+            .email(info.userEmail())
             .password(null)
             .nickname(info.nickname())
             .name(info.name())
@@ -153,8 +147,8 @@ public class SocialLoginService {
 
     private boolean updateExistingUser(User user, SocialUserInfo info, String provider) {
         boolean updated = false;
-        if (shouldUpdateEmail(user.getEmail(), info.email())) {
-            user.setEmail(info.email());
+        if (shouldUpdateEmail(user.getEmail(), info.userEmail())) {
+            user.setEmail(info.userEmail());
             updated = true;
         }
         if (shouldUpdateNickname(user.getNickname(), info.nickname(), provider)) {
@@ -270,10 +264,8 @@ public class SocialLoginService {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Missing provider user id for " + provider);
         }
 
-        String resolvedEmail = email;
-        if (resolvedEmail == null || resolvedEmail.isBlank()) {
-            resolvedEmail = providerId + "@" + provider + ".local";
-        }
+        String resolvedEmail = normalizeEmail(email);
+        String userEmail = resolveUserEmail(provider, providerId, resolvedEmail);
 
         String resolvedNickname = nickname;
         if (resolvedNickname == null || resolvedNickname.isBlank()) {
@@ -285,7 +277,7 @@ public class SocialLoginService {
             resolvedName = resolvedNickname;
         }
 
-        return new SocialUserInfo(providerId, resolvedEmail, resolvedName, resolvedNickname, profileImageUrl);
+        return new SocialUserInfo(providerId, resolvedEmail, userEmail, resolvedName, resolvedNickname, profileImageUrl);
     }
 
     private String deriveNickname(String email, String providerId, String provider) {
@@ -296,6 +288,26 @@ public class SocialLoginService {
             }
         }
         return provider + "_" + providerId;
+    }
+
+    private String resolveUserEmail(String provider, String providerId, String email) {
+        if (email == null || email.isBlank()) {
+            return providerId + "@" + provider + ".local";
+        }
+        String normalized = email.trim();
+        String prefix = provider + "_";
+        if (normalized.startsWith(prefix)) {
+            return normalized;
+        }
+        return prefix + normalized;
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null) {
+            return null;
+        }
+        String trimmed = email.trim();
+        return trimmed.isBlank() ? null : trimmed;
     }
 
     private String getText(JsonNode node, String field) {
@@ -327,6 +339,7 @@ public class SocialLoginService {
     private record SocialUserInfo(
         String providerId,
         String email,
+        String userEmail,
         String name,
         String nickname,
         String profileImageUrl

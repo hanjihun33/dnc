@@ -37,4 +37,6 @@ public class UserProfileResponse {
     private String profileImageUrl;
     @Schema(example = "true")
     private Boolean sensorConnected;
+    @Schema(example = "local")
+    private String provider;
 }

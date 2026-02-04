@@ -15,14 +15,14 @@ import { setAuthSession } from "@/session";
 import { useSignupDraft } from "@/components/signup-context";
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  border: "#E2E8F0",
-  accent: "#FACC15",
-  accentDark: "#F59E0B",
-  ink: "#111827",
+  background: "#FAF8F0",
+  card: "#F6F1E3",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  border: "#E7E0CC",
+  accent: "#7FAF7B",
+  accentDark: "#4E7C5B",
+  ink: "#1F2A1F",
 };
 
 const API_BASE_URL =
@@ -587,7 +587,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#EFE9D9",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -629,7 +629,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     color: palette.text,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F9F5E9",
   },
   inputButton: {
     borderWidth: 1,
@@ -637,7 +637,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F9F5E9",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -657,12 +657,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: "center",
     marginRight: 10,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F9F5E9",
   },
   choiceButtonLast: { marginRight: 0 },
   choiceButtonActive: {
     backgroundColor: palette.accent,
-    borderColor: "#FDE68A",
+    borderColor: palette.accentDark,
   },
   choiceText: { color: palette.textMuted, fontWeight: "700" },
   choiceTextActive: { color: palette.ink },
@@ -679,16 +679,16 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   primaryButtonDisabled: {
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#EFE9D9",
     shadowOpacity: 0,
     elevation: 0,
   },
   primaryButtonText: { color: palette.ink, fontWeight: "800", fontSize: 16 },
-  primaryButtonTextDisabled: { color: "#94A3B8" },
-  errorText: { color: "#DC2626", fontSize: 12, marginTop: 12 },
+  primaryButtonTextDisabled: { color: "#A5AE9C" },
+  errorText: { color: "#C24A4A", fontSize: 12, marginTop: 12 },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    backgroundColor: "rgba(31, 36, 31, 0.35)",
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
@@ -724,8 +724,8 @@ const styles = StyleSheet.create({
     height: pickerItemHeight,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(250, 204, 21, 0.35)",
-    backgroundColor: "rgba(250, 204, 21, 0.12)",
+    borderColor: "rgba(127, 175, 123, 0.35)",
+    backgroundColor: "rgba(127, 175, 123, 0.16)",
   },
   pickerColumns: {
     flexDirection: "row",
@@ -745,7 +745,7 @@ const styles = StyleSheet.create({
   },
   pickerItemText: {
     fontSize: 18,
-    color: "rgba(100, 116, 139, 0.6)",
+    color: "rgba(107, 116, 102, 0.7)",
     fontWeight: "600",
   },
   pickerItemTextActive: {

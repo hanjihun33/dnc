@@ -155,7 +155,8 @@ public class UserService {
                 user.getHeightCm(),
                 user.getWeightKg(),
                 user.getProfileImageUrl(),
-                sensorConnected);
+                sensorConnected,
+                user.getProvider());
     }
 
     private boolean isSensorConnected(User user) {

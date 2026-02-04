@@ -12,12 +12,13 @@ import { useRouter } from "expo-router";
 import SocialLoginSection from "@/components/social-login-section";
 
 const palette = {
-  background: "#FFFFFF",
-  text: "#111827",
-  textMuted: "#6B7280",
-  border: "#E5E7EB",
-  email: "#F3F6F7",
-  ink: "#111827",
+  background: "#FAF8F0",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  border: "#E7E0CC",
+  email: "#F6F1E3",
+  ink: "#1F2A1F",
+  accent: "#4E7C5B",
 };
 
 const logoImage = require("@/assets/images/icon.png");
@@ -44,19 +45,18 @@ export default function AuthEntryScreen() {
         <View style={styles.buttonStack}>
           <TouchableOpacity
             style={[styles.actionButton, styles.emailButton]}
-            onPress={() => router.push("/signup")}
+            onPress={() => router.push("/login")}
           >
-            <View style={[styles.iconDot, styles.emailDot]} />
-            <Text style={styles.emailText}>이메일(아이디)로 가입하기</Text>
+            <Text style={styles.emailText}>이메일로 로그인하기</Text>
           </TouchableOpacity>
         </View>
 
         <SocialLoginSection />
 
         <View style={styles.loginRow}>
-          <Text style={styles.loginHint}>이미 계정이 있으신가요?</Text>
-          <TouchableOpacity onPress={() => router.push("/login")}>
-            <Text style={styles.loginLink}>로그인</Text>
+          <Text style={styles.loginHint}>아직 계정이 없으신가요?</Text>
+          <TouchableOpacity onPress={() => router.push("/signup")}>
+            <Text style={styles.loginLink}>가입하기</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -96,18 +96,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "transparent",
   },
-  iconDot: {
-    position: "absolute",
-    left: 18,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-  },
   emailButton: {
     backgroundColor: palette.email,
-    borderColor: "#EDF2F4",
+    borderColor: palette.border,
   },
-  emailDot: { backgroundColor: "#D1D5DB" },
   emailText: { color: palette.textMuted, fontWeight: "700", fontSize: 16 },
   loginRow: {
     flexDirection: "row",
@@ -115,5 +107,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loginHint: { color: palette.textMuted, fontSize: 13, marginRight: 6 },
-  loginLink: { color: "#4F46E5", fontSize: 13, fontWeight: "700" },
+  loginLink: { color: palette.accent, fontSize: 13, fontWeight: "700" },
 });

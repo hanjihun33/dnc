@@ -20,12 +20,12 @@ import {
 } from "@/session";
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  border: "#E2E8F0",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  accentDark: "#F59E0B",
+  background: "#FAF8F0",
+  card: "#F6F1E3",
+  border: "#E7E0CC",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  accentDark: "#4E7C5B",
 };
 
 const API_BASE_URL =
@@ -35,11 +35,12 @@ export default function AccountScreen() {
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
-  const [profileName, setProfileName] = React.useState("차지훈");
-  const [profileEmail, setProfileEmail] = React.useState("konichan7@kakao.com");
+  const [profileName, setProfileName] = React.useState("");
+  const [profileEmail, setProfileEmail] = React.useState("");
   const [profileImageUrl, setProfileImageUrl] = React.useState<string | null>(
     null
   );
+  const [isProfileLoading, setIsProfileLoading] = React.useState(true);
   const [diabetesType, setDiabetesType] = React.useState<string | null>(null);
   const [diagnosisYear, setDiagnosisYear] = React.useState<number | null>(null);
   const [diagnosisMonth, setDiagnosisMonth] = React.useState<number | null>(null);
@@ -48,6 +49,13 @@ export default function AccountScreen() {
     profileName.trim().length > 0 ? profileName.trim()[0] : "U";
 
   const loadProfile = React.useCallback(async () => {
+    setIsProfileLoading(true);
+    setProfileName("");
+    setProfileEmail("");
+    setProfileImageUrl(null);
+    setDiabetesType(null);
+    setDiagnosisYear(null);
+    setDiagnosisMonth(null);
     try {
       await loadAuthSession();
       const response = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
@@ -81,6 +89,8 @@ export default function AccountScreen() {
       setDiagnosisMonth(profile.diagnosisMonth ?? null);
     } catch {
       // Ignore profile load errors.
+    } finally {
+      setIsProfileLoading(false);
     }
   }, []);
 
@@ -135,7 +145,7 @@ export default function AccountScreen() {
     } finally {
       setIsLoggingOut(false);
       await clearAuthSession();
-      router.replace("/login");
+      router.replace("/login?from=logout");
     }
   };
 
@@ -167,7 +177,7 @@ export default function AccountScreen() {
       setIsDeleting(false);
     }
     await clearAuthSession();
-    router.replace("/login");
+    router.replace("/login?from=logout");
   };
 
   const confirmDeleteAccount = () => {
@@ -206,8 +216,14 @@ export default function AccountScreen() {
             )}
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{profileName}</Text>
-            <Text style={styles.profileEmail}>{profileEmail}</Text>
+            <Text style={styles.profileName}>
+              {isProfileLoading
+                ? "계정 정보 불러오는 중"
+                : profileName || "사용자"}
+            </Text>
+            <Text style={styles.profileEmail}>
+              {isProfileLoading ? "" : profileEmail}
+            </Text>
           </View>
           <Text style={styles.chevron}>›</Text>
         </Pressable>
@@ -275,7 +291,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#E7E0CC",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
