@@ -37,8 +37,9 @@ export default function SettingsScreen() {
   const [profileImageUrl, setProfileImageUrl] = React.useState<string | null>(
     null
   );
+  
   const [isProfileLoading, setIsProfileLoading] = React.useState(true);
-
+  const [sensorConnected, setSensorConnected] = React.useState(false);
   const initials =
     profileName.trim().length > 0 ? profileName.trim()[0] : "U";
 
@@ -67,11 +68,13 @@ export default function SettingsScreen() {
         name?: string;
         email?: string;
         profileImageUrl?: string | null;
+        sensorConnected?: boolean;
       };
       const nextName = profile.nickname || profile.name || profile.email || "";
       setProfileName(nextName);
       setProfileEmail(profile.email ?? "");
       setProfileImageUrl(profile.profileImageUrl ?? null);
+      setSensorConnected(!!profile.sensorConnected);
     } catch {
       // Ignore profile load errors.
     } finally {
@@ -140,10 +143,10 @@ export default function SettingsScreen() {
           >
             <View>
               <Text style={styles.itemTitle}>센서 연결 정보</Text>
-              <Text style={styles.itemDesc}>현재 연결된 센서 없음</Text>
+              <Text style={styles.itemDesc}>{sensorConnected ? "연동됨" : "현재 연결된 센서 없음"}</Text>
             </View>
             <View style={styles.actionPill}>
-              <Text style={styles.actionPillText}>연결하기</Text>
+              <Text style={styles.actionPillText}>{sensorConnected ? "확인하기" : "연결하기"}</Text>
             </View>
           </Pressable>
         </View>
