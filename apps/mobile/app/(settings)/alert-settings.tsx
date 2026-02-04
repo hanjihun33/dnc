@@ -22,13 +22,13 @@ import {
 } from "@/alert-store";
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  border: "#E2E8F0",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  accent: "#FACC15",
-  accentInk: "#111827",
+  background: "#FAF8F0",
+  card: "#F6F1E3",
+  border: "#E7E0CC",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  accent: "#7FAF7B",
+  accentInk: "#1F2A1F",
 };
 
 const alertRowMeta: Array<{
@@ -138,11 +138,11 @@ export default function AlertSettingsScreen() {
                 setAlertSetting("rapid-rise", { enabled: next });
                 void updateAlertSetting("rapid-rise", { enabled: next });
               }}
-              trackColor={{ false: "#E2E8F0", true: palette.accent }}
+              trackColor={{ false: "#E7E0CC", true: palette.accent }}
               thumbColor={
                 settingsSnapshot["rapid-rise"].enabled
                   ? palette.accentInk
-                  : "#FFFFFF"
+                  : "#F6F1E3"
               }
             />
           </View>

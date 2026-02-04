@@ -18,13 +18,13 @@ import {
 } from "@/session";
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  border: "#E2E8F0",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  accent: "#FACC15",
-  accentInk: "#111827",
+  background: "#FAF8F0",
+  card: "#F6F1E3",
+  border: "#E7E0CC",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  accent: "#7FAF7B",
+  accentInk: "#1F2A1F",
 };
 
 const API_BASE_URL =
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     padding: 18,
     marginBottom: 18,
-    shadowColor: "#0F172A",
+    shadowColor: "#0B1220",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#EFE8D7",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   avatarText: {
-    color: "#475569",
+    color: "#5E675A",
     fontSize: 20,
     fontWeight: "700",
   },

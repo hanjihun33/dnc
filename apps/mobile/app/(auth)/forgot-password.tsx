@@ -11,14 +11,14 @@ import {
 import { useRouter } from "expo-router";
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  border: "#E2E8F0",
-  accent: "#FACC15",
-  accentDark: "#F59E0B",
-  ink: "#111827",
+  background: "#FAF8F0",
+  card: "#F6F1E3",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  border: "#E7E0CC",
+  accent: "#7FAF7B",
+  accentDark: "#4E7C5B",
+  ink: "#1F2A1F",
 };
 
 export default function ForgotPasswordScreen() {
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#EFE9D9",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     color: palette.text,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F9F5E9",
   },
   primaryButton: {
     backgroundColor: palette.accent,

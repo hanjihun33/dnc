@@ -15,16 +15,16 @@ import { getAuthHeaders, loadAuthSession } from "@/session";
 import AiGuideText from "@/components/ai-guide-text";
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  border: "#E2E8F0",
-  accent: "#FACC15",
-  accentDark: "#F59E0B",
-  ink: "#111827",
-  navy: "#0F172A",
-  navySoft: "#1E293B",
+  background: "#FAF8F0",
+  card: "#F6F1E3",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  border: "#E7E0CC",
+  accent: "#7FAF7B",
+  accentDark: "#4E7C5B",
+  ink: "#1F2A1F",
+  navy: "#1F2A1F",
+  navySoft: "#2F3B30",
 };
 
 const API_BASE_URL =
@@ -99,7 +99,10 @@ const calcMacroPercents = (
 
 export default function MealDetailScreen() {
   const router = useRouter();
-  const { mealId } = useLocalSearchParams<{ mealId?: string }>();
+  const { mealId, from } = useLocalSearchParams<{
+    mealId?: string;
+    from?: string;
+  }>();
   const [meal, setMeal] = React.useState<MealSummary | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -198,8 +201,7 @@ export default function MealDetailScreen() {
   const timeLabel = eaten ? formatMealTime(eaten) : "--:--";
   const mealTypeLabel = getMealTypeLabel(meal?.mealType);
   const title = meal?.foodName || meal?.memo || "음식 이름 없음";
-  const caloriesText =
-    meal?.calories != null ? `${meal.calories}kcal` : "--kcal";
+  const caloriesValue = meal?.calories != null ? `${meal.calories}` : "--";
   const macroPercents = calcMacroPercents(
     meal?.carbs,
     meal?.protein,
@@ -214,27 +216,39 @@ export default function MealDetailScreen() {
     macroValues.carbPercent +
     macroValues.proteinPercent +
     macroValues.fatPercent;
-  const macroFlex =
-    macroSum > 0
-      ? [
-          macroValues.carbPercent,
-          macroValues.proteinPercent,
-          macroValues.fatPercent,
-        ]
-      : [1, 1, 1];
-  const macroLabels =
-    macroSum > 0
-      ? {
-          carbs: `${macroValues.carbPercent}%`,
-          protein: `${macroValues.proteinPercent}%`,
-          fat: `${macroValues.fatPercent}%`,
-        }
-      : { carbs: "--%", protein: "--%", fat: "--%" };
+  const macroItems = [
+    {
+      key: "carbs",
+      label: "탄수화물",
+      percent: macroSum > 0 ? macroValues.carbPercent : null,
+      color: "#8FBA8A",
+    },
+    {
+      key: "protein",
+      label: "단백질",
+      percent: macroSum > 0 ? macroValues.proteinPercent : null,
+      color: "#E7D7A9",
+    },
+    {
+      key: "fat",
+      label: "지방",
+      percent: macroSum > 0 ? macroValues.fatPercent : null,
+      color: "#A8C4E3",
+    },
+  ];
+
+  const handleBack = React.useCallback(() => {
+    if (from === "meal-list") {
+      router.replace("/(tabs)/meal-list");
+      return;
+    }
+    router.back();
+  }, [from, router]);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Pressable style={styles.headerSide} onPress={() => router.back()}>
+        <Pressable style={styles.headerSide} onPress={handleBack}>
           <Text style={styles.headerBack}>&lt;</Text>
         </Pressable>
         <Text style={styles.headerTitle}>기록 상세</Text>
@@ -254,93 +268,67 @@ export default function MealDetailScreen() {
           <Text style={styles.loadingText}>식단 정보를 불러오는 중..</Text>
         ) : (
           <>
-            <View style={styles.heroCard}>
+            <View style={styles.summarySection}>
+              {!!mealTypeLabel && (
+                <Text style={styles.summaryMealType}>{mealTypeLabel}</Text>
+              )}
+              <View style={styles.summaryCaloriesRow}>
+                <Text style={styles.summaryCalories}>{caloriesValue}</Text>
+                <Text style={styles.summaryCaloriesUnit}>kcal</Text>
+              </View>
+              <Text style={styles.summaryFoodName} numberOfLines={1}>
+                {title}
+              </Text>
+            </View>
+
+            <View style={styles.timeCard}>
+              <Text style={styles.timeLabel}>식사 시간</Text>
+              <Text style={styles.timeValue}>
+                {dateLabel} {timeLabel}
+              </Text>
+            </View>
+
+            <View style={styles.photoCard}>
               {meal.imageUrl ? (
                 <Image
                   source={{ uri: meal.imageUrl }}
-                  style={styles.heroImage}
+                  style={styles.photoImage}
                   resizeMode="cover"
                 />
               ) : (
-                <View style={styles.heroPlaceholder}>
-                  <Text style={styles.heroPlaceholderText}>IMG</Text>
+                <View style={styles.photoPlaceholder}>
+                  <Text style={styles.photoPlaceholderText}>IMG</Text>
                 </View>
               )}
-              <View style={styles.heroInfo}>
-                {!!mealTypeLabel && (
-                  <Text style={styles.mealTypeBadge}>{mealTypeLabel}</Text>
-                )}
-                <View style={styles.mealNameRow}>
-                  <Text style={styles.mealCaloriesLarge}>{caloriesText}</Text>
-                  <Text style={styles.mealNameDivider}>|</Text>
-                  <Text style={styles.mealFoodName} numberOfLines={1}>
-                    {title}
-                  </Text>
-                </View>
-                <Text style={styles.mealTimeLabel}>
-                  {dateLabel} {timeLabel}
-                </Text>
-              </View>
             </View>
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>탄단지 비율</Text>
               <View style={styles.macroCard}>
-                <View style={styles.mealMacroBar}>
-                  <View
-                    style={[
-                      styles.mealMacroSegment,
-                      { flex: macroFlex[0], backgroundColor: "#86EFAC" },
-                    ]}
-                  />
-                  <View
-                    style={[
-                      styles.mealMacroSegment,
-                      { flex: macroFlex[1], backgroundColor: "#FDE68A" },
-                    ]}
-                  />
-                  <View
-                    style={[
-                      styles.mealMacroSegment,
-                      { flex: macroFlex[2], backgroundColor: "#93C5FD" },
-                    ]}
-                  />
-                </View>
-                <View style={styles.mealMacroLegend}>
-                  <View style={styles.mealMacroItem}>
-                    <View
-                      style={[
-                        styles.mealMacroDot,
-                        { backgroundColor: "#86EFAC" },
-                      ]}
-                    />
-                    <Text style={styles.mealMacroLabel}>
-                      탄 {macroLabels.carbs}
-                    </Text>
-                  </View>
-                  <View style={styles.mealMacroItem}>
-                    <View
-                      style={[
-                        styles.mealMacroDot,
-                        { backgroundColor: "#FDE68A" },
-                      ]}
-                    />
-                    <Text style={styles.mealMacroLabel}>
-                      단 {macroLabels.protein}
-                    </Text>
-                  </View>
-                  <View style={styles.mealMacroItem}>
-                    <View
-                      style={[
-                        styles.mealMacroDot,
-                        { backgroundColor: "#93C5FD" },
-                      ]}
-                    />
-                    <Text style={styles.mealMacroLabel}>
-                      지 {macroLabels.fat}
-                    </Text>
-                  </View>
-                </View>
+                {macroItems.map((item) => {
+                  const value =
+                    item.percent == null ? null : Math.round(item.percent);
+                  const fillPercent = value == null ? 0 : value;
+                  const clamped = Math.min(100, Math.max(0, fillPercent));
+                  return (
+                    <View key={item.key} style={styles.macroRow}>
+                      <View style={styles.macroRowHeader}>
+                        <Text style={styles.macroRowLabel}>{item.label}</Text>
+                        <Text style={styles.macroRowValue}>
+                          {value == null ? "--" : `${value}%`}
+                        </Text>
+                      </View>
+                      <View style={styles.macroRowTrack}>
+                        <View
+                          style={[
+                            styles.macroRowFill,
+                            { width: `${clamped}%`, backgroundColor: item.color },
+                          ]}
+                        />
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
             </View>
 
@@ -465,7 +453,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: "rgba(148, 163, 184, 0.2)",
+    borderTopColor: "rgba(107, 116, 102, 0.2)",
     backgroundColor: palette.background,
   },
   actionButton: {
@@ -479,7 +467,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.accent,
   },
   actionButtonGhost: {
-    backgroundColor: palette.navy,
+    backgroundColor: "#E6EDD8",
   },
   actionButtonText: {
     fontSize: 16,
@@ -489,71 +477,81 @@ const styles = StyleSheet.create({
     color: palette.ink,
   },
   actionButtonTextGhost: {
-    color: "#F8FAFC",
+    color: palette.text,
   },
   actionButtonDisabled: {
     opacity: 0.6,
   },
-  heroCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#0F172A",
-    borderRadius: 22,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.2)",
+  summarySection: {
+    marginBottom: 18,
   },
-  heroImage: {
-    width: 84,
-    height: 84,
-    borderRadius: 18,
-    marginRight: 14,
-    backgroundColor: "rgba(15, 23, 42, 0.6)",
-  },
-  heroPlaceholder: {
-    width: 84,
-    height: 84,
-    borderRadius: 18,
-    marginRight: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(30, 41, 59, 0.8)",
-  },
-  heroPlaceholderText: { fontSize: 22, color: "#E2E8F0" },
-  heroInfo: {
-    flex: 1,
-  },
-  mealTypeBadge: {
-    color: "#E2E8F0",
-    fontSize: 16,
+  summaryMealType: {
+    color: palette.text,
+    fontSize: 24,
     fontWeight: "700",
   },
-  mealNameRow: {
+  summaryCaloriesRow: {
     flexDirection: "row",
     alignItems: "baseline",
-    gap: 6,
-    marginTop: 4,
+    marginTop: 10,
   },
-  mealCaloriesLarge: {
-    color: "#FACC15",
-    fontSize: 18,
+  summaryCalories: {
+    color: palette.text,
+    fontSize: 44,
     fontWeight: "800",
   },
-  mealFoodName: {
-    color: "#F8FAFC",
-    fontSize: 16,
+  summaryCaloriesUnit: {
+    color: palette.textMuted,
+    fontSize: 18,
+    marginLeft: 6,
     fontWeight: "600",
-    flex: 1,
   },
-  mealNameDivider: {
-    color: "rgba(226, 232, 240, 0.5)",
-    fontSize: 14,
+  summaryFoodName: {
+    marginTop: 6,
+    color: palette.textMuted,
+    fontSize: 15,
+    fontWeight: "600",
   },
-  mealTimeLabel: {
-    color: "rgba(226, 232, 240, 0.7)",
-    fontSize: 12,
+  timeCard: {
+    backgroundColor: palette.card,
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginBottom: 16,
+  },
+  timeLabel: {
+    color: palette.textMuted,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  timeValue: {
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: "700",
     marginTop: 6,
   },
+  photoCard: {
+    borderRadius: 24,
+    overflow: "hidden",
+    backgroundColor: palette.card,
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginBottom: 20,
+  },
+  photoImage: {
+    width: "100%",
+    height: 260,
+    backgroundColor: "rgba(31, 36, 31, 0.08)",
+  },
+  photoPlaceholder: {
+    width: "100%",
+    height: 260,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(107, 116, 102, 0.12)",
+  },
+  photoPlaceholderText: { fontSize: 28, color: palette.textMuted },
   section: {
     marginTop: 18,
   },
@@ -562,42 +560,44 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: palette.text,
     marginBottom: 8,
+    paddingLeft: 4,
   },
   macroCard: {
-    backgroundColor: "#0F172A",
+    backgroundColor: palette.card,
     borderRadius: 18,
-    padding: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: palette.border,
   },
-  mealMacroBar: {
-    height: 8,
-    borderRadius: 999,
-    overflow: "hidden",
-    backgroundColor: "rgba(148, 163, 184, 0.25)",
-    flexDirection: "row",
+  macroRow: {
+    marginBottom: 14,
   },
-  mealMacroSegment: {
-    height: "100%",
-  },
-  mealMacroLegend: {
+  macroRowHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 10,
+    marginBottom: 8,
   },
-  mealMacroItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+  macroRowLabel: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: "700",
   },
-  mealMacroDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  macroRowValue: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: "700",
   },
-  mealMacroLabel: {
-    color: "rgba(226, 232, 240, 0.8)",
-    fontSize: 12,
-    fontWeight: "600",
+  macroRowTrack: {
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: "#E7E0CC",
+    overflow: "hidden",
+  },
+  macroRowFill: {
+    height: "100%",
+    borderRadius: 999,
   },
   card: {
     backgroundColor: palette.card,
@@ -618,11 +618,11 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   aiGuideCard: {
-    backgroundColor: "#0B1220",
+    backgroundColor: palette.card,
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.18)",
+    borderColor: "rgba(107, 116, 102, 0.2)",
     overflow: "hidden",
     shadowColor: "#0B1220",
     shadowOpacity: 0.22,
@@ -637,7 +637,7 @@ const styles = StyleSheet.create({
   },
   aiGuideTitle: {
     marginTop: 12,
-    color: "#F8FAFC",
+    color: palette.text,
     fontSize: 15,
     fontWeight: "800",
   },
@@ -648,9 +648,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: "rgba(250, 204, 21, 0.18)",
+    backgroundColor: "rgba(127, 175, 123, 0.18)",
     borderWidth: 1,
-    borderColor: "rgba(250, 204, 21, 0.4)",
+    borderColor: "rgba(127, 175, 123, 0.4)",
   },
   aiChipDot: {
     width: 6,
@@ -659,19 +659,19 @@ const styles = StyleSheet.create({
     backgroundColor: palette.accentDark,
   },
   aiChipText: {
-    color: "#FDE68A",
+    color: palette.accentDark,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.6,
   },
   aiMetaText: {
-    color: "rgba(148, 163, 184, 0.8)",
+    color: "rgba(107, 116, 102, 0.8)",
     fontSize: 11,
     fontWeight: "600",
   },
   aiGuideText: {
     marginTop: 10,
-    color: "rgba(226, 232, 240, 0.92)",
+    color: palette.text,
     fontSize: 13,
     lineHeight: 20,
   },
@@ -685,26 +685,26 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#38BDF8",
-    shadowColor: "#38BDF8",
+    backgroundColor: palette.accentDark,
+    shadowColor: palette.accentDark,
     shadowOpacity: 0.8,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 0 },
   },
   aiFooterText: {
-    color: "rgba(148, 163, 184, 0.9)",
+    color: "rgba(107, 116, 102, 0.9)",
     fontSize: 12,
     fontWeight: "600",
   },
   callout: {
     marginTop: 12,
-    backgroundColor: "#FEF3C7",
+    backgroundColor: "#F0F3E1",
     borderRadius: 14,
     paddingVertical: 10,
     paddingHorizontal: 12,
   },
   calloutText: {
-    color: "#92400E",
+    color: "#4E7C5B",
     fontWeight: "700",
     fontSize: 13,
   },

@@ -13,14 +13,14 @@ import { useRouter } from "expo-router";
 import { useSignupDraft } from "@/components/signup-context";
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  border: "#E2E8F0",
-  accent: "#FACC15",
-  accentDark: "#F59E0B",
-  ink: "#111827",
+  background: "#FAF8F0",
+  card: "#F6F1E3",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  border: "#E7E0CC",
+  accent: "#7FAF7B",
+  accentDark: "#4E7C5B",
+  ink: "#1F2A1F",
 };
 
 type DiabetesStatus = "none" | "prediabetes" | "type1" | "type2";
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#EFE9D9",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F9F5E9",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -451,18 +451,18 @@ const styles = StyleSheet.create({
   inputButtonChevron: { color: palette.textMuted, fontSize: 12 },
   targetCard: {
     marginTop: 14,
-    backgroundColor: "#0F172A",
+    backgroundColor: "#E6EDD8",
     borderRadius: 16,
     padding: 14,
   },
   targetLabel: {
-    color: "rgba(226, 232, 240, 0.7)",
+    color: "#4E7C5B",
     fontSize: 12,
     fontWeight: "600",
   },
   targetValue: {
     marginTop: 6,
-    color: "#F8FAFC",
+    color: "#1F2A1F",
     fontSize: 18,
     fontWeight: "800",
   },
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: palette.ink, fontWeight: "800", fontSize: 16 },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    backgroundColor: "rgba(31, 36, 31, 0.35)",
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
@@ -517,8 +517,8 @@ const styles = StyleSheet.create({
     height: pickerItemHeight,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(250, 204, 21, 0.35)",
-    backgroundColor: "rgba(250, 204, 21, 0.12)",
+    borderColor: "rgba(127, 175, 123, 0.35)",
+    backgroundColor: "rgba(127, 175, 123, 0.16)",
   },
   pickerColumns: {
     flexDirection: "row",
@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
   },
   pickerItemText: {
     fontSize: 18,
-    color: "rgba(100, 116, 139, 0.6)",
+    color: "rgba(107, 116, 102, 0.7)",
     fontWeight: "600",
   },
   pickerItemTextActive: {

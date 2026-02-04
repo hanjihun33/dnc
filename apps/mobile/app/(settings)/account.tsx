@@ -20,12 +20,12 @@ import {
 } from "@/session";
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  border: "#E2E8F0",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  accentDark: "#F59E0B",
+  background: "#FAF8F0",
+  card: "#F6F1E3",
+  border: "#E7E0CC",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  accentDark: "#4E7C5B",
 };
 
 const API_BASE_URL =
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#E7E0CC",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",

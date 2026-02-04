@@ -21,14 +21,14 @@ import {
 } from "@/session";
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  border: "#E2E8F0",
-  accent: "#FACC15",
-  accentDark: "#F59E0B",
-  ink: "#111827",
+  background: "#FAF8F0",
+  card: "#F6F1E3",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  border: "#E7E0CC",
+  accent: "#7FAF7B",
+  accentDark: "#4E7C5B",
+  ink: "#1F2A1F",
 };
 
 const API_BASE_URL =
@@ -547,7 +547,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#E7E0CC",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     color: palette.text,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#FAF8F0",
   },
   inputButton: {
     borderWidth: 1,
@@ -584,7 +584,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#FAF8F0",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -604,11 +604,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#FAF8F0",
   },
   choiceButtonActive: {
     backgroundColor: palette.accent,
-    borderColor: "#FDE68A",
+    borderColor: "#E7D7A9",
   },
   choiceText: { color: palette.textMuted, fontWeight: "700" },
   choiceTextActive: { color: palette.ink },
@@ -625,15 +625,15 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   primaryButtonDisabled: {
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#E7E0CC",
     shadowOpacity: 0,
     elevation: 0,
   },
   primaryButtonText: { color: palette.ink, fontWeight: "800", fontSize: 16 },
-  primaryButtonTextDisabled: { color: "#94A3B8" },
+  primaryButtonTextDisabled: { color: "#9BA28F" },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    backgroundColor: "rgba(31, 36, 31, 0.35)",
     alignItems: "center",
     justifyContent: "center",
     padding: 20,

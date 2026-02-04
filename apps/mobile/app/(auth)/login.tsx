@@ -15,14 +15,14 @@ import { registerPushTokenWithServer } from "@/push";
 import SocialLoginSection from "@/components/social-login-section";
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  border: "#E2E8F0",
-  accent: "#FACC15",
-  accentDark: "#F59E0B",
-  ink: "#111827",
+  background: "#FAF8F0",
+  card: "#F6F1E3",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  border: "#E7E0CC",
+  accent: "#7FAF7B",
+  accentDark: "#4E7C5B",
+  ink: "#1F2A1F",
 };
 
 const API_BASE_URL =
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#EFE9D9",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     color: palette.text,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F9F5E9",
   },
   primaryButton: {
     backgroundColor: palette.accent,
@@ -264,12 +264,12 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   primaryButtonDisabled: {
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#EFE9D9",
     shadowOpacity: 0,
     elevation: 0,
   },
   primaryButtonText: { color: palette.ink, fontWeight: "800", fontSize: 16 },
-  primaryButtonTextDisabled: { color: "#94A3B8" },
+  primaryButtonTextDisabled: { color: "#A5AE9C" },
   helperRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -277,5 +277,5 @@ const styles = StyleSheet.create({
   },
   helperText: { color: palette.textMuted, fontSize: 12, fontWeight: "600" },
   helperTextAccent: { color: palette.accentDark, fontSize: 12, fontWeight: "700" },
-  errorText: { color: "#DC2626", fontSize: 12, marginBottom: 8 },
+  errorText: { color: "#C24A4A", fontSize: 12, marginBottom: 8 },
 });
