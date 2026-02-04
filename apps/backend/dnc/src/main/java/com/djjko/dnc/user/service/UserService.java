@@ -27,12 +27,11 @@ public class UserService {
     private final OAuthTokenRepository oauthTokenRepository;
 
     public UserService(
-        UserRepository userRepository,
-        FileStorageService fileStorageService,
-        PasswordEncoder passwordEncoder,
-        SensorRepository sensorRepository,
-        OAuthTokenRepository oauthTokenRepository
-    ) {
+            UserRepository userRepository,
+            FileStorageService fileStorageService,
+            PasswordEncoder passwordEncoder,
+            SensorRepository sensorRepository,
+            OAuthTokenRepository oauthTokenRepository) {
         this.userRepository = userRepository;
         this.fileStorageService = fileStorageService;
         this.passwordEncoder = passwordEncoder;
@@ -119,7 +118,8 @@ public class UserService {
         User user = findUser(userId);
 
         if (!"local".equalsIgnoreCase(user.getProvider())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password change is only available for local accounts");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Password change is only available for local accounts");
         }
 
         if (user.getPassword() == null || !passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
@@ -127,60 +127,62 @@ public class UserService {
         }
 
         if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New password must be different from the current password");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "New password must be different from the current password");
         }
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
     }
 
-
     private User findUser(Long userId) {
         return userRepository.findById(userId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     }
 
     private UserProfileResponse toResponse(User user) {
         boolean sensorConnected = isSensorConnected(user);
         return new UserProfileResponse(
-            user.getUserId(),
-            user.getEmail(),
-            user.getNickname(),
-            user.getName(),
-            user.getBirthDate(),
-            user.getDiabetesType(),
-            user.getDiagnosisYear(),
-            user.getDiagnosisMonth(),
-            user.getGender(),
-            user.getHeightCm(),
-            user.getWeightKg(),
-            user.getProfileImageUrl(),
-            sensorConnected
-        );
+                user.getUserId(),
+                user.getEmail(),
+                user.getNickname(),
+                user.getName(),
+                user.getBirthDate(),
+                user.getDiabetesType(),
+                user.getDiagnosisYear(),
+                user.getDiagnosisMonth(),
+                user.getGender(),
+                user.getHeightCm(),
+                user.getWeightKg(),
+                user.getProfileImageUrl(),
+                sensorConnected);
     }
 
     private boolean isSensorConnected(User user) {
-        boolean hasActiveSensor = sensorRepository.findByUserAndStatus(user, Sensor.SensorStatus.ACTIVE)
-            .map(sensor -> {
-                LocalDateTime startedAt = sensor.getStartedAt();
-                if (startedAt == null) return false;
-                LocalDateTime now = LocalDateTime.now();
-                if (now.isBefore(startedAt)) return false;
-                LocalDateTime endedAt = sensor.getEndedAt();
-                return endedAt == null || !now.isAfter(endedAt);
-            })
-            .orElse(false);
+        boolean hasActiveSensor = sensorRepository
+                .findFirstByUserAndStatusOrderByStartedAtDesc(user, Sensor.SensorStatus.ACTIVE)
+                .map(sensor -> {
+                    LocalDateTime startedAt = sensor.getStartedAt();
+                    if (startedAt == null)
+                        return false;
+                    LocalDateTime now = LocalDateTime.now();
+                    if (now.isBefore(startedAt))
+                        return false;
+                    LocalDateTime endedAt = sensor.getEndedAt();
+                    return endedAt == null || !now.isAfter(endedAt);
+                })
+                .orElse(false);
         if (hasActiveSensor) {
             return true;
         }
 
         return oauthTokenRepository.findByUserUserIdAndProvider(user.getUserId(), "dexcom")
-            .map(token -> {
-                String accessToken = token.getAccessToken();
-                String refreshToken = token.getRefreshToken();
-                return (accessToken != null && !accessToken.isBlank())
-                    || (refreshToken != null && !refreshToken.isBlank());
-            })
-            .orElse(false);
+                .map(token -> {
+                    String accessToken = token.getAccessToken();
+                    String refreshToken = token.getRefreshToken();
+                    return (accessToken != null && !accessToken.isBlank())
+                            || (refreshToken != null && !refreshToken.isBlank());
+                })
+                .orElse(false);
     }
 }

@@ -157,7 +157,7 @@ CREATE TABLE sensors (
     user_id      BIGINT NOT NULL,
     device_id    VARCHAR(100) NULL,
     provider     VARCHAR(50)  NULL,
-    status       ENUM('ACTIVE','INACTIVE','EXPIRED') NOT NULL DEFAULT 'INACTIVE',
+    status       ENUM('ACTIVE','INACTIVE','EXPIRED','PENDING') NOT NULL DEFAULT 'INACTIVE',
     started_at   TIMESTAMP NULL,
     ended_at     TIMESTAMP NULL,
     created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -186,7 +186,7 @@ CREATE TABLE glucose_data (
     measured_at       TIMESTAMP NOT NULL,
     created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (glucose_id),
-    UNIQUE KEY uk_glucose_dexcom_id (dexcom_record_id),
+    UNIQUE KEY uk_user_glucose_dexcom (user_id, dexcom_record_id),
     KEY idx_glucose_user_time (user_id, measured_at),
     CONSTRAINT fk_glucose_user
         FOREIGN KEY (user_id) REFERENCES users (user_id)

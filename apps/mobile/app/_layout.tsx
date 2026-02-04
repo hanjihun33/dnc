@@ -97,13 +97,13 @@ export default function RootLayout() {
               <Stack.Screen name="(settings)" options={{ headerShown: false }} />
               <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
             </Stack>
-            
-            {(showAuthOverlay || showProcessingOverlay) && (
+
+            {/* {(showAuthOverlay || showProcessingOverlay) && (
               <View style={styles.authOverlay} pointerEvents="auto">
                 <ActivityIndicator size="large" color="#F59E0B" />
                 <Text style={styles.authOverlayText}>로그인 처리 중입니다</Text>
               </View>
-            )}
+            )} */}
           </>
         ) : (
           <View style={styles.bootSplash} />

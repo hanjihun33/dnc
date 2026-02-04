@@ -219,7 +219,7 @@ export default function ReportScreen() {
     if (isCurrent) mainTitle = "현재 센서";
     else if (isPending) mainTitle = "센서 예열 중";
 
-    const subTitle = isPending ? "데이터 수집 대기 중..." : `${startStr} ~ ${endStr}`;
+    const subTitle = isPending ? "혈당 데이터 수집 대기 중..." : `${startStr} ~ ${endStr}`;
 
     return { title: mainTitle, subtitle: subTitle, isPending };
   }, [sensors, currentIndex]);
@@ -254,7 +254,7 @@ export default function ReportScreen() {
           <ActivityIndicator size="large" color={palette.accent} style={{ marginBottom: 20 }} />
           <Text style={styles.emptyTitle}>센서가 연결되었습니다!</Text>
           <Text style={[styles.emptySubtitle, { maxWidth: '80%' }]}>
-            현재 첫 혈당 데이터를 수집하기 위해 대기 중입니다.{"\n"}
+            혈당 데이터를 수집하기 위해 대기 중입니다.{"\n"}
             (최대 30분 ~ 2시간 소요)
           </Text>
           <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: palette.background, borderWidth: 1, borderColor: palette.border }]} onPress={onRefresh}>
