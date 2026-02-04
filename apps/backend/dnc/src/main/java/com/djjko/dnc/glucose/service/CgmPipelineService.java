@@ -77,24 +77,29 @@ public class CgmPipelineService {
     /**
      * 스케줄러가 호출할 실시간 데이터 수집 메서드
      */
+    @Transactional
     public void fetchLatestDataForUser(User user) {
         if (user.getDexcomUserId() == null || user.getDexcomUserId().isBlank()) {
             return; // 연동 안 된 유저는 건너뜀
         }
 
         LocalDateTime now = LocalDateTime.now();
-        // 덱스콤 서버의 가장 끝부분인 1시간 전 지점에서 가져옴
-        LocalDateTime startPoint = now.minusMinutes(65);
-        LocalDateTime endPoint = now.minusMinutes(55);
+        // [변경] 너무 좁은 윈도우는 데이터를 놓칠 수 있어 3시간~현재로 가동 범위를 설정합니다.
+        // 중복 체크 로직이 있으므로 안전하게 최근 데이터를 가져옵니다.
+        LocalDateTime startPoint = now.minusHours(3);
+        LocalDateTime endPoint = now;
 
         try {
             DexcomResponse egvResponse = executeWithTokenRefresh(user,
                     (token) -> dexcomApiClient.getEgvs(token, startPoint, endPoint));
 
             if (egvResponse != null && egvResponse.getRecords() != null && !egvResponse.getRecords().isEmpty()) {
-                log.info("   -> [혈당] {}건 실시간 저장 시작 (User: {})", egvResponse.getRecords().size(), user.getNickname());
+                log.info("   -> [혈당] {}건 수집됨 - Redis 버퍼링 및 DB 동기화 시작 (User: {})", egvResponse.getRecords().size(),
+                        user.getNickname());
                 this.bufferCgmData(user, egvResponse);
                 this.syncBufferToDb(user, true);
+            } else {
+                log.info("   -> [혈당] 새로운 데이터 없음 (User: {})", user.getNickname());
             }
         } catch (Exception e) {
             log.error("실시간 데이터 수집 중 사용자 {} 처리 실패: {}", user.getUserId(), e.getMessage());
@@ -182,6 +187,7 @@ public class CgmPipelineService {
         String userId = String.valueOf(user.getUserId());
         String redisKey = "cgm:buffer:" + userId;
         long count = 0;
+        long skipped = 0;
 
         while (true) {
             Object data = redisTemplate.opsForList().leftPop(redisKey);
@@ -189,21 +195,24 @@ public class CgmPipelineService {
                 break;
 
             DexcomResponse.Record record = objectMapper.convertValue(data, DexcomResponse.Record.class);
-            saveOneRecordToDb(user, record, evaluateAlerts);
-            count++;
+            if (saveOneRecordToDb(user, record, evaluateAlerts)) {
+                count++;
+            } else {
+                skipped++;
+            }
         }
-        if (count > 0) {
-            log.info("DB 동기화 완료 (User ID={}): {}건", user.getUserId(), count);
-        }
+        log.info("DB 동기화 완료 (User ID={}): 저장 {}건 / 스킵 {}건", user.getUserId(), count, skipped);
     }
 
     /**
      * 3. 단일 혈당 레코드 저장 (User 격리 저장)
      */
-    public void saveOneRecordToDb(User user, DexcomResponse.Record record, boolean evaluateAlerts) {
+    public boolean saveOneRecordToDb(User user, DexcomResponse.Record record, boolean evaluateAlerts) {
         // 중복 데이터 방지 (User + RecordID 복합 체크)
         if (glucoseDataRepository.existsByUser_UserIdAndDexcomRecordId(user.getUserId(), record.getRecordId())) {
-            return;
+            // log.info("중복 데이터 스킵 (User {}, Record {})", user.getUserId(),
+            // record.getRecordId());
+            return false;
         }
 
         // 활성 센서 찾기 또는 교체 로직
@@ -220,6 +229,7 @@ public class CgmPipelineService {
                 log.warn("혈당 알림 처리 실패 (User: {}): {}", user.getNickname(), e.getMessage());
             }
         }
+        return true;
     }
 
     private Sensor getOrRotateSensor(User user, DexcomResponse.Record record) {
@@ -227,9 +237,25 @@ public class CgmPipelineService {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime endsAt = now.plusDays(10);
 
-        // 현재 ACTIVE 상태인 동일 기기 확인
-        return sensorRepository.findByDeviceIdAndStatus(incomingDeviceId, Sensor.SensorStatus.ACTIVE)
+        // 현재 ACTIVE 상태인 동일 기기 확인 (User 조건 추가)
+        return sensorRepository
+                .findFirstByUserAndDeviceIdAndStatusOrderByStartedAtDesc(user, incomingDeviceId,
+                        Sensor.SensorStatus.ACTIVE)
                 .map(activeSensor -> {
+                    // [Self-Healing] 혹시라도 ACTIVE 센서가 여러 개라면 정리
+                    java.util.List<Sensor> activeSensors = sensorRepository.findAllByUserAndStatus(user,
+                            Sensor.SensorStatus.ACTIVE);
+                    if (activeSensors.size() > 1) {
+                        log.info("중복 ACTIVE 센서 발견 ({}개), 자가 치유 시작: User {}", activeSensors.size(), user.getUserId());
+                        activeSensors.stream()
+                                .filter(s -> !s.getSensorId().equals(activeSensor.getSensorId()))
+                                .forEach(s -> {
+                                    s.changeStatus(Sensor.SensorStatus.INACTIVE);
+                                    s.updateEndedAt(now);
+                                });
+                        sensorRepository.saveAll(activeSensors);
+                    }
+
                     if (activeSensor.getStartedAt() == null || activeSensor.getEndedAt() == null) {
                         LocalDateTime start = activeSensor.getStartedAt() != null
                                 ? activeSensor.getStartedAt()
@@ -243,10 +269,21 @@ public class CgmPipelineService {
                     return activeSensor;
                 })
                 .orElseGet(() -> {
+                    // [Added] PENDING 상태 센서가 있다면 활성화
+                    java.util.Optional<Sensor> pendingSensor = sensorRepository
+                            .findFirstByUserAndStatusOrderByStartedAtDesc(user,
+                                    Sensor.SensorStatus.PENDING);
+                    if (pendingSensor.isPresent()) {
+                        Sensor sensor = pendingSensor.get();
+                        log.info("PENDING 센서 활성화: User {}, Device {}", user.getUserId(), incomingDeviceId);
+                        sensor.activate(incomingDeviceId);
+                        return sensorRepository.save(sensor);
+                    }
+
                     log.info("새로운 센서 연결 또는 재연결 감지: {}", incomingDeviceId);
 
                     // 기존 활성 센서가 있다면 은퇴 처리 (기기 변경 등의 경우)
-                    sensorRepository.findByUserAndStatus(user, Sensor.SensorStatus.ACTIVE)
+                    sensorRepository.findFirstByUserAndStatusOrderByStartedAtDesc(user, Sensor.SensorStatus.ACTIVE)
                             .ifPresent(oldSensor -> {
                                 oldSensor.changeStatus(Sensor.SensorStatus.INACTIVE);
                                 oldSensor.updateEndedAt(now);
