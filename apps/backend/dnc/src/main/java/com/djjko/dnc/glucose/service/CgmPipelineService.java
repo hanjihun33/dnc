@@ -227,8 +227,8 @@ public class CgmPipelineService {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime endsAt = now.plusDays(10);
 
-        // 현재 ACTIVE 상태인 동일 기기 확인
-        return sensorRepository.findByDeviceIdAndStatus(incomingDeviceId, Sensor.SensorStatus.ACTIVE)
+        // 현재 ACTIVE 상태인 동일 기기 확인 (User 조건 추가)
+        return sensorRepository.findByUserAndDeviceIdAndStatus(user, incomingDeviceId, Sensor.SensorStatus.ACTIVE)
                 .map(activeSensor -> {
                     if (activeSensor.getStartedAt() == null || activeSensor.getEndedAt() == null) {
                         LocalDateTime start = activeSensor.getStartedAt() != null

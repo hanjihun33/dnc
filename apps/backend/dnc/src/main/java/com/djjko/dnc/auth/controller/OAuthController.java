@@ -159,13 +159,13 @@ public class OAuthController {
                         log.warn("PENDING 센서 생성 실패: {}", e.getMessage());
                     }
 
-                    // 2. 즉시 데이터 동기화 시도
-                    try {
-                        cgmPipelineService.fetchLatestDataForUser(user);
-                        log.info("Dexcom 연동 즉시 데이터 동기화 완료: User {}", user.getUserId());
-                    } catch (Exception e) {
-                        log.warn("Dexcom 연동 후 즉시 동기화 실패 (스케줄러가 처리 예정): {}", e.getMessage());
-                    }
+                    // 2. 즉시 데이터 동기화 시도 (예열 상태 확인을 위해 주석 처리)
+                    // try {
+                    // cgmPipelineService.fetchLatestDataForUser(user);
+                    // log.info("Dexcom 연동 즉시 데이터 동기화 완료: User {}", user.getUserId());
+                    // } catch (Exception e) {
+                    // log.warn("Dexcom 연동 후 즉시 동기화 실패 (스케줄러가 처리 예정): {}", e.getMessage());
+                    // }
                 }
             } else {
                 log.warn("OAuth callback could not resolve user. provider={} statePresent={}", provider,

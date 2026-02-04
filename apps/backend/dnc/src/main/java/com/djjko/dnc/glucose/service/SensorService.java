@@ -23,7 +23,11 @@ public class SensorService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        return sensorRepository.findByUserAndStatus(user, Sensor.SensorStatus.ACTIVE)
+        Optional<Sensor> activeSensor = sensorRepository.findByUserAndStatus(user, Sensor.SensorStatus.ACTIVE);
+        if (activeSensor.isPresent()) {
+            return activeSensor.map(SensorResponse::from);
+        }
+        return sensorRepository.findByUserAndStatus(user, Sensor.SensorStatus.PENDING)
                 .map(SensorResponse::from);
     }
 
@@ -37,11 +41,14 @@ public class SensorService {
                 .map(SensorResponse::from)
                 .toList();
     }
+
     @Transactional
-    public void createPendingSensor(User user) {
+    public
+
+    void createPendingSensor(User user) {
         boolean hasActiveOrPending = sensorRepository.findByUserAndStatus(user, Sensor.SensorStatus.ACTIVE).isPresent()
-            || sensorRepository.findByUserAndStatus(user, Sensor.SensorStatus.PENDING).isPresent();
-        
+                || sensorRepository.findByUserAndStatus(user, Sensor.SensorStatus.PENDING).isPresent();
+
         if (hasActiveOrPending) {
             return;
         }
