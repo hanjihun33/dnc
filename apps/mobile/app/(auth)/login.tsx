@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  BackHandler,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -8,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { loadAuthSession, setAuthSession } from "@/session";
 import { registerPushTokenWithServer } from "@/push";
 import SocialLoginSection from "@/components/social-login-section";
@@ -38,10 +39,23 @@ const parseErrorMessage = async (response: Response) => {
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { from } = useLocalSearchParams<{ from?: string }>();
+  const isLogoutFlow = from === "logout";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!isLogoutFlow) {
+      return;
+    }
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => true
+    );
+    return () => subscription.remove();
+  }, [isLogoutFlow]);
 
   const handleLogin = async () => {
     if (isSubmitting) {
@@ -113,12 +127,16 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.headerRow}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.backText}>{"<"}</Text>
-          </TouchableOpacity>
+          {isLogoutFlow ? (
+            <View style={styles.backSpacer} />
+          ) : (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.backText}>{"<"}</Text>
+            </TouchableOpacity>
+          )}
           <Text style={styles.pageTitle}>일반 로그인</Text>
           <View style={styles.backSpacer} />
         </View>
