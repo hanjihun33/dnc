@@ -18,13 +18,13 @@ import {
 } from "@/session";
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  border: "#E2E8F0",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  accent: "#FACC15",
-  accentInk: "#111827",
+  background: "#FAF8F0",
+  card: "#F6F1E3",
+  border: "#E7E0CC",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  accent: "#7FAF7B",
+  accentInk: "#1F2A1F",
 };
 
 const API_BASE_URL =
@@ -32,17 +32,22 @@ const API_BASE_URL =
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const [profileName, setProfileName] = React.useState("차지훈");
-  const [profileEmail, setProfileEmail] = React.useState("konichan7@kakao.com");
+  const [profileName, setProfileName] = React.useState("");
+  const [profileEmail, setProfileEmail] = React.useState("");
   const [profileImageUrl, setProfileImageUrl] = React.useState<string | null>(
     null
   );
+  
+  const [isProfileLoading, setIsProfileLoading] = React.useState(true);
   const [sensorConnected, setSensorConnected] = React.useState(false);
-
   const initials =
     profileName.trim().length > 0 ? profileName.trim()[0] : "U";
 
   const loadProfile = React.useCallback(async () => {
+    setIsProfileLoading(true);
+    setProfileName("");
+    setProfileEmail("");
+    setProfileImageUrl(null);
     try {
       await loadAuthSession();
       const response = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
@@ -72,6 +77,8 @@ export default function SettingsScreen() {
       setSensorConnected(!!profile.sensorConnected);
     } catch {
       // Ignore profile load errors.
+    } finally {
+      setIsProfileLoading(false);
     }
   }, []);
 
@@ -115,8 +122,14 @@ export default function SettingsScreen() {
               )}
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{profileName}</Text>
-              <Text style={styles.profileEmail}>{profileEmail}</Text>
+              <Text style={styles.profileName}>
+                {isProfileLoading
+                  ? "계정 정보 불러오는 중"
+                  : profileName || "사용자"}
+              </Text>
+              <Text style={styles.profileEmail}>
+                {isProfileLoading ? "" : profileEmail}
+              </Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </Pressable>
@@ -174,7 +187,7 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     padding: 18,
     marginBottom: 18,
-    shadowColor: "#0F172A",
+    shadowColor: "#0B1220",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
@@ -188,7 +201,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#EFE8D7",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -198,7 +211,7 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   avatarText: {
-    color: "#475569",
+    color: "#5E675A",
     fontSize: 20,
     fontWeight: "700",
   },

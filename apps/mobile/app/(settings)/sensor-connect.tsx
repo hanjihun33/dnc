@@ -24,15 +24,15 @@ import {
 } from "@/session";
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  border: "#E2E8F0",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  accent: "#FACC15",
+  background: "#FAF8F0",
+  card: "#F6F1E3",
+  border: "#E7E0CC",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  accent: "#7FAF7B",
   danger: "#EF4444",
   dangerSoft: "#FEE2E2",
-  overlayBackdrop: "rgba(15, 23, 42, 0.25)",
+  overlayBackdrop: "rgba(31, 36, 31, 0.25)",
 };
 
 const API_BASE_URL =
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     paddingVertical: 24,
     paddingHorizontal: 20,
-    shadowColor: "#0F172A",
+    shadowColor: "#1F241F",
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.08,
     shadowRadius: 18,
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
     height: 52,
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#E7E0CC",
   },
   deviceBody: {
     width: 86,
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
     width: 90,
     height: 18,
     borderRadius: 9,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#E7E0CC",
     marginTop: -6,
   },
   sensorName: {
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
     maxWidth: 280,
     borderWidth: 1,
     borderColor: palette.border,
-    shadowColor: "#0F172A",
+    shadowColor: "#1F241F",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.16,
     shadowRadius: 12,

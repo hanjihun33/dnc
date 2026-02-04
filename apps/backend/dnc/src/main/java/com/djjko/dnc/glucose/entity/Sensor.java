@@ -33,7 +33,7 @@ public class Sensor {
     private LocalDateTime endedAt;
 
     public enum SensorStatus {
-        ACTIVE, INACTIVE, EXPIRED
+        ACTIVE, INACTIVE, EXPIRED, PENDING
     }
 
     public void changeStatus(SensorStatus newStatus) {
@@ -47,5 +47,10 @@ public class Sensor {
 
     public void updateEndedAt(LocalDateTime endedAt) {
         this.endedAt = endedAt;
+    }
+
+    public void activate(String deviceId) {
+        this.deviceId = deviceId;
+        this.status = SensorStatus.ACTIVE;
     }
 }

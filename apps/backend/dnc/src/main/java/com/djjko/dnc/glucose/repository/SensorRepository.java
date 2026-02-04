@@ -10,8 +10,11 @@ public interface SensorRepository extends JpaRepository<Sensor, Long> {
     // 기기 시리얼 번호로 센서 찾기
     Optional<Sensor> findByDeviceId(String deviceId);
 
-    // 특정 유저의 활성 상태인 센서 찾기
-    Optional<Sensor> findByUserAndStatus(User user, Sensor.SensorStatus status);
+    // 특정 유저의 활성 상태인 센서 중 가장 최근 것 찾기
+    java.util.Optional<Sensor> findFirstByUserAndStatusOrderByStartedAtDesc(User user, Sensor.SensorStatus status);
+
+    java.util.Optional<Sensor> findFirstByUserAndDeviceIdAndStatusOrderByStartedAtDesc(User user, String deviceId,
+            Sensor.SensorStatus status);
 
     Optional<Sensor> findByDeviceIdAndStatus(String deviceId, Sensor.SensorStatus status);
 
@@ -24,4 +27,6 @@ public interface SensorRepository extends JpaRepository<Sensor, Long> {
     void deleteAllByUser_UserId(Long userId);
 
     List<Sensor> findAllByUserOrderByStartedAtDesc(User user);
+
+    Optional<Sensor> findByUserAndDeviceIdAndStatus(User user, String deviceId, Sensor.SensorStatus status);
 }
