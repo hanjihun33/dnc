@@ -178,6 +178,10 @@ public class SocialLoginController {
             + newUser;
     }
 
+    private String buildAppRedirectUrl(SocialLoginResponse response) {
+        return buildRedirectUrl(response, appRedirectUri);
+    }
+
     private String resolveState(String state, String platform) {
         String baseState = (state == null || state.isBlank())
             ? UUID.randomUUID().toString()
