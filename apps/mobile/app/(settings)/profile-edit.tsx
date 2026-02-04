@@ -21,13 +21,13 @@ import {
 } from "@/session";
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  border: "#E2E8F0",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  accent: "#FACC15",
-  accentInk: "#111827",
+  background: "#FAF8F0",
+  card: "#F6F1E3",
+  border: "#E7E0CC",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  accent: "#7FAF7B",
+  accentInk: "#1F2A1F",
 };
 
 const API_BASE_URL =
@@ -47,7 +47,7 @@ export default function ProfileEditScreen() {
   const [isSaving, setIsSaving] = React.useState(false);
   const [provider, setProvider] = React.useState<string | null>(null);
   const [avatarIndex, setAvatarIndex] = React.useState(0);
-  const avatarColors = ["#E2E8F0", "#FDE68A", "#FECACA", "#BFDBFE"];
+  const avatarColors = ["#E7E0CC", "#E7D7A9", "#FECACA", "#BFDBFE"];
   const initials = nickname.trim().length > 0 ? nickname.trim()[0] : "U";
   const normalizedProvider = provider?.trim().toLowerCase() ?? null;
   const isSocialAccount = normalizedProvider != null && normalizedProvider !== "local";
@@ -301,7 +301,7 @@ export default function ProfileEditScreen() {
               value={nickname}
               onChangeText={setNickname}
               placeholder="닉네임 입력"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor="#9BA28F"
               style={styles.input}
             />
           </View>
@@ -329,13 +329,9 @@ export default function ProfileEditScreen() {
             <TextInput
               value={password}
               onChangeText={setPassword}
-              placeholder={
-                isSocialAccount
-                  ? "소셜 로그인 계정은 비밀번호 변경 불가"
-                  : "8자 이상 입력"
-              }
+              placeholder="8자 이상 입력"
               placeholderTextColor="#94A3B8"
-              style={[styles.input, isSocialAccount && styles.inputDisabled]}
+              style={styles.input}
               secureTextEntry
               autoCapitalize="none"
               editable={!isSocialAccount}
@@ -347,13 +343,9 @@ export default function ProfileEditScreen() {
             <TextInput
               value={passwordConfirm}
               onChangeText={setPasswordConfirm}
-              placeholder={
-                isSocialAccount
-                  ? "소셜 로그인 계정은 비밀번호 변경 불가"
-                  : "비밀번호 다시 입력"
-              }
+              placeholder="비밀번호 다시 입력"
               placeholderTextColor="#94A3B8"
-              style={[styles.input, isSocialAccount && styles.inputDisabled]}
+              style={styles.input}
               secureTextEntry
               autoCapitalize="none"
               editable={!isSocialAccount}
@@ -467,7 +459,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 15,
     color: palette.text,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F6F1E3",
   },
   inputDisabled: {
     backgroundColor: "#F1F5F9",
@@ -497,7 +489,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   saveButtonDisabled: {
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#E7E0CC",
   },
   saveButtonText: {
     color: palette.accentInk,
@@ -505,6 +497,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   saveButtonTextDisabled: {
-    color: "#94A3B8",
+    color: "#9BA28F",
   },
 });

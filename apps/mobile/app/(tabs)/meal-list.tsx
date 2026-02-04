@@ -1,6 +1,8 @@
 import React from "react";
 import {
   Image,
+  Modal,
+  Pressable,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -14,16 +16,16 @@ import { useFocusEffect } from "@react-navigation/native";
 import { getAuthHeaders, loadAuthSession } from "@/session";
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  border: "#E2E8F0",
-  accent: "#FACC15",
-  accentDark: "#F59E0B",
-  ink: "#111827",
-  navy: "#0F172A",
-  navySoft: "#1E293B",
+  background: "#FAF8F0",
+  card: "#F6F1E3",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  border: "#E7E0CC",
+  accent: "#7FAF7B",
+  accentDark: "#4E7C5B",
+  ink: "#1F2A1F",
+  navy: "#1F2A1F",
+  navySoft: "#2F3B30",
 };
 
 const API_BASE_URL =
@@ -37,6 +39,7 @@ const mealTypeLabels: Record<string, string> = {
 };
 
 const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
+const rangeOptions = [7, 14, 30, 60, 90] as const;
 
 type MealSummary = {
   mealId?: number;
@@ -79,6 +82,44 @@ const formatMealTime = (date: Date) => {
   return `${period} ${displayHour}:${pad2(date.getMinutes())}`;
 };
 
+const startOfDay = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const endOfDay = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+
+const addDays = (date: Date, diff: number) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + diff);
+  return next;
+};
+
+const isSameDay = (left: Date, right: Date) =>
+  left.getFullYear() === right.getFullYear() &&
+  left.getMonth() === right.getMonth() &&
+  left.getDate() === right.getDate();
+
+const getMonthMatrix = (year: number, month: number) => {
+  const first = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const startOffset = first.getDay();
+
+  const cells: Array<number | null> = [];
+  for (let i = 0; i < startOffset; i += 1) {
+    cells.push(null);
+  }
+  for (let day = 1; day <= lastDay; day += 1) {
+    cells.push(day);
+  }
+  while (cells.length % 7 !== 0) {
+    cells.push(null);
+  }
+  return cells;
+};
+
+const formatMonthLabel = (date: Date) =>
+  `${date.getFullYear()}.${pad2(date.getMonth() + 1)}`;
+
 const getMealTypeLabel = (value?: string | null) => {
   if (!value) return "";
   const key = value.toUpperCase();
@@ -112,6 +153,14 @@ export default function MealListScreen() {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [rangeDays, setRangeDays] = React.useState(30);
+  const [endDate, setEndDate] = React.useState(() => startOfDay(new Date()));
+  const [isRangePickerOpen, setIsRangePickerOpen] = React.useState(false);
+  const [tempRangeDays, setTempRangeDays] = React.useState(rangeDays);
+  const [tempEndDate, setTempEndDate] = React.useState(endDate);
+  const [calendarMonth, setCalendarMonth] = React.useState(
+    new Date(endDate.getFullYear(), endDate.getMonth(), 1)
+  );
 
   const fetchMeals = React.useCallback(async () => {
     setIsLoading(true);
@@ -144,14 +193,76 @@ export default function MealListScreen() {
     setIsRefreshing(false);
   };
 
+  const openRangePicker = () => {
+    setTempRangeDays(rangeDays);
+    setTempEndDate(endDate);
+    setCalendarMonth(new Date(endDate.getFullYear(), endDate.getMonth(), 1));
+    setIsRangePickerOpen(true);
+  };
+
+  const closeRangePicker = () => {
+    setIsRangePickerOpen(false);
+  };
+
+  const applyRangePicker = () => {
+    setRangeDays(tempRangeDays);
+    setEndDate(tempEndDate);
+    setIsRangePickerOpen(false);
+  };
+
+  const moveCalendarMonth = (direction: "prev" | "next") => {
+    setCalendarMonth((prev) => {
+      const next = new Date(prev.getFullYear(), prev.getMonth(), 1);
+      next.setMonth(prev.getMonth() + (direction === "prev" ? -1 : 1));
+      return next;
+    });
+  };
+
+  const selectCalendarDay = (day: number) => {
+    const next = new Date(
+      calendarMonth.getFullYear(),
+      calendarMonth.getMonth(),
+      day
+    );
+    const today = startOfDay(new Date());
+    if (next > today) return;
+    setTempEndDate(next);
+  };
+
+  const calendarCells = React.useMemo(
+    () => getMonthMatrix(calendarMonth.getFullYear(), calendarMonth.getMonth()),
+    [calendarMonth]
+  );
+
   useFocusEffect(
     React.useCallback(() => {
       void fetchMeals();
     }, [fetchMeals])
   );
 
+  const rangeLabel = React.useMemo(() => `최근 ${rangeDays}일`, [rangeDays]);
+
+  const rangeStart = React.useMemo(
+    () => startOfDay(addDays(endDate, -(rangeDays - 1))),
+    [endDate, rangeDays]
+  );
+
+  const rangeEnd = React.useMemo(() => endOfDay(endDate), [endDate]);
+
+  const filteredMeals = React.useMemo(
+    () =>
+      meals.filter((meal) => {
+        const date =
+          parseLocalDateTime(meal.eatenAt) ??
+          parseLocalDateTime(meal.recordedAt);
+        if (!date) return false;
+        return date >= rangeStart && date <= rangeEnd;
+      }),
+    [meals, rangeEnd, rangeStart]
+  );
+
   const groupedMeals = React.useMemo(() => {
-    const sorted = [...meals].sort((a, b) => {
+    const sorted = [...filteredMeals].sort((a, b) => {
       const timeA =
         parseLocalDateTime(a.eatenAt) ??
         parseLocalDateTime(a.recordedAt) ??
@@ -184,10 +295,20 @@ export default function MealListScreen() {
     });
 
     return Array.from(map.values());
-  }, [meals]);
+  }, [filteredMeals]);
 
   const openMealRecord = () => {
     router.push("/(tabs)/meal");
+  };
+
+  const openMealDetail = (mealId?: number) => {
+    if (!mealId) {
+      return;
+    }
+    router.push({
+      pathname: "/(tabs)/meal-detail",
+      params: { mealId: String(mealId), from: "meal-list" },
+    });
   };
 
   return (
@@ -196,9 +317,15 @@ export default function MealListScreen() {
         <TouchableOpacity style={styles.headerSide} onPress={router.back}>
           <Text style={styles.headerBack}>&lt;</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>기록</Text>
+        <Text style={styles.headerTitle}>모든 기록</Text>
         <TouchableOpacity style={styles.headerSide} onPress={openMealRecord}>
           <Text style={styles.headerAction}>기록하기</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.rangeRow}>
+        <TouchableOpacity style={styles.rangeButton} onPress={openRangePicker}>
+          <Text style={styles.rangeText}>{rangeLabel}</Text>
+          <Text style={styles.rangeChevron}>▾</Text>
         </TouchableOpacity>
       </View>
 
@@ -277,9 +404,13 @@ export default function MealListScreen() {
                       : { carbs: "--%", protein: "--%", fat: "--%" };
 
                   return (
-                    <View
+                    <Pressable
                       key={meal.mealId ?? `${meal.eatenAt}-${meal.mealType}`}
-                      style={styles.mealCard}
+                      style={({ pressed }) => [
+                        styles.mealCard,
+                        pressed && styles.mealCardPressed,
+                      ]}
+                      onPress={() => openMealDetail(meal.mealId)}
                     >
                       <View style={styles.mealCardTopRow}>
                         {meal.imageUrl ? (
@@ -295,41 +426,41 @@ export default function MealListScreen() {
                             </Text>
                           </View>
                         )}
-                        <View style={styles.mealInfo}>
-                          {!!mealTypeLabel && (
-                            <Text style={styles.mealTypeBadge}>
-                              {mealTypeLabel}
-                            </Text>
-                          )}
+                      <View style={styles.mealInfo}>
+                        {!!mealTypeLabel && (
+                          <Text style={styles.mealTypeBadge}>
+                            {mealTypeLabel}
+                          </Text>
+                        )}
                           <View style={styles.mealNameRow}>
                             <Text style={styles.mealCaloriesLarge}>
                               {caloriesText}
                             </Text>
                             <Text style={styles.mealNameDivider}>|</Text>
-                            <Text style={styles.mealFoodName} numberOfLines={1}>
-                              {title}
-                            </Text>
-                          </View>
-                          <Text style={styles.mealTimeLabel}>{timeLabel}</Text>
+                          <Text style={styles.mealFoodName} numberOfLines={1}>
+                            {title}
+                          </Text>
                         </View>
+                        <Text style={styles.mealTimeLabel}>{timeLabel}</Text>
                       </View>
+                    </View>
                       <View style={styles.mealMacroBar}>
                         <View
                           style={[
                             styles.mealMacroSegment,
-                            { flex: macroFlex[0], backgroundColor: "#86EFAC" },
+                            { flex: macroFlex[0], backgroundColor: "#8FBA8A" },
                           ]}
                         />
                         <View
                           style={[
                             styles.mealMacroSegment,
-                            { flex: macroFlex[1], backgroundColor: "#FDE68A" },
+                            { flex: macroFlex[1], backgroundColor: "#E7D7A9" },
                           ]}
                         />
                         <View
                           style={[
                             styles.mealMacroSegment,
-                            { flex: macroFlex[2], backgroundColor: "#93C5FD" },
+                            { flex: macroFlex[2], backgroundColor: "#A8C4E3" },
                           ]}
                         />
                       </View>
@@ -338,7 +469,7 @@ export default function MealListScreen() {
                           <View
                             style={[
                               styles.mealMacroDot,
-                              { backgroundColor: "#86EFAC" },
+                              { backgroundColor: "#8FBA8A" },
                             ]}
                           />
                           <Text style={styles.mealMacroLabel}>
@@ -349,7 +480,7 @@ export default function MealListScreen() {
                           <View
                             style={[
                               styles.mealMacroDot,
-                              { backgroundColor: "#FDE68A" },
+                              { backgroundColor: "#E7D7A9" },
                             ]}
                           />
                           <Text style={styles.mealMacroLabel}>
@@ -360,7 +491,7 @@ export default function MealListScreen() {
                           <View
                             style={[
                               styles.mealMacroDot,
-                              { backgroundColor: "#93C5FD" },
+                              { backgroundColor: "#A8C4E3" },
                             ]}
                           />
                           <Text style={styles.mealMacroLabel}>
@@ -368,7 +499,7 @@ export default function MealListScreen() {
                           </Text>
                         </View>
                       </View>
-                    </View>
+                    </Pressable>
                   );
                 })}
               </View>
@@ -376,6 +507,127 @@ export default function MealListScreen() {
           ))
         )}
       </ScrollView>
+
+      {isRangePickerOpen && (
+        <Modal transparent animationType="slide" onRequestClose={closeRangePicker}>
+          <View style={styles.modalContainer}>
+            <Pressable style={styles.modalBackdrop} onPress={closeRangePicker} />
+            <View style={styles.rangeSheet}>
+            <View style={styles.rangeOptionRow}>
+              {rangeOptions.map((days) => {
+                const isSelected = tempRangeDays === days;
+                return (
+                  <TouchableOpacity
+                    key={days}
+                    style={[
+                      styles.rangeOption,
+                      isSelected && styles.rangeOptionActive,
+                    ]}
+                    onPress={() => setTempRangeDays(days)}
+                  >
+                    <Text
+                      style={[
+                        styles.rangeOptionText,
+                        isSelected && styles.rangeOptionTextActive,
+                      ]}
+                    >
+                      {days}일
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.calendarHeader}>
+              <TouchableOpacity
+                style={styles.calendarNavButton}
+                onPress={() => moveCalendarMonth("prev")}
+              >
+                <Text style={styles.calendarNavText}>{"<"}</Text>
+              </TouchableOpacity>
+              <Text style={styles.calendarTitle}>{formatMonthLabel(calendarMonth)}</Text>
+              <TouchableOpacity
+                style={styles.calendarNavButton}
+                onPress={() => moveCalendarMonth("next")}
+              >
+                <Text style={styles.calendarNavText}>{">"}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.calendarWeekRow}>
+              {weekdays.map((day, index) => (
+                <Text
+                  key={day}
+                  style={[
+                    styles.calendarWeekday,
+                    index === 0 && styles.calendarWeekdaySunday,
+                    index === 6 && styles.calendarWeekdaySaturday,
+                  ]}
+                >
+                  {day}
+                </Text>
+              ))}
+            </View>
+
+            <View style={styles.calendarGrid}>
+              {calendarCells.map((day, index) => {
+                if (!day) {
+                  return <View key={`empty-${index}`} style={styles.calendarCell} />;
+                }
+                const cellDate = new Date(
+                  calendarMonth.getFullYear(),
+                  calendarMonth.getMonth(),
+                  day
+                );
+                const today = startOfDay(new Date());
+                const rangeStartDate = startOfDay(
+                  addDays(tempEndDate, -(tempRangeDays - 1))
+                );
+                const rangeEndDate = startOfDay(tempEndDate);
+                const isFuture = cellDate > today;
+                const inRange = cellDate >= rangeStartDate && cellDate <= rangeEndDate;
+                const isStart = isSameDay(cellDate, rangeStartDate);
+                const isEnd = isSameDay(cellDate, rangeEndDate);
+
+                return (
+                  <Pressable
+                    key={`day-${index}`}
+                    style={[
+                      styles.calendarCell,
+                      inRange && styles.calendarCellInRange,
+                      (isStart || isEnd) && styles.calendarCellSelected,
+                      isFuture && styles.calendarCellDisabled,
+                    ]}
+                    onPress={() => selectCalendarDay(day)}
+                    disabled={isFuture}
+                  >
+                    <Text
+                      style={[
+                        styles.calendarCellText,
+                        inRange && styles.calendarCellTextInRange,
+                        (isStart || isEnd) && styles.calendarCellTextSelected,
+                        isFuture && styles.calendarCellTextDisabled,
+                      ]}
+                    >
+                      {day}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+              <View style={styles.rangeActions}>
+                <TouchableOpacity style={styles.rangeCancel} onPress={closeRangePicker}>
+                  <Text style={styles.rangeCancelText}>취소</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.rangeApply} onPress={applyRangePicker}>
+                  <Text style={styles.rangeApplyText}>적용</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -410,9 +662,181 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: palette.accentDark,
   },
+  rangeRow: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  rangeButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#F9F5E9",
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  rangeText: {
+    color: palette.accentDark,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  rangeChevron: {
+    color: palette.accentDark,
+    fontSize: 12,
+  },
   content: {
     paddingHorizontal: 16,
     paddingBottom: 24,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(31, 36, 31, 0.35)",
+  },
+  rangeSheet: {
+    backgroundColor: palette.card,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 22,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  rangeOptionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  rangeOption: {
+    flex: 1,
+    marginHorizontal: 4,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(107, 116, 102, 0.35)",
+    alignItems: "center",
+  },
+  rangeOptionActive: {
+    backgroundColor: palette.accent,
+    borderColor: palette.accentDark,
+  },
+  rangeOptionText: {
+    color: palette.textMuted,
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  rangeOptionTextActive: {
+    color: palette.ink,
+  },
+  calendarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  calendarNavButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(127, 175, 123, 0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  calendarNavText: {
+    color: palette.text,
+    fontWeight: "700",
+  },
+  calendarTitle: {
+    color: palette.text,
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  calendarWeekRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  calendarWeekday: {
+    width: "14.2857%",
+    textAlign: "center",
+    color: palette.textMuted,
+    fontSize: 12,
+  },
+  calendarWeekdaySunday: {
+    color: "#C36B66",
+  },
+  calendarWeekdaySaturday: {
+    color: "#6A8BB0",
+  },
+  calendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  calendarCell: {
+    width: "14.2857%",
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+    borderRadius: 8,
+  },
+  calendarCellInRange: {
+    backgroundColor: "rgba(127, 175, 123, 0.2)",
+  },
+  calendarCellSelected: {
+    backgroundColor: palette.accentDark,
+  },
+  calendarCellDisabled: {
+    opacity: 0.3,
+  },
+  calendarCellText: {
+    color: palette.text,
+    fontSize: 14,
+  },
+  calendarCellTextInRange: {
+    color: palette.text,
+    fontWeight: "600",
+  },
+  calendarCellTextSelected: {
+    color: palette.background,
+    fontWeight: "800",
+  },
+  calendarCellTextDisabled: {
+    color: "#A5AE9C",
+  },
+  rangeActions: {
+    flexDirection: "row",
+    marginTop: 16,
+  },
+  rangeCancel: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(107, 116, 102, 0.5)",
+    alignItems: "center",
+    paddingVertical: 12,
+    marginRight: 10,
+    backgroundColor: "#F9F5E9",
+  },
+  rangeCancelText: {
+    color: palette.text,
+    fontWeight: "700",
+  },
+  rangeApply: {
+    flex: 1,
+    borderRadius: 16,
+    backgroundColor: palette.accent,
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  rangeApplyText: {
+    color: palette.ink,
+    fontWeight: "800",
   },
   section: {
     marginBottom: 20,
@@ -443,13 +867,13 @@ const styles = StyleSheet.create({
   },
   callout: {
     marginTop: 12,
-    backgroundColor: "#FEF3C7",
+    backgroundColor: "#F0F3E1",
     borderRadius: 14,
     paddingVertical: 10,
     paddingHorizontal: 12,
   },
   calloutText: {
-    color: "#92400E",
+    color: "#4E7C5B",
     fontWeight: "700",
     fontSize: 13,
   },
@@ -457,11 +881,23 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   mealCard: {
-    backgroundColor: "#0F172A",
+    backgroundColor: palette.card,
     borderRadius: 22,
     padding: 16,
     borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.2)",
+    borderColor: palette.border,
+    shadowColor: "#0B1220",
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  mealCardPressed: {
+    opacity: 0.92,
+    transform: [{ scale: 0.98 }],
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   mealCardTopRow: {
     flexDirection: "row",
@@ -479,7 +915,7 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: 16,
     marginRight: 14,
-    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    backgroundColor: "#EFE8D7",
   },
   mealImagePlaceholder: {
     width: 72,
@@ -488,34 +924,34 @@ const styles = StyleSheet.create({
     marginRight: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(30, 41, 59, 0.8)",
+    backgroundColor: "#EFE8D7",
   },
-  mealImagePlaceholderText: { fontSize: 22, color: "#E2E8F0" },
+  mealImagePlaceholderText: { fontSize: 22, color: palette.textMuted },
   mealInfo: {
     flex: 1,
   },
   mealTypeBadge: {
-    color: "#E2E8F0",
+    color: palette.text,
     fontSize: 16,
     fontWeight: "700",
   },
   mealCaloriesLarge: {
-    color: "#FACC15",
+    color: palette.accentDark,
     fontSize: 18,
     fontWeight: "800",
   },
   mealFoodName: {
-    color: "#F8FAFC",
+    color: palette.text,
     fontSize: 16,
     fontWeight: "600",
     flex: 1,
   },
   mealNameDivider: {
-    color: "rgba(226, 232, 240, 0.5)",
+    color: palette.textMuted,
     fontSize: 14,
   },
   mealTimeLabel: {
-    color: "rgba(226, 232, 240, 0.7)",
+    color: palette.textMuted,
     fontSize: 12,
     marginTop: 6,
   },
@@ -523,7 +959,7 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 999,
     overflow: "hidden",
-    backgroundColor: "rgba(148, 163, 184, 0.25)",
+    backgroundColor: palette.border,
     flexDirection: "row",
     marginTop: 14,
   },
@@ -547,7 +983,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   mealMacroLabel: {
-    color: "rgba(226, 232, 240, 0.8)",
+    color: palette.textMuted,
     fontSize: 12,
     fontWeight: "600",
   },

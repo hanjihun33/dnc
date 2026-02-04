@@ -46,15 +46,24 @@ const mealTypeLabelMap: Record<string, string> = {
   SNACK: mealTypes[3],
 };
 
+const getMealTypeByTime = (date: Date) => {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 11) return mealTypes[0];
+  if (hour >= 11 && hour < 16) return mealTypes[1];
+  if (hour >= 16 && hour < 21) return mealTypes[2];
+  return mealTypes[3];
+};
+
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  border: "#E2E8F0",
-  accent: "#FACC15",
-  accentDark: "#F59E0B",
-  ink: "#111827",
+  background: "#F6E9D3",
+  card: "#F8F0E1",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  border: "#E5D9C4",
+  accent: "#7FAF7B",
+  accentDark: "#4E7C5B",
+  ink: "#1F2A1F",
+  panel: "#E7C17A",
 };
 
 interface NutritionData {
@@ -119,7 +128,7 @@ const buildFallbackPrediction = (): PredictionData => ({
     datasets: [
       {
         data: [108, 126, 142, 131, 118],
-        color: (opacity = 1) => `rgba(250, 204, 21, ${opacity})`,
+        color: (opacity = 1) => `rgba(127, 175, 123, ${opacity})`,
         strokeWidth: 3,
       },
     ],
@@ -293,7 +302,8 @@ export default function MealScreen() {
   const [editCarbsGrams, setEditCarbsGrams] = useState<number | null>(null);
   const [editAiGuide, setEditAiGuide] = useState<string | null>(null);
   const [imageLayout, setImageLayout] = useState({ width: 0, height: 0 });
-  const [mealType, setMealType] = useState(mealTypes[0]);
+  const [mealType, setMealType] = useState(() => getMealTypeByTime(new Date()));
+  const [isMealTypeAuto, setIsMealTypeAuto] = useState(true);
   const [mealDate, setMealDate] = useState(new Date());
   const [mealTime, setMealTime] = useState(new Date());
   const [memo, setMemo] = useState("");
@@ -349,6 +359,7 @@ export default function MealScreen() {
           data.mealType != null ? mealTypeLabelMap[data.mealType] : undefined;
         const nextMealType = resolvedType ?? mealTypes[0];
         setMealType(nextMealType);
+        setIsMealTypeAuto(false);
         setMealDate(parsed);
         setMealTime(parsed);
         setTempDate(parsed);
@@ -446,7 +457,9 @@ export default function MealScreen() {
         return;
       }
     } else if (pickerMode === "time") {
-      setMealTime(buildTimeDate(mealDate, timePeriod, timeHour, timeMinute));
+      const nextTime = buildTimeDate(mealDate, timePeriod, timeHour, timeMinute);
+      setMealTime(nextTime);
+      applyMealTypeByTime(nextTime);
     }
     setPickerMode(null);
   };
@@ -465,7 +478,8 @@ export default function MealScreen() {
   const resetForm = React.useCallback(() => {
     const now = new Date();
     clearImage();
-    setMealType(mealTypes[0]);
+    setMealType(getMealTypeByTime(now));
+    setIsMealTypeAuto(true);
     setMealDate(now);
     setMealTime(now);
     setMemo("");
@@ -481,6 +495,16 @@ export default function MealScreen() {
     setTimeHour(parts.hour);
     setTimeMinute(parts.minute);
   }, [clearImage]);
+
+  const applyMealTypeByTime = React.useCallback(
+    (date: Date) => {
+      if (isEditMode || !isMealTypeAuto) {
+        return;
+      }
+      setMealType(getMealTypeByTime(date));
+    },
+    [isEditMode, isMealTypeAuto]
+  );
 
   useEffect(() => {
     if (isEditMode) {
@@ -826,7 +850,7 @@ export default function MealScreen() {
           datasets: [
             {
               data: data.values?.length ? data.values : [108, 126, 142, 131, 118],
-              color: (opacity = 1) => `rgba(250, 204, 21, ${opacity})`,
+              color: (opacity = 1) => `rgba(127, 175, 123, ${opacity})`,
               strokeWidth: 3,
             },
           ],
@@ -867,6 +891,8 @@ export default function MealScreen() {
       const appliedDate = exifDate ?? new Date();
       setMealDate(appliedDate);
       setMealTime(appliedDate);
+      setMealType(getMealTypeByTime(appliedDate));
+      setIsMealTypeAuto(true);
       setNoticeMessage(
         exifDate
           ? "\uc0ac\uc9c4\uc758 \ucd2c\uc601 \uc2dc\uac04\uc73c\ub85c \uc790\ub3d9 \uc785\ub825\ud588\uc5b4\uc694."
@@ -903,6 +929,8 @@ export default function MealScreen() {
       const appliedDate = exifDate ?? new Date();
       setMealDate(appliedDate);
       setMealTime(appliedDate);
+      setMealType(getMealTypeByTime(appliedDate));
+      setIsMealTypeAuto(true);
       setNoticeMessage(
         exifDate
           ? "\uc0ac\uc9c4\uc758 \ucd2c\uc601 \uc2dc\uac04\uc73c\ub85c \uc790\ub3d9 \uc785\ub825\ud588\uc5b4\uc694."
@@ -937,6 +965,9 @@ export default function MealScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View pointerEvents="none" style={styles.backgroundLayer}>
+        <View style={styles.backgroundPanel} />
+      </View>
       <ScrollView
         style={styles.container}
         contentContainerStyle={[styles.page, isEditMode && styles.pageEdit]}
@@ -960,9 +991,6 @@ export default function MealScreen() {
           <Text style={styles.pageTitle}>식사기록</Text>
           */}
           </View>
-          <View style={[styles.tipBadge, isEditMode && styles.tipBadgeHidden]}>
-            <Text style={styles.tipText}>음식을 추가해보세요!</Text>
-          </View>
         </View>
 
         <Text
@@ -984,7 +1012,10 @@ export default function MealScreen() {
                   styles.mealTypeChip,
                   isActive && styles.mealTypeChipActive,
                 ]}
-                onPress={() => setMealType(type)}
+                onPress={() => {
+                  setMealType(type);
+                  setIsMealTypeAuto(false);
+                }}
               >
                 <Text
                   style={[
@@ -1637,19 +1668,19 @@ export default function MealScreen() {
 }
 
 const chartConfig = {
-  backgroundColor: palette.ink,
-  backgroundGradientFrom: "#0B1220",
-  backgroundGradientTo: "#111827",
+  backgroundColor: palette.card,
+  backgroundGradientFrom: palette.card,
+  backgroundGradientTo: palette.card,
   decimalPlaces: 0,
-  color: (opacity = 1) => `rgba(250, 204, 21, ${opacity})`,
-  labelColor: (opacity = 1) => `rgba(226, 232, 240, ${opacity})`,
-  fillShadowGradient: "rgba(250, 204, 21, 0.25)",
+  color: (opacity = 1) => `rgba(127, 175, 123, ${opacity})`,
+  labelColor: (opacity = 1) => `rgba(107, 116, 102, ${opacity})`,
+  fillShadowGradient: "rgba(127, 175, 123, 0.25)",
   fillShadowGradientOpacity: 0.45,
   style: {
     borderRadius: 18,
   },
   propsForBackgroundLines: {
-    stroke: "rgba(148, 163, 184, 0.2)",
+    stroke: "rgba(107, 116, 102, 0.2)",
     strokeDasharray: "4 6",
   },
   propsForLabels: {
@@ -1659,13 +1690,27 @@ const chartConfig = {
   propsForDots: {
     r: "4.5",
     strokeWidth: "2.5",
-    stroke: "#0B1220",
+    stroke: palette.card,
   },
 };
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
-  container: { flex: 1 },
+  backgroundLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+  },
+  backgroundPanel: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "58%",
+    backgroundColor: palette.panel,
+    borderTopLeftRadius: 220,
+    borderTopRightRadius: 220,
+  },
+  container: { flex: 1, zIndex: 1 },
   page: {
     padding: 20,
     paddingTop: Platform.OS === "android" ? 40 : 20,
@@ -1698,26 +1743,13 @@ const styles = StyleSheet.create({
     color: palette.text,
   },
   pageTitle: { fontSize: 26, fontWeight: "700", color: palette.text },
-  tipBadge: {
-    backgroundColor: palette.accent,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  tipBadgeHidden: {
-    opacity: 0,
-    width: 0,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    marginLeft: 0,
-  },
-  tipText: { color: palette.ink, fontWeight: "700", fontSize: 13 },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
     color: palette.text,
     marginTop: 12,
     marginBottom: 10,
+    paddingLeft: 4,
   },
   sectionTitleEdit: {
     marginTop: 4,
@@ -1731,7 +1763,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   mealTypeChip: {
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#F0EBDD",
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -1782,18 +1814,18 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
   },
   noticeCard: {
-    backgroundColor: palette.ink,
+    backgroundColor: "#E6EDD8",
     borderRadius: 18,
     padding: 16,
     marginTop: 16,
   },
   noticeTitle: {
-    color: "#E2E8F0",
+    color: palette.text,
     fontWeight: "600",
     marginBottom: 6,
   },
   noticeAction: {
-    color: palette.accent,
+    color: palette.accentDark,
     fontWeight: "700",
   },
   imagePickerCard: {
@@ -1802,7 +1834,7 @@ const styles = StyleSheet.create({
     paddingVertical: 30,
     paddingHorizontal: 20,
     borderWidth: 2,
-    borderColor: "#FDE68A",
+    borderColor: palette.accent,
     borderStyle: "dashed",
     alignItems: "center",
   },
@@ -1830,7 +1862,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.accent,
   },
   imagePickerButtonSecondary: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: palette.card,
     borderWidth: 1,
     borderColor: palette.border,
   },
@@ -1860,21 +1892,21 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "rgba(15, 23, 42, 0.7)",
+    backgroundColor: "rgba(31, 36, 31, 0.45)",
     alignItems: "center",
     justifyContent: "center",
   },
-  imageRemoveText: { color: "#FFFFFF", fontWeight: "700" },
+  imageRemoveText: { color: "#FAF8F0", fontWeight: "700" },
   imageTag: {
     position: "absolute",
     left: 12,
     bottom: 12,
-    backgroundColor: "rgba(15, 23, 42, 0.75)",
+    backgroundColor: "rgba(31, 36, 31, 0.55)",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
   },
-  imageTagText: { color: "#FFFFFF", fontWeight: "600", fontSize: 12 },
+  imageTagText: { color: "#FAF8F0", fontWeight: "600", fontSize: 12 },
   analyzingText: {
     marginTop: 10,
     color: palette.textMuted,
@@ -1882,25 +1914,25 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   resultsContainer: {
-    marginTop: 14,
+    marginTop: 0,
   },
   predictionBlock: {
-    backgroundColor: "#0B1220",
+    backgroundColor: palette.card,
     borderRadius: 20,
     paddingVertical: 18,
     paddingHorizontal: 20,
     borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.18)",
-    marginBottom: 16,
+    borderColor: "rgba(107, 116, 102, 0.2)",
+    marginBottom: 0,
   },
   predictionTitle: {
-    color: "#E2E8F0",
+    color: palette.text,
     fontSize: 18,
     fontWeight: "800",
     marginBottom: 6,
   },
   predictionSubtitle: {
-    color: "rgba(226, 232, 240, 0.7)",
+    color: palette.textMuted,
     fontSize: 13,
     marginBottom: 16,
   },
@@ -1912,7 +1944,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   predictionLabel: {
-    color: "rgba(226, 232, 240, 0.75)",
+    color: palette.textMuted,
     fontSize: 12,
     marginBottom: 6,
   },
@@ -1923,17 +1955,17 @@ const styles = StyleSheet.create({
   predictionValue: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#BFDBFE",
+    color: palette.accentDark,
     marginRight: 6,
   },
   predictionUnit: {
     fontSize: 12,
-    color: "rgba(226, 232, 240, 0.75)",
+    color: palette.textMuted,
     marginBottom: 2,
   },
   predictionDivider: {
     width: 1,
-    backgroundColor: "rgba(148, 163, 184, 0.2)",
+    backgroundColor: "rgba(107, 116, 102, 0.2)",
     marginHorizontal: 12,
   },
   predictionChart: {
@@ -1941,11 +1973,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   chartCard: {
-    backgroundColor: "#0B1220",
+    backgroundColor: palette.card,
     borderRadius: 20,
     padding: 10,
     borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.16)",
+    borderColor: "rgba(107, 116, 102, 0.2)",
     shadowColor: "#0B1220",
     shadowOpacity: 0.25,
     shadowRadius: 16,
@@ -1956,11 +1988,11 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   aiGuideCard: {
-    backgroundColor: "#0B1220",
+    backgroundColor: palette.card,
     borderRadius: 20,
     padding: 18,
     borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.18)",
+    borderColor: "rgba(107, 116, 102, 0.2)",
     overflow: "hidden",
     shadowColor: "#0B1220",
     shadowOpacity: 0.25,
@@ -1975,7 +2007,7 @@ const styles = StyleSheet.create({
   },
   aiGuideTitle: {
     marginTop: 12,
-    color: "#F8FAFC",
+    color: palette.text,
     fontSize: 16,
     fontWeight: "800",
   },
@@ -1986,9 +2018,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: "rgba(250, 204, 21, 0.18)",
+    backgroundColor: "rgba(127, 175, 123, 0.18)",
     borderWidth: 1,
-    borderColor: "rgba(250, 204, 21, 0.4)",
+    borderColor: "rgba(127, 175, 123, 0.4)",
   },
   aiChipDot: {
     width: 6,
@@ -1997,19 +2029,19 @@ const styles = StyleSheet.create({
     backgroundColor: palette.accentDark,
   },
   aiChipText: {
-    color: "#FDE68A",
+    color: palette.accentDark,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.6,
   },
   aiMetaText: {
-    color: "rgba(148, 163, 184, 0.8)",
+    color: "rgba(107, 116, 102, 0.8)",
     fontSize: 11,
     fontWeight: "600",
   },
   aiGuideText: {
     marginTop: 10,
-    color: "rgba(226, 232, 240, 0.92)",
+    color: palette.text,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -2023,14 +2055,14 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#38BDF8",
-    shadowColor: "#38BDF8",
+    backgroundColor: palette.accentDark,
+    shadowColor: palette.accentDark,
     shadowOpacity: 0.8,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 0 },
   },
   aiFooterText: {
-    color: "rgba(148, 163, 184, 0.9)",
+    color: "rgba(107, 116, 102, 0.9)",
     fontSize: 12,
     fontWeight: "600",
   },
@@ -2067,7 +2099,7 @@ const styles = StyleSheet.create({
   },
   nutritionItem: {
     width: "48%",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F9F5E9",
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
@@ -2121,7 +2153,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: Platform.OS === "ios" ? 28 : 16,
-    backgroundColor: "rgba(248, 250, 252, 0.98)",
+    backgroundColor: "rgba(231, 193, 122, 0.96)",
     borderTopWidth: 1,
     borderTopColor: palette.border,
     zIndex: 10,
@@ -2138,7 +2170,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   footerButtonDisabled: {
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#EFE9D9",
     shadowOpacity: 0,
     elevation: 0,
   },
@@ -2148,11 +2180,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   footerButtonTextDisabled: {
-    color: "#94A3B8",
+    color: "#A5AE9C",
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    backgroundColor: "rgba(31, 36, 31, 0.35)",
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
@@ -2192,7 +2224,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   confirmButtonCancel: {
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#F0EBDD",
     marginRight: 12,
   },
   confirmButtonPrimary: {
@@ -2204,7 +2236,7 @@ const styles = StyleSheet.create({
     color: palette.text,
   },
   confirmButtonTextPrimary: {
-    color: "#FFFFFF",
+    color: "#FAF8F0",
   },
   modalCard: {
     width: "100%",
@@ -2213,7 +2245,7 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   modalCardDark: {
-    backgroundColor: "#0F172A",
+    backgroundColor: "#E6EDD8",
   },
   modalHeader: {
     flexDirection: "row",
@@ -2235,7 +2267,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   modalTitleLight: {
-    color: "#E2E8F0",
+    color: palette.text,
   },
   modalAction: {
     fontWeight: "700",
@@ -2249,7 +2281,7 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
   },
   modalCancelLight: {
-    color: "#94A3B8",
+    color: palette.textMuted,
   },
   calendarHeader: {
     flexDirection: "row",
@@ -2261,7 +2293,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#F9F5E9",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2286,10 +2318,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   calendarWeekdaySunday: {
-    color: "#DC2626",
+    color: "#C36B66",
   },
   calendarWeekdaySaturday: {
-    color: "#2563EB",
+    color: "#6A8BB0",
   },
   calendarGrid: {
     flexDirection: "row",
@@ -2325,8 +2357,8 @@ const styles = StyleSheet.create({
     height: timeItemHeight,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(250, 204, 21, 0.35)",
-    backgroundColor: "rgba(250, 204, 21, 0.12)",
+    borderColor: "rgba(127, 175, 123, 0.35)",
+    backgroundColor: "rgba(127, 175, 123, 0.16)",
   },
   timeColumns: {
     flexDirection: "row",
@@ -2346,7 +2378,7 @@ const styles = StyleSheet.create({
   },
   timeItemText: {
     fontSize: 18,
-    color: "rgba(226, 232, 240, 0.45)",
+    color: "rgba(107, 116, 102, 0.65)",
     fontWeight: "600",
   },
   timeItemTextActive: {

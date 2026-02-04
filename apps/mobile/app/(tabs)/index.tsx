@@ -18,16 +18,17 @@ import Svg, { Circle, Line, Path } from "react-native-svg";
 import { getAuthHeaders, loadAuthSession } from "@/session";
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  border: "#E2E8F0",
-  accent: "#FACC15",
-  accentDark: "#F59E0B",
-  ink: "#111827",
-  navy: "#0F172A",
-  navySoft: "#1E293B",
+  background: "#F4E8D6",
+  card: "#F8F0E1",
+  text: "#2F3B30",
+  textMuted: "#6F7A6A",
+  border: "#E6DCC6",
+  accent: "#2F6B4F",
+  accentDark: "#24573F",
+  ink: "#233327",
+  navy: "#233327",
+  navySoft: "#2D3A30",
+  mint: "#CFE6D4",
 };
 
 const API_BASE_URL =
@@ -39,6 +40,7 @@ const hoursPerView = 3;
 const pixelsPerHour = chartViewportWidth / hoursPerView;
 const loadMoreHours = 12;
 const maxPastDays = 7;
+const autoRefreshIntervalMs = 60_000;
 
 const mealTypeLabels: Record<string, string> = {
   BREAKFAST: "아침",
@@ -131,6 +133,14 @@ const isSameDay = (a: Date, b: Date) =>
 
 const startOfDay = (date: Date) =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0);
+
+const getWeekStart = (date: Date, startOnSunday = true) => {
+  const day = date.getDay();
+  const offset = startOnSunday ? -day : (1 - day + 7) % 7;
+  const start = new Date(date);
+  start.setDate(date.getDate() + offset);
+  return startOfDay(start);
+};
 
 const endOfDay = (date: Date) =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
@@ -259,6 +269,7 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [isLoadingMore, setIsLoadingMore] = React.useState(false);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [lastRefreshAt, setLastRefreshAt] = React.useState<Date | null>(null);
   const [hasMore, setHasMore] = React.useState(true);
   const [didInitialScroll, setDidInitialScroll] = React.useState(false);
   const [allMeals, setAllMeals] = React.useState<MealSummary[]>([]);
@@ -281,19 +292,25 @@ export default function HomeScreen() {
   }, [todayMeals]);
   const mealCountsByDate = React.useMemo(() => {
     const counts: Record<string, number> = {};
-    const year = calendarMonth.getFullYear();
-    const month = calendarMonth.getMonth();
     allMeals.forEach((meal) => {
       const parsed =
         parseLocalDateTime(meal.eatenAt ?? null) ??
         parseLocalDateTime(meal.recordedAt ?? null);
       if (!parsed) return;
-      if (parsed.getFullYear() !== year || parsed.getMonth() !== month) return;
       const key = formatDateKey(parsed);
       counts[key] = (counts[key] ?? 0) + 1;
     });
     return counts;
-  }, [allMeals, calendarMonth]);
+  }, [allMeals]);
+
+  const weekDates = React.useMemo(() => {
+    const start = getWeekStart(selectedDate, true);
+    return Array.from({ length: 7 }).map((_, index) => {
+      const next = new Date(start);
+      next.setDate(start.getDate() + index);
+      return next;
+    });
+  }, [selectedDate]);
 
   const mergePoints = React.useCallback(
     (incoming: GlucosePoint[], mode: "replace" | "prepend") => {
@@ -373,9 +390,9 @@ export default function HomeScreen() {
     setSelectedDate(nextDay);
   };
 
-  const openMealList = () => {
+  const openMealList = React.useCallback(() => {
     router.push("/(tabs)/meal-list");
-  };
+  }, [router]);
 
   const openMealRecord = () => {
     router.push("/(tabs)/meal");
@@ -471,6 +488,7 @@ export default function HomeScreen() {
       const end = isSameDay(selectedDate, now) ? now : endOfDay(selectedDate);
       const start = startOfDay(selectedDate);
       await fetchRealtime(start, end, "replace");
+      setLastRefreshAt(new Date());
     } catch {
       // Ignore errors for now.
     } finally {
@@ -478,7 +496,7 @@ export default function HomeScreen() {
     }
   }, [fetchRealtime, selectedDate]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = React.useCallback(async () => {
     if (isRefreshing) return;
     setIsRefreshing(true);
     try {
@@ -487,12 +505,13 @@ export default function HomeScreen() {
       const start = startOfDay(selectedDate);
       await fetchRealtime(start, end, "replace");
       await fetchMeals();
+      setLastRefreshAt(new Date());
     } catch {
       // Ignore refresh errors.
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [fetchMeals, fetchRealtime, isRefreshing, selectedDate]);
 
   const loadMore = React.useCallback(async () => {
     if (!rangeStart || !rangeEnd || isLoadingMore) return;
@@ -531,6 +550,33 @@ export default function HomeScreen() {
       void fetchProfile();
       void fetchMeals();
     }, [fetchMeals, fetchProfile])
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!sensorConnected) {
+        return undefined;
+      }
+
+      const intervalId = setInterval(() => {
+        void handleRefresh();
+      }, autoRefreshIntervalMs);
+
+      return () => {
+        clearInterval(intervalId);
+      };
+    }, [handleRefresh, sensorConnected])
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const intervalId = setInterval(() => {
+        setLastRefreshAt((prev) => (prev ? new Date(prev) : prev));
+      }, 60_000);
+      return () => {
+        clearInterval(intervalId);
+      };
+    }, [])
   );
 
   React.useEffect(() => {
@@ -804,7 +850,7 @@ export default function HomeScreen() {
             const bucket = getBucket(lastValue);
             const color = bucket
               ? softenColor(bucket.color, 0.35)
-              : "rgba(148, 163, 184, 0.45)";
+              : "rgba(107, 116, 102, 0.45)";
             segments.push({ path, color });
           }
         }
@@ -883,10 +929,14 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View pointerEvents="none" style={styles.backgroundLayer}>
+        <View style={styles.backgroundTop} />
+        <View style={styles.backgroundBottom} />
+      </View>
       <StatusBar barStyle="dark-content" />
       <ScrollView
         style={styles.container}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
       >
         <View style={styles.page}>
           <View style={styles.header}>
@@ -912,42 +962,130 @@ export default function HomeScreen() {
                 </Text>
               </Pressable>
             </View>
-            <View style={styles.headerActions}>
-              {sensorConnected ? (
-                <View style={styles.statusBadge}>
-                  <View style={styles.statusDot} />
-                  <Text style={styles.statusText}>실시간 측정 중</Text>
-                </View>
-              ) : (
-                <View style={[styles.statusBadge, styles.statusBadgeInactive]}>
-                  <View style={[styles.statusDot, styles.statusDotInactive]} />
-                  <Text style={styles.statusText}>센서 미연결</Text>
-                </View>
-              )}
-            </View>
+          </View>
+
+          <View style={styles.weekStrip}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.weekStripContent}
+            >
+              {weekDates.map((date) => {
+                const dayKey = formatDateKey(date);
+                const isSelected = isSameDay(date, selectedDate);
+                const isFuture = date > startOfDay(new Date());
+                const mealCount = mealCountsByDate[dayKey] ?? 0;
+                const dotCount = Math.min(mealCount, 4);
+                return (
+                  <Pressable
+                    key={dayKey}
+                    style={[
+                      styles.weekDayCell,
+                      isSelected && styles.weekDayCellSelected,
+                      isFuture && styles.weekDayCellDisabled,
+                    ]}
+                    onPress={() => setSelectedDate(startOfDay(date))}
+                    disabled={isFuture}
+                  >
+                    <Text
+                      style={[
+                        styles.weekDayNumber,
+                        isSelected && styles.weekDayNumberSelected,
+                        isFuture && styles.weekDayNumberDisabled,
+                      ]}
+                    >
+                      {date.getDate()}
+                    </Text>
+                    <View
+                      style={[
+                        styles.weekDayDots,
+                        isSelected && styles.weekDayDotsSelected,
+                      ]}
+                    >
+                      {Array.from({ length: dotCount }).map((_, index) => (
+                        <View
+                          key={`${dayKey}-dot-${index}`}
+                          style={[
+                            styles.weekDayDot,
+                            isSelected && styles.weekDayDotSelected,
+                          ]}
+                        />
+                      ))}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
           </View>
 
           <View style={styles.heroCard}>
             <View style={styles.heroHeader}>
-              <Text style={styles.heroLabel}>{heroTitle}</Text>
-              <TouchableOpacity
-                style={[styles.heroPill, isRefreshing && styles.refreshButtonDisabled]}
-                onPress={handleRefresh}
-                disabled={isRefreshing}
-              >
-                <Text style={styles.heroPillText}>
-                  {isRefreshing ? "새로고침..." : "새로고침"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.heroValueRow}>
-              <Text style={styles.heroValue}>{heroValue}</Text>
-              <Text style={styles.heroUnit}>mg/dL</Text>
+              <View style={styles.heroHeaderLeft}>
+                <Text style={styles.heroLabel}>{heroTitle}</Text>
+                <View style={styles.heroValueRow}>
+                  <Text style={styles.heroValue}>{heroValue}</Text>
+                  <Text style={styles.heroUnit}>mg/dL</Text>
+                </View>
+              </View>
+              <View style={styles.heroHeaderRight}>
+                <View
+                  style={[
+                    styles.statusInline,
+                    !sensorConnected && styles.statusInlineInactive,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.statusInlineDot,
+                      !sensorConnected && styles.statusInlineDotInactive,
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.statusInlineText,
+                      !sensorConnected && styles.statusInlineTextInactive,
+                    ]}
+                  >
+                    {sensorConnected ? "측정 중" : "센서 미연결"}
+                  </Text>
+                </View>
+                {sensorConnected && (
+                  <TouchableOpacity
+                    style={[
+                      styles.refreshInline,
+                      isRefreshing && styles.refreshInlineDisabled,
+                    ]}
+                    onPress={handleRefresh}
+                    disabled={isRefreshing}
+                  >
+                    <Text
+                      style={[
+                        styles.refreshInlineText,
+                        isRefreshing && styles.refreshInlineTextDisabled,
+                      ]}
+                    >
+                      {lastRefreshAt
+                        ? `${formatMinutesAgo(lastRefreshAt)} 업데이트`
+                        : "업데이트"}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.refreshInlineIcon,
+                        isRefreshing && styles.refreshInlineTextDisabled,
+                      ]}
+                    >
+                      ↺
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
             <Text style={styles.heroHint}>
-              {latestMeasuredAt
-                ? `마지막 측정 ${heroHint}`
-                : "측정 데이터를 불러오는 중"}
+              {!sensorConnected
+                ? "센서가 연결되지 않았어요. 연결하면 실시간 혈당 그래프가 표시됩니다."
+                : latestMeasuredAt
+                  ? `마지막 측정 ${heroHint}`
+                  : "측정 데이터를 불러오는 중"}
             </Text>
 
             <View style={styles.heroChart}>
@@ -967,7 +1105,7 @@ export default function HomeScreen() {
                         x2={chartWidth}
                         y1={toY(label)}
                         y2={toY(label)}
-                        stroke="rgba(148, 163, 184, 0.2)"
+                        stroke="rgba(107, 116, 102, 0.25)"
                         strokeWidth={1}
                       />
                     ))}
@@ -1028,7 +1166,9 @@ export default function HomeScreen() {
               </View>
               {validPointCount <= 2 && (
                 <Text style={styles.chartHint}>
-                  데이터가 부족하면 추세가 표시됩니다.
+                  {sensorConnected
+                    ? "데이터가 부족하면 추세가 표시됩니다."
+                    : "센서를 연결하면 실시간 추세가 표시됩니다."}
                 </Text>
               )}
             </View>
@@ -1077,6 +1217,10 @@ export default function HomeScreen() {
 
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>기록</Text>
+            <TouchableOpacity style={styles.sectionLink} onPress={openMealList}>
+              <Text style={styles.sectionLinkText}>더보기</Text>
+              <Text style={styles.sectionLinkChevron}>&gt;</Text>
+            </TouchableOpacity>
           </View>
 
           {orderedMeals.length === 0 ? (
@@ -1138,7 +1282,10 @@ export default function HomeScreen() {
                 return (
                   <Pressable
                     key={meal.mealId ?? `${meal.eatenAt}-${meal.mealType}`}
-                    style={styles.mealCard}
+                    style={({ pressed }) => [
+                      styles.mealCard,
+                      pressed && styles.mealCardPressed,
+                    ]}
                     onPress={() => openMealDetail(meal.mealId)}
                   >
                     <View style={styles.mealCardTopRow}>
@@ -1166,32 +1313,31 @@ export default function HomeScreen() {
                         </View>
                         <Text style={styles.mealTimeLabel}>{timeLabel}</Text>
                       </View>
-                      <Text style={styles.mealDetailLink}>상세 &gt;</Text>
                     </View>
                     <View style={styles.mealMacroBar}>
                       <View
                         style={[
                           styles.mealMacroSegment,
-                          { flex: macroFlex[0], backgroundColor: "#86EFAC" },
+                          { flex: macroFlex[0], backgroundColor: "#8FBA8A" },
                         ]}
                       />
                       <View
                         style={[
                           styles.mealMacroSegment,
-                          { flex: macroFlex[1], backgroundColor: "#FDE68A" },
+                          { flex: macroFlex[1], backgroundColor: "#E7D7A9" },
                         ]}
                       />
                       <View
                         style={[
                           styles.mealMacroSegment,
-                          { flex: macroFlex[2], backgroundColor: "#93C5FD" },
+                          { flex: macroFlex[2], backgroundColor: "#A8C4E3" },
                         ]}
                       />
                     </View>
                     <View style={styles.mealMacroLegend}>
                       <View style={styles.mealMacroItem}>
                         <View
-                          style={[styles.mealMacroDot, { backgroundColor: "#86EFAC" }]}
+                          style={[styles.mealMacroDot, { backgroundColor: "#8FBA8A" }]}
                         />
                         <Text style={styles.mealMacroLabel}>
                           탄 {macroLabels.carbs}
@@ -1199,7 +1345,7 @@ export default function HomeScreen() {
                       </View>
                       <View style={styles.mealMacroItem}>
                         <View
-                          style={[styles.mealMacroDot, { backgroundColor: "#FDE68A" }]}
+                          style={[styles.mealMacroDot, { backgroundColor: "#E7D7A9" }]}
                         />
                         <Text style={styles.mealMacroLabel}>
                           단 {macroLabels.protein}
@@ -1207,7 +1353,7 @@ export default function HomeScreen() {
                       </View>
                       <View style={styles.mealMacroItem}>
                         <View
-                          style={[styles.mealMacroDot, { backgroundColor: "#93C5FD" }]}
+                          style={[styles.mealMacroDot, { backgroundColor: "#A8C4E3" }]}
                         />
                         <Text style={styles.mealMacroLabel}>
                           지 {macroLabels.fat}
@@ -1352,6 +1498,18 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
+  backgroundLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+  },
+  backgroundTop: {
+    height: "44%",
+    backgroundColor: palette.background,
+  },
+  backgroundBottom: {
+    flex: 1,
+    backgroundColor: palette.mint,
+  },
   container: { flex: 1 },
   page: { padding: 20, paddingTop: Platform.OS === "android" ? 40 : 20 },
   header: {
@@ -1364,25 +1522,80 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    justifyContent: "center",
+    flex: 1,
   },
   headerNavButton: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "rgba(148, 163, 184, 0.18)",
+    backgroundColor: "rgba(127, 175, 123, 0.22)",
     alignItems: "center",
     justifyContent: "center",
   },
-  headerNavText: { color: "#94A3B8", fontSize: 12, fontWeight: "700" },
-  headerNavTextDisabled: { color: "rgba(148, 163, 184, 0.4)" },
+  headerNavText: { color: palette.textMuted, fontSize: 12, fontWeight: "700" },
+  headerNavTextDisabled: { color: "rgba(107, 116, 102, 0.45)" },
   headerTitle: { fontSize: 22, fontWeight: "700", color: palette.text },
   headerSubtitle: { color: palette.textMuted, marginTop: 4 },
-  headerActions: {
-    alignItems: "flex-end",
-    gap: 8,
+  weekStrip: {
+    marginBottom: 16,
+  },
+  weekStripContent: {
+    gap: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  weekDayCell: {
+    width: 46,
+    height: 66,
+    borderRadius: 18,
+    backgroundColor: palette.card,
+    borderWidth: 1,
+    borderColor: palette.border,
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+  },
+  weekDayCellSelected: {
+    backgroundColor: palette.ink,
+    borderColor: palette.ink,
+    shadowColor: "#0B1220",
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 5,
+  },
+  weekDayCellDisabled: {
+    opacity: 0.45,
+  },
+  weekDayNumber: {
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  weekDayNumberSelected: {
+    color: palette.background,
+  },
+  weekDayNumberDisabled: {
+    color: palette.textMuted,
+  },
+  weekDayDots: {
+    flexDirection: "row",
+    gap: 4,
+    minHeight: 6,
+  },
+  weekDayDotsSelected: {},
+  weekDayDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: palette.accent,
+  },
+  weekDayDotSelected: {
+    backgroundColor: palette.background,
   },
   refreshButton: {
-    backgroundColor: "#FDE68A",
+    backgroundColor: palette.accent,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
@@ -1394,43 +1607,100 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#EFE9D9",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
   },
   statusBadgeInactive: {
-    backgroundColor: "#E5E7EB",
+    backgroundColor: "#F4EFE1",
   },
   statusDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#10B981",
+    backgroundColor: palette.accent,
     marginRight: 6,
   },
   statusDotInactive: {
-    backgroundColor: "#94A3B8",
+    backgroundColor: "#9BA28F",
   },
   statusText: { color: palette.text, fontSize: 12, fontWeight: "600" },
   heroCard: {
-    backgroundColor: palette.navy,
+    backgroundColor: palette.card,
     borderRadius: 28,
-    padding: 22,
+    paddingHorizontal: 22,
+    paddingTop: 18,
+    paddingBottom: 22,
     marginBottom: 16,
-    shadowColor: palette.navy,
+    borderWidth: 1,
+    borderColor: palette.border,
+    shadowColor: "#0B1220",
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 6,
   },
   heroHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  heroHeaderLeft: {
+    gap: 6,
+  },
+  heroHeaderRight: {
+    alignItems: "flex-end",
+    gap: 6,
+  },
+  statusInline: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: 6,
+  },
+  statusInlineInactive: {
+    opacity: 0.7,
+  },
+  statusInlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: palette.accent,
+  },
+  statusInlineDotInactive: {
+    backgroundColor: "#9BA28F",
+  },
+  statusInlineText: {
+    color: palette.text,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  statusInlineTextInactive: {
+    color: palette.textMuted,
+  },
+  refreshInline: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  refreshInlineDisabled: {
+    opacity: 0.6,
+  },
+  refreshInlineText: {
+    color: palette.textMuted,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  refreshInlineTextDisabled: {
+    color: "#A5AE9C",
+  },
+  refreshInlineIcon: {
+    color: palette.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
   },
   heroLabel: {
-    color: "rgba(248, 250, 252, 0.7)",
+    color: palette.textMuted,
     fontSize: 13,
     fontWeight: "600",
   },
@@ -1448,25 +1718,26 @@ const styles = StyleSheet.create({
   heroValueRow: {
     flexDirection: "row",
     alignItems: "baseline",
-    marginTop: 12,
   },
   heroValue: {
-    color: "#F8FAFC",
+    color: palette.text,
     fontSize: 44,
     fontWeight: "800",
     marginRight: 6,
   },
-  heroUnit: { color: "#E2E8F0", fontSize: 16 },
+  heroUnit: { color: palette.textMuted, fontSize: 16 },
   heroHint: {
-    color: "rgba(226, 232, 240, 0.7)",
+    color: palette.textMuted,
     marginTop: 6,
     fontSize: 12,
   },
   heroChart: {
     height: 170,
     marginTop: 16,
-    backgroundColor: palette.navySoft,
+    backgroundColor: palette.card,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
     justifyContent: "center",
     paddingVertical: 8,
     position: "relative",
@@ -1488,7 +1759,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   chartYAxisText: {
-    color: "rgba(226, 232, 240, 0.65)",
+    color: "rgba(31, 36, 31, 0.55)",
     fontSize: 11,
   },
   chartXAxisRow: {
@@ -1498,18 +1769,18 @@ const styles = StyleSheet.create({
   },
   chartXAxisText: {
     position: "absolute",
-    color: "rgba(248, 250, 252, 0.8)",
+    color: "rgba(31, 36, 31, 0.6)",
     fontSize: 10,
   },
   chartHint: {
-    color: "rgba(226, 232, 240, 0.7)",
+    color: "rgba(31, 36, 31, 0.6)",
     fontSize: 11,
     marginTop: 8,
     paddingHorizontal: 8,
   },
   datePickerOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(3, 7, 18, 0.72)",
+    backgroundColor: "rgba(31, 36, 31, 0.35)",
     justifyContent: "flex-end",
   },
   datePickerBackdrop: {
@@ -1519,14 +1790,14 @@ const styles = StyleSheet.create({
     margin: 16,
     borderRadius: 28,
     padding: 18,
-    backgroundColor: "#0B1220",
+    backgroundColor: palette.card,
     borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.2)",
+    borderColor: "rgba(107, 116, 102, 0.2)",
   },
   datePickerTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#E2E8F0",
+    color: palette.text,
     marginBottom: 16,
   },
   datePickerWeekdays: {
@@ -1537,11 +1808,11 @@ const styles = StyleSheet.create({
   datePickerWeekday: {
     width: 36,
     textAlign: "center",
-    color: "#94A3B8",
+    color: palette.textMuted,
     fontSize: 12,
   },
   datePickerSundayText: {
-    color: "#F87171",
+    color: "#C36B66",
   },
   datePickerMonthRow: {
     flexDirection: "row",
@@ -1549,16 +1820,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 10,
   },
-  datePickerMonthText: { fontSize: 18, fontWeight: "700", color: "#E2E8F0" },
+  datePickerMonthText: { fontSize: 18, fontWeight: "700", color: palette.text },
   datePickerMonthArrow: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: "rgba(148, 163, 184, 0.18)",
+    backgroundColor: "rgba(127, 175, 123, 0.2)",
     alignItems: "center",
     justifyContent: "center",
   },
-  datePickerMonthArrowText: { color: "#E2E8F0", fontSize: 12 },
+  datePickerMonthArrowText: { color: palette.text, fontSize: 12 },
   datePickerCalendar: {
     marginBottom: 18,
   },
@@ -1575,14 +1846,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   datePickerDaySelected: {
-    backgroundColor: "#FACC15",
+    backgroundColor: palette.ink,
   },
   datePickerDayDisabled: {
     opacity: 0.35,
   },
-  datePickerDayText: { color: "#E2E8F0", fontSize: 15 },
-  datePickerDayTextSelected: { color: "#111827", fontWeight: "800" },
-  datePickerDayTextDisabled: { color: "#94A3B8" },
+  datePickerDayText: { color: palette.text, fontSize: 15 },
+  datePickerDayTextSelected: { color: palette.background, fontWeight: "800" },
+  datePickerDayTextDisabled: { color: "#A5AE9C" },
   datePickerDotRow: {
     position: "absolute",
     bottom: 4,
@@ -1593,10 +1864,10 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#FACC15",
+    backgroundColor: palette.accent,
   },
   datePickerDotSelected: {
-    backgroundColor: "#111827",
+    backgroundColor: palette.background,
   },
   datePickerActions: {
     flexDirection: "row",
@@ -1607,20 +1878,20 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.4)",
+    borderColor: "rgba(107, 116, 102, 0.4)",
     alignItems: "center",
-    backgroundColor: "rgba(15, 23, 42, 0.7)",
+    backgroundColor: "#F9F5E9",
     marginRight: 10,
   },
-  datePickerCancelText: { color: "#CBD5F5", fontSize: 16, fontWeight: "700" },
+  datePickerCancelText: { color: palette.text, fontSize: 16, fontWeight: "700" },
   datePickerApply: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 16,
     alignItems: "center",
-    backgroundColor: "#FACC15",
+    backgroundColor: palette.accent,
   },
-  datePickerApplyText: { color: "#111827", fontSize: 16, fontWeight: "800" },
+  datePickerApplyText: { color: palette.ink, fontSize: 16, fontWeight: "800" },
   statsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1672,14 +1943,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#F9F5E9",
+    borderWidth: 1,
+    borderColor: "#E7E0CC",
   },
   sectionLinkText: {
-    color: palette.textMuted,
+    color: palette.accentDark,
     fontSize: 13,
     fontWeight: "600",
   },
   sectionLinkChevron: {
-    color: palette.textMuted,
+    color: palette.accentDark,
     fontSize: 16,
     marginTop: -1,
   },
@@ -1703,8 +1980,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   badge: {
-    backgroundColor: "#EEF2FF",
-    color: "#4338CA",
+    backgroundColor: "#E6EDD8",
+    color: "#4E7C5B",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
@@ -1714,13 +1991,13 @@ const styles = StyleSheet.create({
   },
   callout: {
     marginTop: 12,
-    backgroundColor: "#FEF3C7",
+    backgroundColor: "#F0F3E1",
     borderRadius: 14,
     paddingVertical: 10,
     paddingHorizontal: 12,
   },
   calloutText: {
-    color: "#92400E",
+    color: "#4E7C5B",
     fontWeight: "700",
     fontSize: 13,
   },
@@ -1729,11 +2006,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   mealCard: {
-    backgroundColor: "#0F172A",
+    backgroundColor: palette.card,
     borderRadius: 22,
     padding: 16,
     borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.2)",
+    borderColor: palette.border,
+    shadowColor: "#0B1220",
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  mealCardPressed: {
+    opacity: 0.92,
+    transform: [{ scale: 0.98 }],
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   mealCardTopRow: {
     flexDirection: "row",
@@ -1761,7 +2050,7 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: 16,
     marginRight: 14,
-    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    backgroundColor: "#EFE8D7",
   },
   mealImagePlaceholder: {
     width: 72,
@@ -1770,46 +2059,46 @@ const styles = StyleSheet.create({
     marginRight: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(30, 41, 59, 0.8)",
+    backgroundColor: "#EFE8D7",
   },
-  mealImagePlaceholderText: { fontSize: 22 },
+  mealImagePlaceholderText: { fontSize: 22, color: palette.textMuted },
   mealInfo: {
     flex: 1,
   },
   mealTypeBadge: {
-    color: "#E2E8F0",
+    color: palette.text,
     fontSize: 16,
     fontWeight: "700",
   },
   mealTitle: {
-    color: "#F8FAFC",
+    color: palette.text,
     fontSize: 18,
     fontWeight: "700",
     flex: 1,
     marginRight: 8,
   },
   mealCalories: {
-    color: "#FACC15",
+    color: palette.accentDark,
     fontSize: 15,
     fontWeight: "700",
   },
   mealCaloriesLarge: {
-    color: "#FACC15",
+    color: palette.accentDark,
     fontSize: 18,
     fontWeight: "800",
   },
   mealFoodName: {
-    color: "#F8FAFC",
+    color: palette.text,
     fontSize: 16,
     fontWeight: "600",
     flex: 1,
   },
   mealNameDivider: {
-    color: "rgba(226, 232, 240, 0.5)",
+    color: palette.textMuted,
     fontSize: 14,
   },
   mealTimeLabel: {
-    color: "rgba(226, 232, 240, 0.7)",
+    color: palette.textMuted,
     fontSize: 12,
     marginTop: 6,
   },
@@ -1817,7 +2106,7 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 999,
     overflow: "hidden",
-    backgroundColor: "rgba(148, 163, 184, 0.25)",
+    backgroundColor: palette.border,
     flexDirection: "row",
     marginTop: 14,
   },
@@ -1841,18 +2130,12 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   mealMacroLabel: {
-    color: "rgba(226, 232, 240, 0.8)",
+    color: palette.textMuted,
     fontSize: 12,
     fontWeight: "600",
   },
-  mealDetailLink: {
-    color: "rgba(226, 232, 240, 0.8)",
-    fontSize: 13,
-    fontWeight: "600",
-    marginLeft: 8,
-  },
   mealGuide: {
-    color: "rgba(226, 232, 240, 0.6)",
+    color: palette.textMuted,
     fontSize: 12,
     marginTop: 12,
     lineHeight: 16,

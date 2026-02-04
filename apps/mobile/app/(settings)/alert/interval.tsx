@@ -11,12 +11,12 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 const palette = {
-  background: "#F8FAFC",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  accent: "#FACC15",
-  accentInk: "#111827",
-  border: "#E2E8F0",
+  background: "#FAF8F0",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  accent: "#7FAF7B",
+  accentInk: "#1F2A1F",
+  border: "#E7E0CC",
 };
 
 const options = [5, 10, 15, 20, 30, 60];
