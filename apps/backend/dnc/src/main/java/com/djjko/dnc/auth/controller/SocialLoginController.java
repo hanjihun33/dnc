@@ -174,6 +174,54 @@ public class SocialLoginController {
             + newUser;
     }
 
+<<<<<<< Updated upstream
+=======
+    private String buildAppRedirectUrl(SocialLoginResponse response) {
+        return buildRedirectUrl(response, appRedirectUri);
+    }
+
+    private String resolveState(String state, String platform) {
+        String baseState = (state == null || state.isBlank())
+            ? UUID.randomUUID().toString()
+            : state;
+        String normalizedPlatform = normalizePlatform(platform);
+        if (baseState.startsWith("app:") || baseState.startsWith("web:")) {
+            return baseState;
+        }
+        return normalizedPlatform + ":" + baseState;
+    }
+
+    private String resolveRedirectBase(String state) {
+        String platform = extractPlatform(state);
+        if ("web".equals(platform)) {
+            return webRedirectUri;
+        }
+        return appRedirectUri;
+    }
+
+    private String extractPlatform(String state) {
+        if (state == null || state.isBlank()) {
+            return "app";
+        }
+        String normalized = state.trim().toLowerCase();
+        if (normalized.startsWith("web:")) {
+            return "web";
+        }
+        if (normalized.startsWith("app:")) {
+            return "app";
+        }
+        return "app";
+    }
+
+    private String normalizePlatform(String platform) {
+        if (platform == null || platform.isBlank()) {
+            return "app";
+        }
+        String normalized = platform.trim().toLowerCase();
+        return "web".equals(normalized) ? "web" : "app";
+    }
+
+>>>>>>> Stashed changes
     private String urlEncode(String value) {
         if (value == null) {
             return "";
