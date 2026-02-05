@@ -9,14 +9,16 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const palette = {
-  background: "#FAF8F0",
-  text: "#1F241F",
-  textMuted: "#6B7466",
-  accent: "#7FAF7B",
-  accentInk: "#1F2A1F",
-  border: "#E7E0CC",
+  background: "#F4E8D6",
+  text: "#2F3B30",
+  textMuted: "#6F7A6A",
+  accent: "#2F6B4F",
+  accentInk: "#233327",
+  border: "#E6DCC6",
 };
 
 const options = [5, 10, 15, 20, 30, 60];
@@ -26,10 +28,12 @@ const formatInterval = (minutes: number) =>
 
 export default function AlertIntervalScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { type, interval } = useLocalSearchParams<{
     type?: string;
     interval?: string;
   }>();
+  const headerPaddingTop = Math.max(12, insets.top + 8);
   const initial =
     typeof interval === "string" && interval.length > 0
       ? Number(interval)
@@ -48,10 +52,13 @@ export default function AlertIntervalScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.container}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backIcon}>←</Text>
-        </Pressable>
-        <Text style={styles.title}>상태 지속 시 알림 간격</Text>
+        <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+          <Pressable style={styles.headerSide} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={20} color={palette.text} />
+          </Pressable>
+          <Text style={styles.headerTitle}>상태 지속 시 알림 간격</Text>
+          <View style={styles.headerSide} />
+        </View>
 
         <View style={styles.list}>
           {options.map((option) => {
@@ -88,22 +95,21 @@ export default function AlertIntervalScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
-  container: { padding: 20, paddingBottom: 40 },
+  container: { paddingHorizontal: 16, paddingBottom: 40 },
 
-  backButton: {
-    width: 36,
-    height: 36,
+  header: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 0,
+    paddingBottom: 12,
+  },
+  headerSide: {
+    minWidth: 72,
+    minHeight: 40,
     justifyContent: "center",
-    marginBottom: 6,
   },
-  backIcon: { fontSize: 20, color: palette.text },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: palette.text,
-    marginBottom: 20,
-  },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: palette.text },
 
   list: {
     borderTopWidth: 1,

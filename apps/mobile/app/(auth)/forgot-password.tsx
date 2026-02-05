@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 const palette = {
@@ -36,7 +37,7 @@ export default function ForgotPasswordScreen() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <Text style={styles.backText}>{"<"}</Text>
+            <Ionicons name="chevron-back" size={18} color={palette.text} />
           </TouchableOpacity>
           <Text style={styles.pageTitle}>비밀번호 찾기</Text>
           <View style={styles.backSpacer} />
@@ -82,6 +83,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: 24,
     marginBottom: 10,
   },
   backButton: {
@@ -92,7 +94,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backText: { fontSize: 16, color: palette.text },
   backSpacer: { width: 36 },
   pageTitle: { fontSize: 22, fontWeight: "800", color: palette.text },
   subtitle: { color: palette.textMuted, marginBottom: 18, lineHeight: 20 },

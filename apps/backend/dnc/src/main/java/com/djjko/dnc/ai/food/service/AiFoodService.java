@@ -4,6 +4,7 @@ import com.djjko.dnc.ai.food.FoodAnalysis;
 import com.djjko.dnc.ai.food.FoodAnalysisRepository;
 import com.djjko.dnc.ai.food.dto.AiFoodAnalyzeResponse;
 import com.djjko.dnc.ai.food.dto.AiFoodDetectResult;
+import com.djjko.dnc.ai.food.dto.AiGuideStatusResponse;
 import com.djjko.dnc.ai.food.dto.AiFoodNutrition;
 import com.djjko.dnc.ai.food.dto.AiGlucosePredictionRequest;
 import com.djjko.dnc.prediction.entity.GlucosePrediction;
@@ -19,6 +20,8 @@ import com.djjko.dnc.report.repository.GlucoseDataRepository;
 import com.djjko.dnc.user.model.DiabetesType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PreDestroy;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -26,6 +29,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -56,6 +64,8 @@ public class AiFoodService {
     private static final String PREDICTION_MODEL_NAME = "glucose-prediction";
     private static final String PREDICTION_MODEL_VERSION = "v1";
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+    private static final Duration GUIDE_JOB_TTL = Duration.ofMinutes(15);
+    private static final int GUIDE_EXECUTOR_SIZE = 2;
 
     private final AiServerClient aiServerClient;
     private final FoodMetadataRepository foodMetadataRepository;
@@ -67,6 +77,8 @@ public class AiFoodService {
     private final ObjectMapper objectMapper;
     private final com.djjko.dnc.ai.gemini.service.AiFoodGuideService aiFoodGuideService;
     private final FoodRecordRepository foodRecordRepository;
+    private final ExecutorService aiGuideExecutor = Executors.newFixedThreadPool(GUIDE_EXECUTOR_SIZE);
+    private final ConcurrentMap<String, GuideTaskState> guideTaskStore = new ConcurrentHashMap<>();
 
     public AiFoodService(
             AiServerClient aiServerClient,
@@ -91,7 +103,36 @@ public class AiFoodService {
         this.foodRecordRepository = foodRecordRepository;
     }
 
-    public AiFoodAnalyzeResponse analyze(Long userId, MultipartFile image, Double estimatedWeight) {
+    private enum GuideTaskStatus {
+        PENDING,
+        COMPLETED,
+        FAILED
+    }
+
+    private static final class GuideTaskState {
+        private final Long userId;
+        private final LocalDateTime createdAt;
+        private volatile GuideTaskStatus status;
+        private volatile String aiGuide;
+        private volatile String message;
+
+        private GuideTaskState(Long userId) {
+            this.userId = userId;
+            this.createdAt = LocalDateTime.now();
+            this.status = GuideTaskStatus.PENDING;
+        }
+    }
+
+    @PreDestroy
+    public void shutdownGuideExecutor() {
+        aiGuideExecutor.shutdown();
+    }
+
+    public AiFoodAnalyzeResponse analyze(
+            Long userId,
+            MultipartFile image,
+            Double estimatedWeight,
+            boolean aiGuideEnabled) {
         if (image == null || image.isEmpty()) {
             return new AiFoodAnalyzeResponse(
                     DEFAULT_LABELS,
@@ -102,6 +143,8 @@ public class AiFoodService {
                     null,
                     null,
                     estimatedWeight,
+                    null,
+                    "DISABLED",
                     null);
         }
 
@@ -138,36 +181,118 @@ public class AiFoodService {
             values = mapPredictionValues(predictedValues.get());
         }
 
-        // AI Guide Generation
         String aiGuide = null;
-        try {
-            // 임시 FoodRecord 생성 (가이드 생성을 위한 데이터 전달용)
-            // 주의: 실제 DB에 저장되지 않은 상태이므로 ID는 null입니다.
-            FoodRecord tempRecord = new FoodRecord();
-            tempRecord.setEatenAt(LocalDateTime.now());
-            tempRecord.setMealType(com.djjko.dnc.meal.domain.MealType.LUNCH); // 기본값 설정 (필요시 파라미터로 받아야 함)
+        String aiGuideStatus = aiGuideEnabled ? GuideTaskStatus.PENDING.name() : "DISABLED";
+        String aiGuideRequestId = null;
 
-            // 영양 성분 문자열 생성
-            String nutritionSummary = nutrition != null ? String.format(
-                    "- 칼로리: %d kcal\n- 탄수화물: %d g\n- 단백질: %d g\n- 지방: %d g\n- 당류: %d g\n- 나트륨: %d mg",
-                    nutrition.calories(), nutrition.carbs(), nutrition.protein(), nutrition.fat(), nutrition.sugar(),
-                    nutrition.sodium()) : "영양 성분 정보 없음";
-
-            // 음식 목록 문자열 생성
-            String foodListString = foodName
-                    + (resolvedWeight != null ? String.format(" (%.0fg)", resolvedWeight) : "");
-
-            com.djjko.dnc.auth.entity.User user = userRepository.findById(userId).orElse(null);
-            if (user != null) {
-                aiGuide = aiFoodGuideService.generateGuide(user, tempRecord, foodListString, nutritionSummary);
+        if (aiGuideEnabled) {
+            aiGuideRequestId = enqueueGuideTask(userId, foodName, resolvedWeight, nutrition);
+            if (aiGuideRequestId == null) {
+                aiGuideStatus = GuideTaskStatus.FAILED.name();
             }
-        } catch (Exception e) {
-            log.warn("AI Guide generation failed: {}", e.getMessage());
-            aiGuide = "가이드 생성 실패";
         }
 
-        return buildResponse(DEFAULT_LABELS, values, guide, foodName, detectedBox, imageUrl, nutrition, resolvedWeight,
-                aiGuide);
+        return buildResponse(
+                DEFAULT_LABELS,
+                values,
+                guide,
+                foodName,
+                detectedBox,
+                imageUrl,
+                nutrition,
+                resolvedWeight,
+                aiGuide,
+                aiGuideStatus,
+                aiGuideRequestId);
+    }
+
+    public Optional<AiGuideStatusResponse> getGuideStatus(Long userId, String requestId) {
+        if (requestId == null || requestId.isBlank()) {
+            return Optional.empty();
+        }
+        cleanupExpiredGuideTasks();
+        GuideTaskState state = guideTaskStore.get(requestId);
+        if (state == null || !state.userId.equals(userId)) {
+            return Optional.empty();
+        }
+        return Optional.of(new AiGuideStatusResponse(
+                requestId,
+                state.status.name(),
+                state.aiGuide,
+                state.message));
+    }
+
+    private String enqueueGuideTask(
+            Long userId,
+            String foodName,
+            Double resolvedWeight,
+            AiFoodNutrition nutrition) {
+        cleanupExpiredGuideTasks();
+        if (userId == null) {
+            return null;
+        }
+        if (userRepository.findById(userId).isEmpty()) {
+            return null;
+        }
+
+        final String requestId = UUID.randomUUID().toString();
+        GuideTaskState state = new GuideTaskState(userId);
+        guideTaskStore.put(requestId, state);
+
+        aiGuideExecutor.submit(() -> {
+            try {
+                String aiGuide = generatePreviewGuide(userId, foodName, resolvedWeight, nutrition);
+                state.aiGuide = aiGuide;
+                state.status = GuideTaskStatus.COMPLETED;
+                state.message = null;
+            } catch (Exception ex) {
+                log.warn("Async AI guide generation failed. requestId={}, message={}", requestId, ex.getMessage());
+                state.status = GuideTaskStatus.FAILED;
+                state.message = "AI 코칭 생성에 실패했어요.";
+            }
+        });
+
+        return requestId;
+    }
+
+    private String generatePreviewGuide(
+            Long userId,
+            String foodName,
+            Double resolvedWeight,
+            AiFoodNutrition nutrition) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalStateException("User not found"));
+
+        FoodRecord tempRecord = new FoodRecord();
+        tempRecord.setEatenAt(LocalDateTime.now());
+        tempRecord.setMealType(com.djjko.dnc.meal.domain.MealType.LUNCH);
+
+        String nutritionSummary = buildNutritionSummary(nutrition);
+        String normalizedFoodName =
+                (foodName != null && !foodName.isBlank()) ? foodName : FALLBACK_FOOD_NAME;
+        String foodListString = normalizedFoodName
+                + (resolvedWeight != null ? String.format(" (%.0fg)", resolvedWeight) : "");
+
+        return aiFoodGuideService.generateGuide(user, tempRecord, foodListString, nutritionSummary);
+    }
+
+    private String buildNutritionSummary(AiFoodNutrition nutrition) {
+        if (nutrition == null) {
+            return "영양 성분 정보 없음";
+        }
+        return String.format(
+                "- 칼로리: %d kcal%n- 탄수화물: %d g%n- 단백질: %d g%n- 지방: %d g%n- 당류: %d g%n- 나트륨: %d mg",
+                nutrition.calories(),
+                nutrition.carbs(),
+                nutrition.protein(),
+                nutrition.fat(),
+                nutrition.sugar(),
+                nutrition.sodium());
+    }
+
+    private void cleanupExpiredGuideTasks() {
+        LocalDateTime threshold = LocalDateTime.now().minus(GUIDE_JOB_TTL);
+        guideTaskStore.entrySet().removeIf(entry -> entry.getValue().createdAt.isBefore(threshold));
     }
 
     public void analyzeAndPersist(
@@ -266,18 +391,22 @@ public class AiFoodService {
     }
 
     private Optional<FoodMetadata> resolveMetadata(String detectedName) {
-        if (detectedName == null || detectedName.isBlank()) {
+        if (detectedName == null) {
             return Optional.empty();
         }
-        Optional<FoodMetadata> byName = foodMetadataRepository.findFirstByFoodNameIgnoreCase(detectedName);
+        String normalized = detectedName.trim();
+        if (normalized.isBlank()) {
+            return Optional.empty();
+        }
+        Optional<FoodMetadata> byName = foodMetadataRepository.findFirstByFoodNameIgnoreCase(normalized);
         if (byName.isPresent()) {
             return byName;
         }
-        if (!detectedName.matches("\\d+")) {
+        if (!normalized.matches("\\d+")) {
             return Optional.empty();
         }
         try {
-            Long code = Long.parseLong(detectedName);
+            Long code = Long.parseLong(normalized);
             return foodMetadataRepository.findById(code);
         } catch (NumberFormatException ex) {
             return Optional.empty();
@@ -293,7 +422,9 @@ public class AiFoodService {
             String imageUrl,
             AiFoodNutrition nutrition,
             Double estimatedWeight,
-            String aiGuide) {
+            String aiGuide,
+            String aiGuideStatus,
+            String aiGuideRequestId) {
         return new AiFoodAnalyzeResponse(
                 labels,
                 values,
@@ -303,7 +434,9 @@ public class AiFoodService {
                 imageUrl,
                 nutrition,
                 estimatedWeight,
-                aiGuide);
+                aiGuide,
+                aiGuideStatus,
+                aiGuideRequestId);
     }
 
     private Optional<List<Double>> fetchGlucosePrediction(Long userId, AiFoodNutrition nutrition) {

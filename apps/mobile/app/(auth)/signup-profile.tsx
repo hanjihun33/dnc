@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { setAuthSession } from "@/session";
 
@@ -88,10 +89,7 @@ export default function SignupProfileScreen() {
     (_, index) => index + 1
   );
 
-  const scrollToIndex = (
-    ref: React.RefObject<ScrollView>,
-    index: number
-  ) => {
+  const scrollToIndex = (ref: React.RefObject<ScrollView>, index: number) => {
     if (!ref.current) {
       return;
     }
@@ -293,7 +291,7 @@ export default function SignupProfileScreen() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <Text style={styles.backText}>{"<"}</Text>
+            <Ionicons name="chevron-back" size={18} color={palette.text} />
           </TouchableOpacity>
           <Text style={styles.pageTitle}>신체 정보</Text>
           <View style={styles.backSpacer} />
@@ -312,38 +310,48 @@ export default function SignupProfileScreen() {
         </View>
         <Text style={styles.progressLabel}>단계 3/3</Text>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>신체 정보를 입력해 주세요</Text>
-          <Text style={styles.cardDesc}>
-            목표 칼로리에 맞춘 식단 추천에 사용됩니다.
+        <View style={styles.formArea}>
+          <Text style={styles.sectionTitle}>신체 정보를 입력해 주세요</Text>
+          <Text style={styles.sectionDesc}>
+            개인별 맞춤 혈당 분석 및 예측을 위해 사용됩니다.
           </Text>
 
-          <View style={styles.fieldBlock}>
-            <Text style={styles.inputLabel}>키(cm)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="170"
-              placeholderTextColor={palette.textMuted}
-              keyboardType="number-pad"
-              value={draft.height}
-              onChangeText={(value) => updateDraft({ height: value })}
-            />
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>키(cm)</Text>
+            <View style={styles.inputPill}>
+              <View style={styles.inputIcon}>
+                <Ionicons name="resize-outline" size={18} color={palette.textMuted} />
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="170"
+                placeholderTextColor={palette.textMuted}
+                keyboardType="number-pad"
+                value={draft.height}
+                onChangeText={(value) => updateDraft({ height: value })}
+              />
+            </View>
           </View>
 
-          <View style={styles.fieldBlock}>
-            <Text style={styles.inputLabel}>몸무게(kg)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="65"
-              placeholderTextColor={palette.textMuted}
-              keyboardType="number-pad"
-              value={draft.weight}
-              onChangeText={(value) => updateDraft({ weight: value })}
-            />
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>몸무게(kg)</Text>
+            <View style={styles.inputPill}>
+              <View style={styles.inputIcon}>
+                <Ionicons name="barbell-outline" size={18} color={palette.textMuted} />
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="65"
+                placeholderTextColor={palette.textMuted}
+                keyboardType="number-pad"
+                value={draft.weight}
+                onChangeText={(value) => updateDraft({ weight: value })}
+              />
+            </View>
           </View>
 
-          <View style={styles.fieldBlock}>
-            <Text style={styles.inputLabel}>성별</Text>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>성별</Text>
             <View style={styles.choiceRow}>
               <TouchableOpacity
                 style={[
@@ -381,24 +389,25 @@ export default function SignupProfileScreen() {
             </View>
           </View>
 
-          <View style={styles.fieldBlock}>
-            <Text style={styles.inputLabel}>생년월일</Text>
-            <TouchableOpacity style={styles.inputButton} onPress={openPicker}>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>생년월일</Text>
+            <TouchableOpacity style={styles.inputPill} onPress={openPicker}>
+              <View style={styles.inputIcon}>
+                <Ionicons name="calendar-outline" size={18} color={palette.textMuted} />
+              </View>
               <Text
                 style={[
-                  styles.inputButtonText,
+                  styles.pillValue,
                   !draft.birthDate && styles.inputPlaceholder,
                 ]}
               >
                 {birthDateLabel}
               </Text>
-              <Text style={styles.inputButtonChevron}>v</Text>
+              <Ionicons name="chevron-down" size={16} color={palette.textMuted} />
             </TouchableOpacity>
           </View>
 
-          {errorMessage && (
-            <Text style={styles.errorText}>{errorMessage}</Text>
-          )}
+          {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
         </View>
 
         <TouchableOpacity
@@ -581,6 +590,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: 24,
     marginBottom: 12,
   },
   backButton: {
@@ -591,7 +601,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backText: { fontSize: 16, color: palette.text },
   backSpacer: { width: 36 },
   pageTitle: { fontSize: 22, fontWeight: "800", color: palette.text },
   progressRow: { flexDirection: "row" },
@@ -605,46 +614,54 @@ const styles = StyleSheet.create({
   progressBarActive: { backgroundColor: palette.accent },
   progressBarLast: { marginRight: 0 },
   progressLabel: { marginTop: 8, color: palette.textMuted, fontSize: 12 },
-  card: {
+  formArea: {
     marginTop: 18,
-    backgroundColor: palette.card,
-    borderRadius: 22,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: palette.border,
   },
-  cardTitle: { fontSize: 16, fontWeight: "700", color: palette.text },
-  cardDesc: { fontSize: 12, color: palette.textMuted, marginTop: 6 },
-  fieldBlock: { marginTop: 16 },
-  inputLabel: {
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: palette.text },
+  sectionDesc: {
+    fontSize: 12,
+    color: palette.textMuted,
+    marginTop: 6,
+  },
+  fieldGroup: { marginTop: 16 },
+  fieldLabel: {
     color: palette.textMuted,
     fontSize: 12,
     fontWeight: "600",
     marginBottom: 8,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: palette.text,
-    backgroundColor: "#F9F5E9",
-  },
-  inputButton: {
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: "#F9F5E9",
+  inputPill: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    backgroundColor: "#F1E7D6",
+    borderRadius: 26,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: palette.border,
   },
-  inputButtonText: { color: palette.text, fontWeight: "600" },
+  inputIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#E6DCC6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  input: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: palette.text,
+    fontSize: 15,
+  },
+  pillValue: {
+    flex: 1,
+    paddingHorizontal: 14,
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: "600",
+  },
   inputPlaceholder: { color: palette.textMuted },
-  inputButtonChevron: { color: palette.textMuted, fontSize: 12 },
   choiceRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -653,11 +670,11 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 14,
+    borderRadius: 22,
     paddingVertical: 12,
     alignItems: "center",
     marginRight: 10,
-    backgroundColor: "#F9F5E9",
+    backgroundColor: "#F1E7D6",
   },
   choiceButtonLast: { marginRight: 0 },
   choiceButtonActive: {
@@ -668,10 +685,10 @@ const styles = StyleSheet.create({
   choiceTextActive: { color: palette.ink },
   primaryButton: {
     backgroundColor: palette.accent,
-    borderRadius: 18,
-    paddingVertical: 14,
+    borderRadius: 26,
+    paddingVertical: 16,
     alignItems: "center",
-    marginTop: 18,
+    marginTop: 22,
     shadowColor: palette.ink,
     shadowOpacity: 0.15,
     shadowRadius: 10,

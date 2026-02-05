@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   LayoutChangeEvent,
@@ -15,14 +16,16 @@ import {
   Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { LineChart } from "react-native-chart-kit";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getAuthHeaders, loadAuthSession } from "@/session";
 import AiGuideText from "@/components/ai-guide-text";
 
 const mealTypes = ["아침", "점심", "저녁", "간식"];
-const chartWidth = Dimensions.get("window").width - 48;
+const chartWidth = Dimensions.get("window").width - 32;
 const timePeriods = ["오전", "오후"];
 const timeHours = Array.from({ length: 12 }, (_, index) => index + 1);
 const timeMinutes = Array.from({ length: 60 }, (_, index) => index);
@@ -32,6 +35,7 @@ const timePickerPadding = (timePickerHeight - timeItemHeight) / 2;
 const weekLabels = ["일", "월", "화", "수", "목", "금", "토"];
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+const GUIDE_PENDING_TEXT = "AI 코칭 생성 중...";
 const mealTypeMap: Record<string, string> = {
   아침: "BREAKFAST",
   점심: "LUNCH",
@@ -106,6 +110,8 @@ type MealResponse = {
   aiGuide?: string | null;
   foodName?: string | null;
   carbsGrams?: number | null;
+  weightGrams?: number | null;
+  servingCount?: number | null;
   calories?: number | null;
   carbs?: number | null;
   protein?: number | null;
@@ -283,18 +289,42 @@ const getPredictionSummary = (type: string | null, values: number[]) => {
 export default function MealScreen() {
   const router = useRouter();
   const navigation = useNavigation();
-  const { mealId: mealIdParam } = useLocalSearchParams<{ mealId?: string }>();
+  const insets = useSafeAreaInsets();
+  const { mealId: mealIdParam, photoUri, capturedAt } =
+    useLocalSearchParams<{ mealId?: string | string[]; photoUri?: string | string[]; capturedAt?: string | string[] }>();
+  const resolvedPhotoUri =
+    typeof photoUri === "string"
+      ? photoUri
+      : Array.isArray(photoUri)
+        ? photoUri[0]
+        : undefined;
+  const resolvedCapturedAt =
+    typeof capturedAt === "string"
+      ? capturedAt
+      : Array.isArray(capturedAt)
+        ? capturedAt[0]
+        : undefined;
+
+  console.log("MEAL PARAMS", {
+    photoUri,
+    capturedAt,
+    resolvedPhotoUri,
+    resolvedCapturedAt,
+  });
   const editMealId =
     typeof mealIdParam === "string" && mealIdParam.length > 0
       ? Number(mealIdParam)
       : NaN;
   const isEditMode = Number.isFinite(editMealId);
+  const headerPaddingTop = Math.max(12, insets.top + 8);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] =
     useState<ImagePicker.ImagePickerAsset | null>(null);
   const [predictionData, setPredictionData] = useState<PredictionData | null>(
     null
   );
+  const [aiGuideRequestId, setAiGuideRequestId] = useState<string | null>(null);
+  const [isAiGuidePending, setIsAiGuidePending] = useState(false);
   const [analysisSnapshot, setAnalysisSnapshot] = useState<{
     foodName?: string;
     nutrition?: NutritionData;
@@ -307,6 +337,11 @@ export default function MealScreen() {
   const [mealDate, setMealDate] = useState(new Date());
   const [mealTime, setMealTime] = useState(new Date());
   const [memo, setMemo] = useState("");
+  const [weightGramsInput, setWeightGramsInput] = useState("");
+  const [servingCountInput, setServingCountInput] = useState("");
+  const [portionInputMode, setPortionInputMode] = useState<"serving" | "grams">(
+    "serving"
+  );
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
   const [autoAdvanceTime, setAutoAdvanceTime] = useState(false);
   const [pickerMode, setPickerMode] = useState<"date" | "time" | null>(null);
@@ -369,9 +404,22 @@ export default function MealScreen() {
         setTimeHour(parts.hour);
         setTimeMinute(parts.minute);
         setMemo(data.memo ?? "");
+        setWeightGramsInput(
+          data.weightGrams != null ? String(data.weightGrams) : ""
+        );
+        setServingCountInput(
+          data.servingCount != null ? String(data.servingCount) : ""
+        );
+        if (data.servingCount != null) {
+          setPortionInputMode("serving");
+        } else if (data.weightGrams != null) {
+          setPortionInputMode("grams");
+        }
         setSelectedImage(data.imageUrl ?? null);
         setSelectedAsset(null);
         setPredictionData(null);
+        setAiGuideRequestId(null);
+        setIsAiGuidePending(false);
         setAnalysisSnapshot(
           data.foodName ? { foodName: data.foodName } : null
         );
@@ -399,6 +447,34 @@ export default function MealScreen() {
       isActive = false;
     };
   }, [isEditMode, editMealId]);
+
+  useEffect(() => {
+    if (!resolvedPhotoUri) {
+      return;
+    }
+    const appliedDate = resolvedCapturedAt ? new Date(resolvedCapturedAt) : new Date();
+    setMealDate(appliedDate);
+    setMealTime(appliedDate);
+    setMealType(getMealTypeByTime(appliedDate));
+    setIsMealTypeAuto(true);
+    setNoticeMessage("메타데이터가 없어 현재 시간으로 입력했어요.");
+
+    const asset = {
+      uri: resolvedPhotoUri,
+      fileName: `camera-${Date.now()}.jpg`,
+      mimeType: "image/jpeg",
+    } as ImagePicker.ImagePickerAsset;
+    setSelectedAsset(asset);
+    setSelectedImage(resolvedPhotoUri);
+    setPredictionData(null);
+    setAiGuideRequestId(null);
+    setIsAiGuidePending(false);
+    setAnalysisSnapshot(null);
+    analyzeImage(asset);
+
+    (navigation as { setParams?: (params: Record<string, unknown>) => void })
+      ?.setParams?.({ photoUri: undefined, capturedAt: undefined });
+  }, [resolvedPhotoUri, resolvedCapturedAt, navigation]);
 
   const scrollToIndex = (ref: React.RefObject<ScrollView>, index: number) => {
     if (!ref.current) {
@@ -471,6 +547,8 @@ export default function MealScreen() {
     setSelectedImage(null);
     setSelectedAsset(null);
     setPredictionData(null);
+    setAiGuideRequestId(null);
+    setIsAiGuidePending(false);
     setAnalysisSnapshot(null);
     setNoticeMessage(null);
   }, [isEditMode]);
@@ -483,6 +561,8 @@ export default function MealScreen() {
     setMealDate(now);
     setMealTime(now);
     setMemo("");
+    setWeightGramsInput("");
+    setServingCountInput("");
     setEditCarbsGrams(null);
     setEditAiGuide(null);
     setAutoAdvanceTime(false);
@@ -505,6 +585,19 @@ export default function MealScreen() {
     },
     [isEditMode, isMealTypeAuto]
   );
+
+  const parseOptionalNumber = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    const normalized = trimmed.replace(/,/g, "");
+    const parsed = Number(normalized);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return null;
+    }
+    return parsed;
+  };
 
   useEffect(() => {
     if (isEditMode) {
@@ -562,11 +655,14 @@ export default function MealScreen() {
       if (isEditMode) {
         return;
       }
+      if (resolvedPhotoUri) {
+        return;
+      }
       if (selectedAsset || selectedImage) {
         return;
       }
       resetForm();
-    }, [isEditMode, resetForm, selectedAsset, selectedImage])
+    }, [isEditMode, resetForm, selectedAsset, selectedImage, resolvedPhotoUri])
   );
 
   useFocusEffect(
@@ -585,6 +681,106 @@ export default function MealScreen() {
       };
     }, [isEditMode, navigation])
   );
+
+  useEffect(() => {
+    if (!aiGuideRequestId || !isAiGuidePending) {
+      return;
+    }
+
+    let isActive = true;
+    let inFlight = false;
+    let attempts = 0;
+    const maxAttempts = 20;
+
+    const stopPolling = () => {
+      setIsAiGuidePending(false);
+      setAiGuideRequestId(null);
+    };
+
+    const applyFallbackGuide = () => {
+      setPredictionData((prev) => {
+        if (!prev) return prev;
+        if (prev.guide !== GUIDE_PENDING_TEXT) return prev;
+        return { ...prev, guide: buildFallbackPrediction().guide };
+      });
+    };
+
+    const pollGuide = async () => {
+      if (!isActive || inFlight) {
+        return;
+      }
+      inFlight = true;
+      try {
+        await loadAuthSession();
+        const response = await fetch(
+          `${API_BASE_URL}/api/v1/ai/food/guides/${aiGuideRequestId}`,
+          { headers: getAuthHeaders() }
+        );
+        attempts += 1;
+        if (!response.ok) {
+          if (attempts >= maxAttempts) {
+            applyFallbackGuide();
+            stopPolling();
+          }
+          return;
+        }
+
+        const payload = (await response.json()) as {
+          status?: string;
+          aiGuide?: string | null;
+          message?: string | null;
+        };
+        const status = payload.status?.toUpperCase();
+
+        if (status === "COMPLETED") {
+          const guide = payload.aiGuide?.trim();
+          if (guide) {
+            setPredictionData((prev) =>
+              prev
+                ? {
+                  ...prev,
+                  guide,
+                }
+                : prev
+            );
+          } else {
+            applyFallbackGuide();
+          }
+          stopPolling();
+          return;
+        }
+
+        if (status === "FAILED") {
+          applyFallbackGuide();
+          stopPolling();
+          return;
+        }
+
+        if (attempts >= maxAttempts) {
+          applyFallbackGuide();
+          stopPolling();
+        }
+      } catch (error) {
+        attempts += 1;
+        if (attempts >= maxAttempts) {
+          applyFallbackGuide();
+          stopPolling();
+        }
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void pollGuide();
+    const interval = setInterval(() => {
+      void pollGuide();
+    }, 1500);
+
+    return () => {
+      isActive = false;
+      clearInterval(interval);
+    };
+  }, [aiGuideRequestId, isAiGuidePending]);
 
   const handleSubmit = async () => {
     if (!selectedAsset || isSubmitting) {
@@ -650,9 +846,21 @@ export default function MealScreen() {
       if (analysisSnapshot?.nutrition?.carbs != null) {
         formData.append("carbsGrams", String(analysisSnapshot.nutrition.carbs));
       }
-      // Send AI guide if available to skip re-generation on server
-      if (predictionData?.guide || editAiGuide) {
-        formData.append("aiGuide", (predictionData?.guide ?? editAiGuide ?? "").trim());
+      const weightGrams = parseOptionalNumber(weightGramsInput);
+      if (weightGrams != null) {
+        formData.append("weightGrams", String(weightGrams));
+      }
+      const servingCount = parseOptionalNumber(servingCountInput);
+      if (servingCount != null) {
+        formData.append("servingCount", String(servingCount));
+      }
+      const resolvedGuide = (predictionData?.guide ?? editAiGuide ?? "").trim();
+      if (
+        !isAiGuidePending &&
+        resolvedGuide.length > 0 &&
+        resolvedGuide !== GUIDE_PENDING_TEXT
+      ) {
+        formData.append("aiGuide", resolvedGuide);
       }
       formData.append("mealType", mealTypeMap[mealType] ?? "SNACK");
       formData.append("eatenAt", eatenAt.toISOString());
@@ -735,6 +943,14 @@ export default function MealScreen() {
       if (resolvedCarbs != null) {
         payload.carbsGrams = resolvedCarbs;
       }
+      const resolvedWeight = parseOptionalNumber(weightGramsInput);
+      if (resolvedWeight != null) {
+        payload.weightGrams = resolvedWeight;
+      }
+      const resolvedServing = parseOptionalNumber(servingCountInput);
+      if (resolvedServing != null) {
+        payload.servingCount = resolvedServing;
+      }
 
       const response = await fetch(`${API_BASE_URL}/api/v1/meals/${editMealId}`, {
         method: "PATCH",
@@ -793,8 +1009,27 @@ export default function MealScreen() {
     openPicker("date");
   };
 
+  const parseServingBaseGrams = (servingSize?: string) => {
+    if (!servingSize) return null;
+    const match = servingSize.match(/(\d+(?:\.\d+)?)\s*g/i);
+    if (!match) return null;
+    const grams = Number(match[1]);
+    return Number.isFinite(grams) ? grams : null;
+  };
+
+  const servingBaseGrams = parseServingBaseGrams(
+    predictionData?.nutrition?.servingSize
+  );
+  const servingCountValue = Number(servingCountInput);
+  const servingApproxGrams =
+    servingBaseGrams != null && Number.isFinite(servingCountValue) && servingCountValue > 0
+      ? Math.round(servingBaseGrams * servingCountValue)
+      : null;
+
   const analyzeImage = async (asset: ImagePicker.ImagePickerAsset) => {
     setIsAnalyzing(true);
+    setAiGuideRequestId(null);
+    setIsAiGuidePending(false);
     try {
       await loadAuthSession();
       const formData = new FormData();
@@ -821,6 +1056,8 @@ export default function MealScreen() {
         values?: number[];
         guide?: string;
         aiGuide?: string;
+        aiGuideStatus?: string;
+        aiGuideRequestId?: string | null;
         foodName?: string;
         foodBox?: {
           x_min?: number;
@@ -839,10 +1076,18 @@ export default function MealScreen() {
           label.endsWith("분") ? label : `${label}분`
         ) ?? [];
 
+      const status = data.aiGuideStatus?.toUpperCase();
+      const hasAiGuide = !!(data.aiGuide && data.aiGuide.trim().length > 0);
+      const shouldPollGuide = status === "PENDING" && !!data.aiGuideRequestId;
+      setAiGuideRequestId(shouldPollGuide ? data.aiGuideRequestId ?? null : null);
+      setIsAiGuidePending(shouldPollGuide);
+
       const resolvedGuide =
-        data.aiGuide && data.aiGuide.trim().length > 0
+        hasAiGuide
           ? data.aiGuide
-          : data.guide ?? buildFallbackPrediction().guide;
+          : shouldPollGuide
+            ? GUIDE_PENDING_TEXT
+            : data.guide ?? buildFallbackPrediction().guide;
 
       setPredictionData({
         graphData: {
@@ -862,6 +1107,8 @@ export default function MealScreen() {
       });
     } catch (error) {
       console.warn(error);
+      setAiGuideRequestId(null);
+      setIsAiGuidePending(false);
       setPredictionData(buildFallbackPrediction());
       setAnalysisSnapshot(null);
     } finally {
@@ -908,44 +1155,12 @@ export default function MealScreen() {
 
 
 
-  const pickImageFromCamera = async () => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert("\uad8c\ud55c \ud544\uc694", "\uce74\uba54\ub77c \uc811\uadfc \uad8c\ud55c\uc744 \ud5c8\uc6a9\ud574\uc8fc\uc138\uc694.");
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 1,
-      exif: true,
-    });
-
-    if (!result.canceled) {
-      const asset = result.assets[0];
-      const exifDate = getExifDate(
-        asset.exif as Record<string, unknown> | undefined
-      );
-      const appliedDate = exifDate ?? new Date();
-      setMealDate(appliedDate);
-      setMealTime(appliedDate);
-      setMealType(getMealTypeByTime(appliedDate));
-      setIsMealTypeAuto(true);
-      setNoticeMessage(
-        exifDate
-          ? "\uc0ac\uc9c4\uc758 \ucd2c\uc601 \uc2dc\uac04\uc73c\ub85c \uc790\ub3d9 \uc785\ub825\ud588\uc5b4\uc694."
-          : "\uba54\ud0c0\ub370\uc774\ud130\uac00 \uc5c6\uc5b4 \ud604\uc7ac \uc2dc\uac04\uc73c\ub85c \uc785\ub825\ud588\uc5b4\uc694."
-      );
-      setSelectedAsset(asset);
-      setSelectedImage(asset.uri);
-      setPredictionData(null);
-      setAnalysisSnapshot(null);
-      analyzeImage(asset);
-    }
+  const pickImageFromCamera = () => {
+    router.push("/(tabs)/meal-camera");
   };
 
-
-
+  
+  
   const calendarCells = getMonthMatrix(calendarMonth);
   const isTimePicker = pickerMode === "time";
   /*
@@ -955,6 +1170,10 @@ export default function MealScreen() {
   */
   const isSubmitDisabled =
     isSubmitting || isEditLoading || (!isEditMode && !selectedAsset);
+  const showFooter = isEditMode || !!selectedImage;
+  const showPostAnalysisFields = isEditMode
+    ? !isAnalyzing
+    : !!selectedImage && !isAnalyzing && !!predictionData;
   const footerButtonLabel = isSubmitting
     ? isEditMode
       ? "\uc218\uc815 \uc911..."
@@ -972,25 +1191,27 @@ export default function MealScreen() {
         style={styles.container}
         contentContainerStyle={[styles.page, isEditMode && styles.pageEdit]}
       >
-        <View style={[styles.headerRow, isEditMode && styles.headerRowEdit]}>
-          <View style={styles.headerLeft}>
-            {isEditMode && (
+        <View
+          style={[
+            styles.headerRow,
+            { paddingTop: headerPaddingTop },
+            isEditMode && styles.headerRowEdit,
+          ]}
+        >
+          <View style={styles.headerSide}>
+            {isEditMode ? (
               <TouchableOpacity
                 style={styles.backButton}
                 onPress={() => router.back()}
               >
-                <Text style={styles.backButtonText}>{"<"}</Text>
+                <Ionicons name="chevron-back" size={20} color={palette.text} />
               </TouchableOpacity>
-            )}
-            {isEditMode ? (
-              <Text style={styles.pageTitle}>{"\uae30\ub85d \uc218\uc815"}</Text>
-            ) : (
-              <Text style={styles.pageTitle}>{"\uc2dd\ub2e8 \uae30\ub85d"}</Text>
-            )}
-            {/*
-          <Text style={styles.pageTitle}>식사기록</Text>
-          */}
+            ) : null}
           </View>
+          <Text style={styles.pageTitle}>
+            {isEditMode ? "\uae30\ub85d \uc218\uc815" : "\uc2dd\ub2e8 \uae30\ub85d"}
+          </Text>
+          <View style={styles.headerSide} />
         </View>
 
         <Text
@@ -1039,7 +1260,7 @@ export default function MealScreen() {
               <Text style={styles.infoLabel}>식사 날짜</Text>
               <View style={styles.infoValueRow}>
                 <Text style={styles.infoValue}>{formatDate(mealDate)}</Text>
-                <Text style={styles.infoChevron}>v</Text>
+                <Ionicons name="chevron-down" size={16} color={palette.textMuted} />
               </View>
             </TouchableOpacity>
             <TouchableOpacity
@@ -1049,7 +1270,7 @@ export default function MealScreen() {
               <Text style={styles.infoLabel}>식사 시간</Text>
               <View style={styles.infoValueRow}>
                 <Text style={styles.infoValue}>{formatTime(mealTime)}</Text>
-                <Text style={styles.infoChevron}>v</Text>
+                <Ionicons name="chevron-down" size={16} color={palette.textMuted} />
               </View>
             </TouchableOpacity>
           </View>
@@ -1102,12 +1323,20 @@ export default function MealScreen() {
         ) : (
           <View style={styles.imageCard} onLayout={handleImageLayout}>
             <Image source={{ uri: selectedImage }} style={styles.imagePreview} />
+            {isAnalyzing && (
+              <View style={styles.imageAnalyzingOverlay}>
+                <View style={styles.imageAnalyzingPill}>
+                  <ActivityIndicator size="small" color="#FAF8F0" />
+                  <Text style={styles.imageAnalyzingPillText}>AI 분석 중...</Text>
+                </View>
+              </View>
+            )}
             {!isEditMode && (
               <TouchableOpacity
                 style={styles.imageRemoveButton}
                 onPress={clearImage}
               >
-                <Text style={styles.imageRemoveText}>X</Text>
+                <Ionicons name="close" size={16} color="#FAF8F0" />
               </TouchableOpacity>
             )}
             {predictionData?.foodName ? (
@@ -1162,9 +1391,6 @@ export default function MealScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-        )}
-        {selectedImage && isAnalyzing && (
-          <Text style={styles.analyzingText}>AI 분석 중...</Text>
         )}
 
         {selectedImage && predictionData && (
@@ -1248,12 +1474,20 @@ export default function MealScreen() {
                 </View>
                 <Text style={styles.aiMetaText}>이미지·영양·혈당 패턴 기반</Text>
               </View>
-              <Text style={styles.aiGuideTitle}>AI가 가이드를 제공해요</Text>
-              <AiGuideText text={predictionData.guide} textStyle={styles.aiGuideText} />
+              {isAiGuidePending ? (
+                <View style={styles.aiGuideLoadingRow}>
+                  <ActivityIndicator size="small" color={palette.accentDark} />
+                  <Text style={styles.aiGuideLoadingText}>{GUIDE_PENDING_TEXT}</Text>
+                </View>
+              ) : (
+                <AiGuideText text={predictionData.guide} textStyle={styles.aiGuideText} />
+              )}
               <View style={styles.aiGuideFooter}>
                 <View style={styles.aiPulse} />
                 <Text style={styles.aiFooterText}>
-                  AI가 생성한 개인 맞춤 추천입니다.
+                  {isAiGuidePending
+                    ? "맞춤 코칭을 생성하고 있어요."
+                    : "AI가 생성한 개인 맞춤 추천입니다."}
                 </Text>
               </View>
             </View>
@@ -1337,7 +1571,97 @@ export default function MealScreen() {
           </>
         ) : null}
 
-        {(selectedImage || isEditMode) && (
+
+        {showPostAnalysisFields && (
+          <>
+            <Text
+              style={[styles.sectionTitle, isEditMode && styles.sectionTitleEdit]}
+            >
+              중량/인분
+            </Text>
+            <Text style={styles.portionHint}>
+              인분 또는 중량 중 하나만 입력하세요.
+            </Text>
+            <View style={styles.portionSegmented}>
+              <TouchableOpacity
+                style={[
+                  styles.portionSegmentButton,
+                  portionInputMode === "serving" && styles.portionSegmentButtonActive,
+                ]}
+                onPress={() => {
+                  setPortionInputMode("serving");
+                  setWeightGramsInput("");
+                }}
+              >
+                <Text
+                  style={[
+                    styles.portionSegmentText,
+                    portionInputMode === "serving" && styles.portionSegmentTextActive,
+                  ]}
+                >
+                  인분
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.portionSegmentButton,
+                  portionInputMode === "grams" && styles.portionSegmentButtonActive,
+                ]}
+                onPress={() => {
+                  setPortionInputMode("grams");
+                  setServingCountInput("");
+                }}
+              >
+                <Text
+                  style={[
+                    styles.portionSegmentText,
+                    portionInputMode === "grams" && styles.portionSegmentTextActive,
+                  ]}
+                >
+                  중량(g)
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.portionCard}>
+              {portionInputMode === "serving" ? (
+                <>
+                  <Text style={styles.portionFieldLabel}>섭취 인분</Text>
+                  <View style={styles.portionInputContainer}>
+                    <TextInput
+                      value={servingCountInput}
+                      onChangeText={setServingCountInput}
+                      placeholder="예: 1.0"
+                      placeholderTextColor={palette.textMuted}
+                      keyboardType="decimal-pad"
+                      style={styles.portionInput}
+                    />
+                    <Text style={styles.portionUnit}>인분</Text>
+                  </View>
+                  {servingApproxGrams != null && (
+                    <Text style={styles.portionApprox}>약 {servingApproxGrams}g</Text>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Text style={styles.portionFieldLabel}>섭취 중량</Text>
+                  <View style={styles.portionInputContainer}>
+                    <TextInput
+                      value={weightGramsInput}
+                      onChangeText={setWeightGramsInput}
+                      placeholder="예: 200"
+                      placeholderTextColor={palette.textMuted}
+                      keyboardType="decimal-pad"
+                      style={styles.portionInput}
+                    />
+                    <Text style={styles.portionUnit}>g</Text>
+                  </View>
+                </>
+              )}
+            </View>
+          </>
+        )}
+
+        {showPostAnalysisFields && (
           <>
             <Text
               style={[styles.sectionTitle, isEditMode && styles.sectionTitleEdit]}
@@ -1359,25 +1683,28 @@ export default function MealScreen() {
           </>
         )}
       </ScrollView>
-      <View style={styles.footerBar}>
-        <TouchableOpacity
-          style={[
-            styles.footerButton,
-            isSubmitDisabled && styles.footerButtonDisabled,
-          ]}
-          onPress={isEditMode ? handleUpdate : handleSubmit}
-          disabled={isSubmitDisabled}
-        >
-          <Text
+      {showFooter && (
+        <View style={styles.footerBar}>
+          <View pointerEvents="none" style={styles.footerFade} />
+          <TouchableOpacity
             style={[
-              styles.footerButtonText,
-              isSubmitDisabled && styles.footerButtonTextDisabled,
+              styles.footerButton,
+              isSubmitDisabled && styles.footerButtonDisabled,
             ]}
+            onPress={isEditMode ? handleUpdate : handleSubmit}
+            disabled={isSubmitDisabled}
           >
-            {footerButtonLabel}
-          </Text>
-        </TouchableOpacity>
-      </View>
+            <Text
+              style={[
+                styles.footerButtonText,
+                isSubmitDisabled && styles.footerButtonTextDisabled,
+              ]}
+            >
+              {footerButtonLabel}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {replacePrompt.visible && (
         <Modal
           transparent
@@ -1466,7 +1793,7 @@ export default function MealScreen() {
                         setCalendarMonth(shiftMonth(calendarMonth, -1))
                       }
                     >
-                      <Text style={styles.calendarNavText}>{"<"}</Text>
+                      <Ionicons name="chevron-back" size={16} color={palette.textMuted} />
                     </TouchableOpacity>
                     <Text style={styles.calendarTitle}>
                       {`${calendarMonth.getFullYear()}년 ${calendarMonth.getMonth() + 1
@@ -1478,7 +1805,7 @@ export default function MealScreen() {
                         setCalendarMonth(shiftMonth(calendarMonth, 1))
                       }
                     >
-                      <Text style={styles.calendarNavText}>{">"}</Text>
+                      <Ionicons name="chevron-forward" size={16} color={palette.textMuted} />
                     </TouchableOpacity>
                   </View>
 
@@ -1712,8 +2039,8 @@ const styles = StyleSheet.create({
   },
   container: { flex: 1, zIndex: 1 },
   page: {
-    padding: 20,
-    paddingTop: Platform.OS === "android" ? 40 : 20,
+    paddingHorizontal: 16,
+    paddingTop: 0,
     paddingBottom: 140,
   },
   pageEdit: {
@@ -1723,16 +2050,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
+    paddingTop: 0,
+    paddingBottom: 12,
   },
   headerRowEdit: {
     marginBottom: 0,
-    marginTop: Platform.OS === "android" ? -50 : -8,
   },
-  headerLeft: {
-    flexDirection: "row",
+  headerSide: {
+    minWidth: 72,
+    minHeight: 40,
     alignItems: "center",
-    gap: 8,
+    justifyContent: "center",
   },
   backButton: {
     paddingVertical: 6,
@@ -1742,7 +2070,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: palette.text,
   },
-  pageTitle: { fontSize: 26, fontWeight: "700", color: palette.text },
+  pageTitle: { fontSize: 18, fontWeight: "700", color: palette.text },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
@@ -1756,7 +2084,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   sectionTitleFirstEdit: {
-    marginTop: -70,
+    marginTop: 8,
   },
   mealTypeRow: {
     flexDirection: "row",
@@ -1812,6 +2140,87 @@ const styles = StyleSheet.create({
   infoChevron: {
     fontSize: 14,
     color: palette.textMuted,
+  },
+  portionHint: {
+    marginTop: 2,
+    marginBottom: 10,
+    color: palette.textMuted,
+    fontSize: 12,
+    paddingLeft: 4,
+  },
+  portionSegmented: {
+    flexDirection: "row",
+    backgroundColor: "#EFE4D1",
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 10,
+  },
+  portionSegmentButton: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  portionSegmentButtonActive: {
+    backgroundColor: palette.card,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  portionSegmentText: {
+    color: palette.textMuted,
+    fontWeight: "600",
+    fontSize: 13,
+  },
+  portionSegmentTextActive: {
+    color: palette.text,
+    fontWeight: "800",
+  },
+  portionCard: {
+    backgroundColor: palette.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: palette.border,
+    padding: 16,
+  },
+  portionFieldLabel: {
+    color: palette.textMuted,
+    fontSize: 12,
+    marginBottom: 8,
+    fontWeight: "600",
+  },
+  portionInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F4E8D6",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  portionInput: {
+    flex: 1,
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: "700",
+    paddingVertical: 0,
+  },
+  portionUnit: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  portionApprox: {
+    marginTop: 8,
+    color: palette.accentDark,
+    fontSize: 12,
+    fontWeight: "600",
   },
   noticeCard: {
     backgroundColor: "#E6EDD8",
@@ -1907,11 +2316,27 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   imageTagText: { color: "#FAF8F0", fontWeight: "600", fontSize: 12 },
-  analyzingText: {
-    marginTop: 10,
-    color: palette.textMuted,
-    fontSize: 13,
-    textAlign: "center",
+  imageAnalyzingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(17, 22, 17, 0.28)",
+  },
+  imageAnalyzingPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: "rgba(31, 36, 31, 0.78)",
+    borderWidth: 1,
+    borderColor: "rgba(250, 248, 240, 0.25)",
+  },
+  imageAnalyzingPillText: {
+    color: "#FAF8F0",
+    fontSize: 15,
+    fontWeight: "700",
   },
   resultsContainer: {
     marginTop: 0,
@@ -2045,6 +2470,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
   },
+  aiGuideLoadingRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  aiGuideLoadingText: {
+    color: palette.textMuted,
+    fontSize: 14,
+    fontWeight: "700",
+  },
   aiGuideFooter: {
     marginTop: 14,
     flexDirection: "row",
@@ -2151,23 +2587,42 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 10,
     paddingBottom: Platform.OS === "ios" ? 28 : 16,
-    backgroundColor: "rgba(231, 193, 122, 0.96)",
+    backgroundColor: palette.panel,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     borderTopWidth: 1,
-    borderTopColor: palette.border,
+    borderTopColor: "rgba(107, 116, 102, 0.18)",
     zIndex: 10,
+  },
+  footerFade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: -10,
+    height: 10,
+    backgroundColor: "transparent",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: "#E7C17A",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
   },
   footerButton: {
     backgroundColor: palette.accent,
     borderRadius: 20,
-    paddingVertical: 16,
+    minHeight: 56,
     alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(31, 42, 31, 0.08)",
     shadowColor: palette.ink,
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
   footerButtonDisabled: {
     backgroundColor: "#EFE9D9",
@@ -2178,6 +2633,9 @@ const styles = StyleSheet.create({
     color: palette.ink,
     fontWeight: "800",
     fontSize: 16,
+    lineHeight: 20,
+    includeFontPadding: false,
+    textAlignVertical: "center",
   },
   footerButtonTextDisabled: {
     color: "#A5AE9C",

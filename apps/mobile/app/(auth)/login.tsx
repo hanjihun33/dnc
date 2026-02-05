@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   BackHandler,
   SafeAreaView,
@@ -9,10 +9,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { loadAuthSession, setAuthSession } from "@/session";
 import { registerPushTokenWithServer } from "@/push";
-import SocialLoginSection from "@/components/social-login-section";
 
 const palette = {
   background: "#FAF8F0",
@@ -37,6 +37,20 @@ const parseErrorMessage = async (response: Response) => {
   }
 };
 
+const mapLoginError = (message: string | null, status?: number) => {
+  if (status === 401 || status === 403) {
+    return "이메일 또는 비밀번호가 올바르지 않습니다.";
+  }
+  if (!message) {
+    return null;
+  }
+  const lower = message.toLowerCase();
+  if (lower.includes("invalid credentials") || lower.includes("bad credentials")) {
+    return "이메일 또는 비밀번호가 올바르지 않습니다.";
+  }
+  return message;
+};
+
 export default function LoginScreen() {
   const router = useRouter();
   const { from } = useLocalSearchParams<{ from?: string }>();
@@ -46,7 +60,7 @@ export default function LoginScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isLogoutFlow) {
       return;
     }
@@ -78,7 +92,8 @@ export default function LoginScreen() {
 
       if (!response.ok) {
         const message = await parseErrorMessage(response);
-        throw new Error(message ?? "로그인에 실패했습니다.");
+        const mapped = mapLoginError(message, response.status);
+        throw new Error(mapped ?? "로그인에 실패했습니다.");
       }
 
       const loginData = (await response.json()) as {
@@ -134,7 +149,7 @@ export default function LoginScreen() {
               style={styles.backButton}
               onPress={() => router.back()}
             >
-              <Text style={styles.backText}>{"<"}</Text>
+              <Ionicons name="chevron-back" size={18} color={palette.text} />
             </TouchableOpacity>
           )}
           <Text style={styles.pageTitle}>일반 로그인</Text>
@@ -144,12 +159,14 @@ export default function LoginScreen() {
           등록한 이메일(아이디)과 비밀번호로 로그인하세요.
         </Text>
 
-        <View style={styles.formCard}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>이메일(아이디)</Text>
+        <View style={styles.formArea}>
+          <View style={styles.inputPill}>
+            <View style={styles.inputIcon}>
+              <Ionicons name="mail-outline" size={18} color={palette.textMuted} />
+            </View>
             <TextInput
               style={styles.input}
-              placeholder="you@example.com"
+              placeholder="이메일(아이디)"
               placeholderTextColor={palette.textMuted}
               autoCapitalize="none"
               keyboardType="email-address"
@@ -157,11 +174,17 @@ export default function LoginScreen() {
               onChangeText={setEmail}
             />
           </View>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>비밀번호</Text>
+          <View style={styles.inputPill}>
+            <View style={styles.inputIcon}>
+              <Ionicons
+                name="lock-closed-outline"
+                size={18}
+                color={palette.textMuted}
+              />
+            </View>
             <TextInput
               style={styles.input}
-              placeholder="비밀번호를 입력하세요"
+              placeholder="비밀번호"
               placeholderTextColor={palette.textMuted}
               secureTextEntry
               value={password}
@@ -169,9 +192,7 @@ export default function LoginScreen() {
             />
           </View>
 
-          {errorMessage && (
-            <Text style={styles.errorText}>{errorMessage}</Text>
-          )}
+          {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
 
           <TouchableOpacity
             style={[
@@ -200,8 +221,6 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
         </View>
-
-        <SocialLoginSection />
       </ScrollView>
     </SafeAreaView>
   );
@@ -214,6 +233,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: 24,
     marginBottom: 10,
   },
   backButton: {
@@ -224,37 +244,41 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backText: { fontSize: 16, color: palette.text },
   backSpacer: { width: 36 },
   pageTitle: { fontSize: 22, fontWeight: "800", color: palette.text },
   subtitle: { color: palette.textMuted, marginBottom: 18 },
-  formCard: {
-    backgroundColor: palette.card,
-    borderRadius: 22,
-    padding: 18,
+  formArea: {
+    marginTop: 4,
+  },
+  inputPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F1E7D6",
+    borderRadius: 26,
+    padding: 6,
     borderWidth: 1,
     borderColor: palette.border,
+    marginBottom: 14,
   },
-  inputGroup: { marginBottom: 14 },
-  inputLabel: {
-    color: palette.textMuted,
-    fontSize: 12,
-    fontWeight: "600",
-    marginBottom: 8,
+  inputIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#E6DCC6",
+    alignItems: "center",
+    justifyContent: "center",
   },
   input: {
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 14,
+    flex: 1,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 10,
     color: palette.text,
-    backgroundColor: "#F9F5E9",
+    fontSize: 15,
   },
   primaryButton: {
     backgroundColor: palette.accent,
-    borderRadius: 18,
-    paddingVertical: 14,
+    borderRadius: 26,
+    paddingVertical: 16,
     alignItems: "center",
     marginTop: 6,
     shadowColor: palette.ink,
@@ -276,6 +300,10 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   helperText: { color: palette.textMuted, fontSize: 12, fontWeight: "600" },
-  helperTextAccent: { color: palette.accentDark, fontSize: 12, fontWeight: "700" },
+  helperTextAccent: {
+    color: palette.accentDark,
+    fontSize: 12,
+    fontWeight: "700",
+  },
   errorText: { color: "#C24A4A", fontSize: 12, marginBottom: 8 },
 });

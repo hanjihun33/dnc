@@ -2,6 +2,14 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+const palette = {
+    card: '#F8F0E1',
+    border: '#E5D9C4',
+    text: '#1F241F',
+    textMuted: '#6B7466',
+    contentBg: '#F1E8D8',
+};
+
 interface DailyReportProps {
     report: {
         healthScore: number;
@@ -39,7 +47,7 @@ export const DailySummaryCard = ({ report, onPressHistory }: DailyReportProps) =
                 </View>
                 <TouchableOpacity onPress={onPressHistory} style={styles.moreBtn}>
                     <Text style={styles.moreText}>더보기</Text>
-                    <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
+                    <Ionicons name="chevron-forward" size={14} color={palette.textMuted} />
                 </TouchableOpacity>
             </View>
 
@@ -63,17 +71,17 @@ export const DailySummaryCard = ({ report, onPressHistory }: DailyReportProps) =
 
 const styles = StyleSheet.create({
     card: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: palette.card,
         borderRadius: 20,
         padding: 20,
         marginVertical: 10,
-        shadowColor: "#000",
+        shadowColor: "#1F241F",
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
+        shadowOpacity: 0.06,
         shadowRadius: 10,
         elevation: 3,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: palette.border,
     },
     header: {
         flexDirection: 'row',
@@ -102,12 +110,12 @@ const styles = StyleSheet.create({
     dateText: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#475569',
+        color: palette.text,
     },
     dayCounter: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#94A3B8',
+        color: palette.textMuted,
     },
     moreBtn: {
         flexDirection: 'row',
@@ -115,17 +123,17 @@ const styles = StyleSheet.create({
     },
     moreText: {
         fontSize: 13,
-        color: '#94A3B8',
+        color: palette.textMuted,
         marginRight: 2,
     },
     content: {
-        backgroundColor: '#F8FAFC',
+        backgroundColor: palette.contentBg,
         padding: 16,
         borderRadius: 12,
     },
     summaryText: {
         fontSize: 15,
-        color: '#334155',
+        color: palette.text,
         lineHeight: 24,
     },
     aiFooter: {

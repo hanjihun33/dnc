@@ -11,6 +11,8 @@ import {
 import { useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getAuthHeaders,
   loadAuthSession,
@@ -18,13 +20,13 @@ import {
 } from "@/session";
 
 const palette = {
-  background: "#FAF8F0",
-  card: "#F6F1E3",
-  border: "#E7E0CC",
-  text: "#1F241F",
-  textMuted: "#6B7466",
-  accent: "#7FAF7B",
-  accentInk: "#1F2A1F",
+  background: "#F4E8D6",
+  card: "#F8F0E1",
+  border: "#E6DCC6",
+  text: "#2F3B30",
+  textMuted: "#6F7A6A",
+  accent: "#2F6B4F",
+  accentInk: "#233327",
 };
 
 const API_BASE_URL =
@@ -32,6 +34,7 @@ const API_BASE_URL =
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [profileName, setProfileName] = React.useState("");
   const [profileEmail, setProfileEmail] = React.useState("");
   const [profileImageUrl, setProfileImageUrl] = React.useState<string | null>(
@@ -42,6 +45,7 @@ export default function SettingsScreen() {
   const [sensorConnected, setSensorConnected] = React.useState(false);
   const initials =
     profileName.trim().length > 0 ? profileName.trim()[0] : "U";
+  const headerPaddingTop = Math.max(12, insets.top + 8);
 
   const loadProfile = React.useCallback(async () => {
     setIsProfileLoading(true);
@@ -103,7 +107,11 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>더보기</Text>
+        <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+          <View style={styles.headerSide} />
+          <Text style={styles.headerTitle}>설정</Text>
+          <View style={styles.headerSide} />
+        </View>
 
         <View style={styles.card}>
           <Pressable
@@ -131,7 +139,7 @@ export default function SettingsScreen() {
                 {isProfileLoading ? "" : profileEmail}
               </Text>
             </View>
-            <Text style={styles.chevron}>›</Text>
+            <Ionicons name="chevron-forward" style={styles.chevron} />
           </Pressable>
         </View>
 
@@ -161,7 +169,7 @@ export default function SettingsScreen() {
               <Text style={styles.itemTitle}>알림 설정</Text>
               <Text style={styles.itemDesc}>혈당 기준과 주기 관리</Text>
             </View>
-            <Text style={styles.chevron}>›</Text>
+            <Ionicons name="chevron-forward" style={styles.chevron} />
           </Pressable>
         </View>
       </ScrollView>
@@ -171,7 +179,21 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
-  container: { padding: 20, paddingBottom: 40 },
+  container: { paddingHorizontal: 16, paddingBottom: 40 },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 0,
+    paddingBottom: 12,
+  },
+  headerSide: {
+    minWidth: 72,
+    minHeight: 40,
+    justifyContent: "center",
+  },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: palette.text },
 
   title: {
     fontSize: 28,
@@ -227,6 +249,11 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     padding: 16,
     marginBottom: 16,
+    shadowColor: "#0B1220",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 6,
   },
   sectionTitle: {
     color: palette.textMuted,
@@ -249,7 +276,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   actionPillText: {
-    color: palette.accentInk,
+    color: "#F8F0E1",
     fontWeight: "700",
     fontSize: 12,
   },

@@ -1,14 +1,16 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { ActivityIndicator, AppState, StyleSheet, Text, View } from 'react-native';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadAuthSession } from '@/session';
 import { registerPushTokenWithServer } from '@/push';
+import { SplashScreen } from '@/components/splash-screen';
 import {
   getSocialLoginPending,
   getSocialLoginProcessing,
@@ -25,6 +27,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
   const [isBootstrapped, setIsBootstrapped] = React.useState(false);
+  const [showSplash, setShowSplash] = React.useState(true);
   const [showAuthOverlay, setShowAuthOverlay] = React.useState(false);
   const [showProcessingOverlay, setShowProcessingOverlay] = React.useState(
     getSocialLoginProcessing()
@@ -87,7 +90,9 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={theme}>
-        {isBootstrapped ? (
+        {showSplash ? (
+          <SplashScreen onFinish={() => setShowSplash(false)} />
+        ) : isBootstrapped ? (
           <>
             <Stack>
               <Stack.Screen name="(auth)" options={{ headerShown: false }} />

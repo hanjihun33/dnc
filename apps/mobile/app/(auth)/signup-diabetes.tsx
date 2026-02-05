@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+﻿import React, { useRef, useState } from "react";
 import {
   Modal,
   SafeAreaView,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { useSignupDraft } from "@/components/signup-context";
@@ -27,7 +28,7 @@ type DiabetesStatus = "none" | "prediabetes" | "type1" | "type2";
 
 const diabetesOptions: Array<{ value: DiabetesStatus; label: string }> = [
   { value: "none", label: "해당 없음" },
-  { value: "prediabetes", label: "당뇨병 전단계" },
+  { value: "prediabetes", label: "당뇨 전 단계" },
   { value: "type1", label: "1형 당뇨병" },
   { value: "type2", label: "2형 당뇨병" },
 ];
@@ -76,10 +77,7 @@ export default function SignupDiabetesScreen() {
       ? "70~ 180 mg/dL"
       : "70~ 140 mg/dL";
 
-  const scrollToIndex = (
-    ref: React.RefObject<ScrollView>,
-    index: number
-  ) => {
+  const scrollToIndex = (ref: React.RefObject<ScrollView>, index: number) => {
     if (!ref.current) {
       return;
     }
@@ -140,7 +138,7 @@ export default function SignupDiabetesScreen() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <Text style={styles.backText}>{"<"}</Text>
+            <Ionicons name="chevron-back" size={18} color={palette.text} />
           </TouchableOpacity>
           <Text style={styles.pageTitle}>당뇨 확인</Text>
           <View style={styles.backSpacer} />
@@ -153,34 +151,57 @@ export default function SignupDiabetesScreen() {
         </View>
         <Text style={styles.progressLabel}>가입 2/3</Text>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>당뇨 상태를 선택해주세요</Text>
-          <Text style={styles.cardDesc}>
-            입력한 정보는 맞춤 식단과 혈당 코칭 추천에만 사용됩니다.
+        <View style={styles.formArea}>
+          <Text style={styles.sectionTitle}>당뇨 상태를 선택해주세요</Text>
+          <Text style={styles.sectionDesc}>
+            입력한 정보에 맞춘 식단과 혈당 코칭 추천만 사용됩니다.
           </Text>
 
-          <View style={styles.detailBlock}>
-            <Text style={styles.inputLabel}>당뇨 상태</Text>
-            <TouchableOpacity style={styles.inputButton} onPress={openStatusPicker}>
-              <Text style={styles.inputButtonText}>{statusLabel}</Text>
-              <Text style={styles.inputButtonChevron}>v</Text>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>당뇨 상태</Text>
+            <TouchableOpacity style={styles.inputPill} onPress={openStatusPicker}>
+              <View style={styles.inputIcon}>
+                <Ionicons name="pulse-outline" size={18} color={palette.textMuted} />
+              </View>
+              <Text style={styles.pillValue}>{statusLabel}</Text>
+              <Ionicons name="chevron-down" size={16} color={palette.textMuted} />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.targetCard}>
-            <Text style={styles.targetLabel}>정상 혈당 목표</Text>
-            <Text style={styles.targetValue}>{targetRange}</Text>
+          <View style={styles.infoPill}>
+            <View style={styles.inputIcon}>
+              <Ionicons
+                name="speedometer-outline"
+                size={18}
+                color={palette.textMuted}
+              />
+            </View>
+            <View style={styles.infoTextGroup}>
+              <Text style={styles.infoLabel}>정상 혈당 목표</Text>
+              <Text style={styles.infoValue}>{targetRange}</Text>
+            </View>
           </View>
 
           {showDiagnosisPeriod && (
-            <View style={styles.detailBlock}>
-              <Text style={styles.inputLabel}>최초 진단 시기</Text>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>최초 진단 시기</Text>
               <TouchableOpacity
-                style={styles.inputButton}
+                style={styles.inputPill}
                 onPress={openDiagnosisPicker}
               >
-                <Text style={styles.inputButtonText}>{diagnosisLabel}</Text>
-                <Text style={styles.inputButtonChevron}>v</Text>
+                <View style={styles.inputIcon}>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={18}
+                    color={palette.textMuted}
+                  />
+                </View>
+                <Text style={styles.pillValue}>{diagnosisLabel}</Text>
+                <Ionicons
+                  name="chevron-down"
+                  size={16}
+                  color={palette.textMuted}
+                />
               </TouchableOpacity>
             </View>
           )}
@@ -395,6 +416,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: 24,
     marginBottom: 12,
   },
   backButton: {
@@ -405,7 +427,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backText: { fontSize: 16, color: palette.text },
   backSpacer: { width: 36 },
   pageTitle: { fontSize: 22, fontWeight: "800", color: palette.text },
   progressRow: { flexDirection: "row" },
@@ -419,59 +440,75 @@ const styles = StyleSheet.create({
   progressBarActive: { backgroundColor: palette.accent },
   progressBarLast: { marginRight: 0 },
   progressLabel: { marginTop: 8, color: palette.textMuted, fontSize: 12 },
-  card: {
+  formArea: {
     marginTop: 18,
-    backgroundColor: palette.card,
-    borderRadius: 22,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: palette.border,
   },
-  cardTitle: { fontSize: 16, fontWeight: "700", color: palette.text },
-  cardDesc: { fontSize: 12, color: palette.textMuted, marginTop: 6 },
-  detailBlock: { marginTop: 16 },
-  inputLabel: {
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: palette.text },
+  sectionDesc: {
+    fontSize: 12,
+    color: palette.textMuted,
+    marginTop: 6,
+  },
+  fieldGroup: { marginTop: 16 },
+  fieldLabel: {
     color: palette.textMuted,
     fontSize: 12,
     fontWeight: "600",
     marginBottom: 8,
   },
-  inputButton: {
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: "#F9F5E9",
+  inputPill: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    backgroundColor: "#F1E7D6",
+    borderRadius: 26,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: palette.border,
   },
-  inputButtonText: { color: palette.text, fontWeight: "600" },
-  inputButtonChevron: { color: palette.textMuted, fontSize: 12 },
-  targetCard: {
-    marginTop: 14,
+  inputIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#E6DCC6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pillValue: {
+    flex: 1,
+    paddingHorizontal: 14,
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  infoPill: {
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#E6EDD8",
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 26,
+    padding: 6,
   },
-  targetLabel: {
-    color: "#4E7C5B",
+  infoTextGroup: {
+    flex: 1,
+    paddingHorizontal: 14,
+  },
+  infoLabel: {
+    color: palette.accentDark,
     fontSize: 12,
     fontWeight: "600",
   },
-  targetValue: {
-    marginTop: 6,
-    color: "#1F2A1F",
+  infoValue: {
+    marginTop: 4,
+    color: palette.ink,
     fontSize: 18,
     fontWeight: "800",
   },
   primaryButton: {
     backgroundColor: palette.accent,
-    borderRadius: 18,
-    paddingVertical: 14,
+    borderRadius: 26,
+    paddingVertical: 16,
     alignItems: "center",
-    marginTop: 18,
+    marginTop: 22,
     shadowColor: palette.ink,
     shadowOpacity: 0.15,
     shadowRadius: 10,

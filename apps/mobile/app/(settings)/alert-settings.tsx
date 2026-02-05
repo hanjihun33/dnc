@@ -11,6 +11,8 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { alertConfig, AlertType } from "@/alert-config";
 import { fetchAlertSettings, updateAlertSetting } from "@/alert-api";
 import {
@@ -22,13 +24,13 @@ import {
 } from "@/alert-store";
 
 const palette = {
-  background: "#FAF8F0",
-  card: "#F6F1E3",
-  border: "#E7E0CC",
-  text: "#1F241F",
-  textMuted: "#6B7466",
-  accent: "#7FAF7B",
-  accentInk: "#1F2A1F",
+  background: "#F4E8D6",
+  card: "#F8F0E1",
+  border: "#E6DCC6",
+  text: "#2F3B30",
+  textMuted: "#6F7A6A",
+  accent: "#2F6B4F",
+  accentInk: "#233327",
 };
 
 const alertRowMeta: Array<{
@@ -46,9 +48,11 @@ const formatInterval = (minutes: number) =>
 
 export default function AlertSettingsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [settingsSnapshot, setSettingsSnapshot] = React.useState(() =>
     getAlertSettings()
   );
+  const headerPaddingTop = Math.max(12, insets.top + 8);
 
   const syncFromStore = React.useCallback(() => {
     setSettingsSnapshot(getAlertSettings());
@@ -95,10 +99,13 @@ export default function AlertSettingsScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.container}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backIcon}>←</Text>
-        </Pressable>
-        <Text style={styles.title}>알림 설정</Text>
+        <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+          <Pressable style={styles.headerSide} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={20} color={palette.text} />
+          </Pressable>
+          <Text style={styles.headerTitle}>알림 설정</Text>
+          <View style={styles.headerSide} />
+        </View>
 
         <Text style={styles.sectionTitle}>혈당 알림</Text>
         <View style={styles.listCard}>
@@ -114,7 +121,7 @@ export default function AlertSettingsScreen() {
                 </View>
                 <View style={styles.rowValue}>
                   <Text style={styles.rowValueText}>{row.value}</Text>
-                  <Text style={styles.chevron}>›</Text>
+                  <Ionicons name="chevron-forward" style={styles.chevron} />
                 </View>
               </Pressable>
               {index < alertRows.length - 1 && <View style={styles.divider} />}
@@ -138,11 +145,11 @@ export default function AlertSettingsScreen() {
                 setAlertSetting("rapid-rise", { enabled: next });
                 void updateAlertSetting("rapid-rise", { enabled: next });
               }}
-              trackColor={{ false: "#E7E0CC", true: palette.accent }}
+              trackColor={{ false: "#E6DCC6", true: palette.accent }}
               thumbColor={
                 settingsSnapshot["rapid-rise"].enabled
                   ? palette.accentInk
-                  : "#F6F1E3"
+                  : "#F8F0E1"
               }
             />
           </View>
@@ -154,22 +161,21 @@ export default function AlertSettingsScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
-  container: { padding: 20, paddingBottom: 40 },
+  container: { paddingHorizontal: 16, paddingBottom: 40 },
 
-  backButton: {
-    width: 36,
-    height: 36,
+  header: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 0,
+    paddingBottom: 12,
+  },
+  headerSide: {
+    minWidth: 72,
+    minHeight: 40,
     justifyContent: "center",
-    marginBottom: 6,
   },
-  backIcon: { fontSize: 20, color: palette.text },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: palette.text,
-    marginBottom: 20,
-  },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: palette.text },
 
   sectionTitle: {
     color: palette.textMuted,

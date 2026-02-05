@@ -1,4 +1,4 @@
-import { Tabs } from "expo-router";
+﻿import { Tabs } from "expo-router";
 import React from "react";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -48,7 +48,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="meal"
         options={{
-          title: "식단",
+          title: "AI식단분석",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="restaurant-outline" size={size ?? 22} color={color} />
           ),
@@ -87,7 +87,21 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="meal-camera"
+        options={{
+          href: null,
+          tabBarStyle: { display: "none" },
+        }}
+      />
+      <Tabs.Screen
         name="meal-edit"
+        options={{
+          href: null,
+          tabBarStyle: { display: "none" },
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
         options={{
           href: null,
           tabBarStyle: { display: "none" },

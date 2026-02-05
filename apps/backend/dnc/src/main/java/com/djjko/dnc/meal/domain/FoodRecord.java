@@ -28,6 +28,12 @@ public class FoodRecord {
     @Column(name = "carbs_grams")
     private Double carbsGrams;
 
+    @Column(name = "weight_grams")
+    private Double weightGrams;
+
+    @Column(name = "serving_count")
+    private Double servingCount;
+
     @Column(name = "peak_glucose")
     private Integer peakGlucose;
 
@@ -80,6 +86,22 @@ public class FoodRecord {
 
     public void setCarbsGrams(Double carbsGrams) {
         this.carbsGrams = carbsGrams;
+    }
+
+    public Double getWeightGrams() {
+        return weightGrams;
+    }
+
+    public void setWeightGrams(Double weightGrams) {
+        this.weightGrams = weightGrams;
+    }
+
+    public Double getServingCount() {
+        return servingCount;
+    }
+
+    public void setServingCount(Double servingCount) {
+        this.servingCount = servingCount;
     }
 
     public Integer getPeakGlucose() {

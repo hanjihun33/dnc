@@ -9,8 +9,10 @@ import {
   Text,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getAuthHeaders, loadAuthSession } from "@/session";
 import AiGuideText from "@/components/ai-guide-text";
 
@@ -50,6 +52,8 @@ type MealSummary = {
   protein?: number | null;
   fat?: number | null;
   foodName?: string | null;
+  weightGrams?: number | null;
+  servingCount?: number | null;
 };
 
 const pad2 = (value: number) => String(value).padStart(2, "0");
@@ -69,6 +73,12 @@ const formatMealTime = (date: Date) => {
 
 const formatDateLabel = (date: Date) =>
   `${date.getFullYear()}.${pad2(date.getMonth() + 1)}.${pad2(date.getDate())}`;
+
+const formatOptionalNumber = (value?: number | null) => {
+  if (value == null) return null;
+  if (Number.isInteger(value)) return String(value);
+  return value.toFixed(1).replace(/\.0$/, "");
+};
 
 const getMealTypeLabel = (value?: string | null) => {
   if (!value) return "";
@@ -99,6 +109,7 @@ const calcMacroPercents = (
 
 export default function MealDetailScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { mealId, from } = useLocalSearchParams<{
     mealId?: string;
     from?: string;
@@ -236,6 +247,17 @@ export default function MealDetailScreen() {
       color: "#A8C4E3",
     },
   ];
+  const weightLabel =
+    meal?.weightGrams != null
+      ? `${formatOptionalNumber(meal.weightGrams)} g`
+      : null;
+  const servingLabel =
+    meal?.servingCount != null
+      ? `${formatOptionalNumber(meal.servingCount)} 인분`
+      : null;
+  const portionLabel = [weightLabel, servingLabel]
+    .filter((value) => value && value.length > 0)
+    .join(" · ");
 
   const handleBack = React.useCallback(() => {
     if (from === "meal-list") {
@@ -245,11 +267,13 @@ export default function MealDetailScreen() {
     router.back();
   }, [from, router]);
 
+  const headerPaddingTop = Math.max(12, insets.top + 8);
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
         <Pressable style={styles.headerSide} onPress={handleBack}>
-          <Text style={styles.headerBack}>&lt;</Text>
+          <Ionicons name="chevron-back" size={20} color={palette.text} />
         </Pressable>
         <Text style={styles.headerTitle}>기록 상세</Text>
         <View style={styles.headerSide} />
@@ -287,6 +311,12 @@ export default function MealDetailScreen() {
                 {dateLabel} {timeLabel}
               </Text>
             </View>
+            {portionLabel ? (
+              <View style={styles.portionCard}>
+                <Text style={styles.portionLabel}>중량/인분</Text>
+                <Text style={styles.portionValue}>{portionLabel}</Text>
+              </View>
+            ) : null}
 
             <View style={styles.photoCard}>
               {meal.imageUrl ? (
@@ -424,19 +454,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingTop: 32,
+    paddingTop: 0,
     paddingBottom: 12,
   },
   headerSide: {
     minWidth: 72,
     minHeight: 40,
     justifyContent: "center",
-  },
-  headerBack: {
-    fontSize: 20,
-    color: palette.text,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
   },
   headerTitle: {
     fontSize: 18,
@@ -519,6 +543,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border,
     marginBottom: 16,
+  },
+  portionCard: {
+    backgroundColor: palette.card,
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginBottom: 16,
+  },
+  portionLabel: {
+    color: palette.textMuted,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  portionValue: {
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: 6,
   },
   timeLabel: {
     color: palette.textMuted,
