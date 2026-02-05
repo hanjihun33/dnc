@@ -14,6 +14,8 @@ import { useRouter } from "expo-router";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   bumpProfileRevision,
   getAuthHeaders,
@@ -21,13 +23,13 @@ import {
 } from "@/session";
 
 const palette = {
-  background: "#FAF8F0",
-  card: "#F6F1E3",
-  border: "#E7E0CC",
-  text: "#1F241F",
-  textMuted: "#6B7466",
-  accent: "#7FAF7B",
-  accentInk: "#1F2A1F",
+  background: "#F4E8D6",
+  card: "#F8F0E1",
+  border: "#E6DCC6",
+  text: "#2F3B30",
+  textMuted: "#6F7A6A",
+  accent: "#2F6B4F",
+  accentInk: "#233327",
 };
 
 const API_BASE_URL =
@@ -35,6 +37,7 @@ const API_BASE_URL =
 
 export default function ProfileEditScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [nickname, setNickname] = React.useState("");
   const [initialNickname, setInitialNickname] = React.useState("");
   const [currentPassword, setCurrentPassword] = React.useState("");
@@ -45,9 +48,10 @@ export default function ProfileEditScreen() {
     null
   );
   const [isSaving, setIsSaving] = React.useState(false);
+  const headerPaddingTop = Math.max(12, insets.top + 8);
   const [provider, setProvider] = React.useState<string | null>(null);
   const [avatarIndex, setAvatarIndex] = React.useState(0);
-  const avatarColors = ["#E7E0CC", "#E7D7A9", "#FECACA", "#BFDBFE"];
+  const avatarColors = ["#E6DCC6", "#E7D7A9", "#FECACA", "#BFDBFE"];
   const initials = nickname.trim().length > 0 ? nickname.trim()[0] : "U";
   const normalizedProvider = provider?.trim().toLowerCase() ?? null;
   const isSocialAccount = normalizedProvider != null && normalizedProvider !== "local";
@@ -261,10 +265,13 @@ export default function ProfileEditScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.container}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backIcon}>←</Text>
-        </Pressable>
-        <Text style={styles.title}>프로필 수정</Text>
+        <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+          <Pressable style={styles.headerSide} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={20} color={palette.text} />
+          </Pressable>
+          <Text style={styles.headerTitle}>프로필 수정</Text>
+          <View style={styles.headerSide} />
+        </View>
         <Text style={styles.subtitle}>
           {isSocialAccount
             ? "닉네임과 프로필 이미지를 수정하세요."
@@ -389,22 +396,21 @@ export default function ProfileEditScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
-  container: { padding: 20, paddingBottom: 40 },
+  container: { paddingHorizontal: 16, paddingBottom: 40 },
 
-  backButton: {
-    width: 36,
-    height: 36,
+  header: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 0,
+    paddingBottom: 12,
+  },
+  headerSide: {
+    minWidth: 72,
+    minHeight: 40,
     justifyContent: "center",
-    marginBottom: 6,
   },
-  backIcon: { fontSize: 20, color: palette.text },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: palette.text,
-    marginBottom: 6,
-  },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: palette.text },
   subtitle: {
     color: palette.textMuted,
     marginBottom: 18,
@@ -459,7 +465,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 15,
     color: palette.text,
-    backgroundColor: "#F6F1E3",
+    backgroundColor: "#F8F0E1",
   },
   inputDisabled: {
     backgroundColor: "#F1F5F9",
@@ -489,7 +495,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   saveButtonDisabled: {
-    backgroundColor: "#E7E0CC",
+    backgroundColor: "#E6DCC6",
   },
   saveButtonText: {
     color: palette.accentInk,

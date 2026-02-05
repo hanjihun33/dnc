@@ -25,6 +25,7 @@ DROP TABLE IF EXISTS food_metadata;
 DROP TABLE IF EXISTS food_records;
 DROP TABLE IF EXISTS glucose_data;
 DROP TABLE IF EXISTS sensors;
+DROP TABLE IF EXISTS user_notifications;
 DROP TABLE IF EXISTS user_push_tokens;
 DROP TABLE IF EXISTS user_alert_settings;
 DROP TABLE IF EXISTS user_settings;
@@ -132,6 +133,23 @@ CREATE TABLE user_push_tokens (
         FOREIGN KEY (user_id) REFERENCES users (user_id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- 2-2-3. user_notifications (1:N)
+CREATE TABLE user_notifications (
+    notification_id  BIGINT   NOT NULL AUTO_INCREMENT,
+    user_id          BIGINT   NOT NULL,
+    notification_type VARCHAR(50) NULL,
+    title            VARCHAR(120) NOT NULL,
+    body             TEXT NOT NULL,
+    read_at          TIMESTAMP NULL,
+    created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (notification_id),
+    KEY idx_notifications_user_time (user_id, created_at),
+    CONSTRAINT fk_user_notifications_user
+        FOREIGN KEY (user_id) REFERENCES users (user_id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 -- 2-3. oauth_tokens (OAuth 인증 토큰 관리)
 CREATE TABLE oauth_tokens (
     token_id      BIGINT       NOT NULL AUTO_INCREMENT,
@@ -202,6 +220,8 @@ CREATE TABLE food_records (
     user_id      BIGINT NOT NULL,
     food_name    VARCHAR(100) NULL,
     carbs_grams  FLOAT NULL,
+    weight_grams FLOAT NULL,
+    serving_count FLOAT NULL,
     peak_glucose INT NULL,
     image_url    VARCHAR(500) NULL,
     memo         TEXT NULL,

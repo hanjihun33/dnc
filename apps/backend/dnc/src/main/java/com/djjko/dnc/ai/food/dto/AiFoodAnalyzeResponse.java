@@ -11,5 +11,7 @@ public record AiFoodAnalyzeResponse(
         String imageUrl,
         AiFoodNutrition nutrition,
         Double estimatedWeight,
-        String aiGuide) {
+        String aiGuide,
+        String aiGuideStatus,
+        String aiGuideRequestId) {
 }

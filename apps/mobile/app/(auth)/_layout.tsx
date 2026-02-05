@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 
 import { SignupDraftProvider } from "@/components/signup-context";
 
@@ -15,18 +16,19 @@ export default function AuthLayout() {
 
   const checkOnboarding = async () => {
     try {
-      const completed = await AsyncStorage.getItem('onboarding_completed');
-      
-      // 온보딩 완료했고, 현재 onboarding 페이지면 로그인으로 이동
-      if (completed === 'true' && segments[1] === 'onboarding') {
-        router.replace('/login');
-      }
-      // 온보딩 안했고, onboarding 페이지 아니면 온보딩으로 이동
-      else if (completed !== 'true' && segments[1] !== 'onboarding') {
-        router.replace('/onboarding');
+      const completed = await AsyncStorage.getItem("onboarding_completed");
+      const storedVersion = await AsyncStorage.getItem("onboarding_version");
+      const currentVersion = Constants.expoConfig?.version ?? "1.0.0";
+      const isUpToDate =
+        completed === "true" && storedVersion === currentVersion;
+
+      if (isUpToDate && segments[1] === "onboarding") {
+        router.replace("/(auth)");
+      } else if (!isUpToDate && segments[1] !== "onboarding") {
+        router.replace("/onboarding");
       }
     } catch (error) {
-      console.error('Failed to check onboarding status:', error);
+      console.error("Failed to check onboarding status:", error);
     } finally {
       setIsChecking(false);
     }

@@ -2,6 +2,14 @@ import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+const palette = {
+    panel: '#F8F0E1',
+    card: '#F1E8D8',
+    text: '#1F241F',
+    textMuted: '#6B7466',
+    border: '#E5D9C4',
+};
+
 interface TimelineModalProps {
     visible: boolean;
     onClose: () => void;
@@ -31,7 +39,7 @@ export const TimelineHistoryModal = ({ visible, onClose, history }: TimelineModa
                     <View style={styles.header}>
                         <Text style={styles.title}>지난 리포트 기록</Text>
                         <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                            <Ionicons name="close" size={24} color="#64748B" />
+                            <Ionicons name="close" size={24} color={palette.textMuted} />
                         </TouchableOpacity>
                     </View>
 
@@ -78,7 +86,7 @@ export const TimelineHistoryModal = ({ visible, onClose, history }: TimelineModa
                                             <Ionicons
                                                 name={isExpanded ? 'chevron-up' : 'chevron-down'}
                                                 size={14}
-                                                color="#64748B"
+                                                color={palette.textMuted}
                                             />
                                         </TouchableOpacity>
                                     </View>
@@ -102,15 +110,17 @@ export const TimelineHistoryModal = ({ visible, onClose, history }: TimelineModa
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(31,36,31,0.38)',
         justifyContent: 'flex-end',
     },
     container: {
-        backgroundColor: '#fff',
+        backgroundColor: palette.panel,
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         height: '80%',
         paddingTop: 24,
+        borderWidth: 1,
+        borderColor: palette.border,
     },
     header: {
         flexDirection: 'row',
@@ -119,13 +129,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24,
         marginBottom: 20,
         borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
+        borderBottomColor: palette.border,
         paddingBottom: 16,
     },
     title: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#0F172A',
+        color: palette.text,
     },
     closeBtn: {
         padding: 4,
@@ -135,12 +145,12 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     cardItem: {
-        backgroundColor: '#F8FAFC',
+        backgroundColor: palette.card,
         borderRadius: 16,
         padding: 16,
         marginBottom: 12,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: palette.border,
     },
     itemHeader: {
         flexDirection: 'row',
@@ -165,22 +175,22 @@ const styles = StyleSheet.create({
     itemDate: {
         fontSize: 14,
         fontWeight: '700',
-        color: '#475569',
+        color: palette.text,
     },
     dayCounter: {
         fontSize: 12,
         fontWeight: '600',
-        color: '#94A3B8',
+        color: palette.textMuted,
         marginTop: 2,
     },
     itemSummary: {
         fontSize: 14,
-        color: '#334155',
+        color: palette.text,
         lineHeight: 20,
         marginTop: 12,
         paddingTop: 12,
         borderTopWidth: 1,
-        borderTopColor: '#E2E8F0',
+        borderTopColor: palette.border,
     },
     expandBtn: {
         flexDirection: 'row',
@@ -191,7 +201,7 @@ const styles = StyleSheet.create({
     },
     expandText: {
         fontSize: 12,
-        color: '#64748B',
+        color: palette.textMuted,
         fontWeight: '600',
     },
 });

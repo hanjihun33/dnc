@@ -11,8 +11,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getAuthHeaders, loadAuthSession } from "@/session";
 
 const palette = {
@@ -149,6 +151,7 @@ const calcMacroPercents = (
 
 export default function MealListScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [meals, setMeals] = React.useState<MealSummary[]>([]);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -311,11 +314,13 @@ export default function MealListScreen() {
     });
   };
 
+  const headerPaddingTop = Math.max(12, insets.top + 8);
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
         <TouchableOpacity style={styles.headerSide} onPress={router.back}>
-          <Text style={styles.headerBack}>&lt;</Text>
+          <Ionicons name="chevron-back" size={20} color={palette.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>모든 기록</Text>
         <TouchableOpacity style={styles.headerSide} onPress={openMealRecord}>
@@ -325,7 +330,7 @@ export default function MealListScreen() {
       <View style={styles.rangeRow}>
         <TouchableOpacity style={styles.rangeButton} onPress={openRangePicker}>
           <Text style={styles.rangeText}>{rangeLabel}</Text>
-          <Text style={styles.rangeChevron}>▾</Text>
+          <Ionicons name="chevron-down" size={18} color={palette.accentDark} />
         </TouchableOpacity>
       </View>
 
@@ -543,14 +548,14 @@ export default function MealListScreen() {
                 style={styles.calendarNavButton}
                 onPress={() => moveCalendarMonth("prev")}
               >
-                <Text style={styles.calendarNavText}>{"<"}</Text>
+                <Ionicons name="chevron-back" size={16} color={palette.text} />
               </TouchableOpacity>
               <Text style={styles.calendarTitle}>{formatMonthLabel(calendarMonth)}</Text>
               <TouchableOpacity
                 style={styles.calendarNavButton}
                 onPress={() => moveCalendarMonth("next")}
               >
-                <Text style={styles.calendarNavText}>{">"}</Text>
+                <Ionicons name="chevron-forward" size={16} color={palette.text} />
               </TouchableOpacity>
             </View>
 
@@ -642,14 +647,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 0,
+    paddingBottom: 12,
   },
   headerSide: {
     minWidth: 72,
-  },
-  headerBack: {
-    fontSize: 20,
-    color: palette.text,
+    minHeight: 40,
+    justifyContent: "center",
   },
   headerTitle: {
     fontSize: 18,

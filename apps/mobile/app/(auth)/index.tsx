@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   Image,
   SafeAreaView,
@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import SocialLoginSection from "@/components/social-login-section";
 
 const palette = {
@@ -25,6 +26,14 @@ const logoImage = require("@/assets/images/icon.png");
 
 export default function AuthEntryScreen() {
   const router = useRouter();
+
+  const handleResetOnboarding = async () => {
+    await AsyncStorage.multiRemove([
+      "onboarding_completed",
+      "onboarding_version",
+    ]);
+    router.replace("/onboarding");
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -51,7 +60,7 @@ export default function AuthEntryScreen() {
           </TouchableOpacity>
         </View>
 
-        <SocialLoginSection />
+        <SocialLoginSection showTitle={false} compact />
 
         <View style={styles.loginRow}>
           <Text style={styles.loginHint}>아직 계정이 없으신가요?</Text>
@@ -59,6 +68,15 @@ export default function AuthEntryScreen() {
             <Text style={styles.loginLink}>가입하기</Text>
           </TouchableOpacity>
         </View>
+
+        {__DEV__ && (
+          <TouchableOpacity
+            style={styles.devReset}
+            onPress={handleResetOnboarding}
+          >
+            <Text style={styles.devResetText}>Reset onboarding</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -74,9 +92,9 @@ const styles = StyleSheet.create({
   },
   hero: { alignItems: "center", marginBottom: 48 },
   logoImage: {
-    width: 84,
-    height: 84,
-    borderRadius: 24,
+    width: 300,
+    height: 150,
+    borderRadius: 32,
     backgroundColor: "transparent",
     marginBottom: 18,
   },
@@ -108,4 +126,13 @@ const styles = StyleSheet.create({
   },
   loginHint: { color: palette.textMuted, fontSize: 13, marginRight: 6 },
   loginLink: { color: palette.accent, fontSize: 13, fontWeight: "700" },
+  devReset: {
+    marginTop: 18,
+    alignItems: "center",
+  },
+  devResetText: {
+    fontSize: 12,
+    color: palette.textMuted,
+    textDecorationLine: "underline",
+  },
 });

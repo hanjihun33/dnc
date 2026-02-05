@@ -6,6 +6,8 @@ public record MealUpdateRequest(
     String memo,
     String foodName,
     Double carbsGrams,
+    Double weightGrams,
+    Double servingCount,
     Integer peakGlucose
 ) {
 }

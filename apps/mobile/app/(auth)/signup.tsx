@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import {
+  KeyboardAvoidingView,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -8,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { useSignupDraft } from "@/components/signup-context";
@@ -30,11 +33,122 @@ export default function SignupScreen() {
   const router = useRouter();
   const { draft, updateDraft } = useSignupDraft();
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [confirmMatch, setConfirmMatch] = useState<boolean | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
+  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
+  const [nicknameAvailable, setNicknameAvailable] = useState<boolean | null>(null);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   const [isCheckingNickname, setIsCheckingNickname] = useState(false);
+
+  const checkEmailAvailability = async (email: string) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/auth/check-email?email=${encodeURIComponent(
+          email
+        )}`
+      );
+      if (response.status === 409) {
+        setEmailError("이미 사용 중인 이메일입니다.");
+        setEmailAvailable(false);
+        return false;
+      }
+      if (!response.ok) {
+        setErrorMessage("이메일 확인에 실패했습니다.");
+        setEmailAvailable(null);
+        return false;
+      }
+      return true;
+    } catch {
+      setErrorMessage("이메일 확인에 실패했습니다.");
+      setEmailAvailable(null);
+      return false;
+    }
+  };
+
+  const checkNicknameAvailability = async (nickname: string) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/auth/check-nickname?nickname=${encodeURIComponent(
+          nickname
+        )}`
+      );
+      if (response.status === 409) {
+        setNicknameError("이미 사용 중인 닉네임입니다.");
+        setNicknameAvailable(false);
+        return false;
+      }
+      if (!response.ok) {
+        setErrorMessage("닉네임 확인에 실패했습니다.");
+        setNicknameAvailable(null);
+        return false;
+      }
+      return true;
+    } catch {
+      setErrorMessage("닉네임 확인에 실패했습니다.");
+      setNicknameAvailable(null);
+      return false;
+    }
+  };
+
+  const handleCheckEmail = async () => {
+    const trimmedEmail = draft.email.trim();
+    setErrorMessage(null);
+    setEmailError(null);
+    setEmailAvailable(null);
+    if (!trimmedEmail) {
+      setEmailError("이메일(아이디)를 입력해 주세요.");
+      return;
+    }
+    setIsCheckingEmail(true);
+    const ok = await checkEmailAvailability(trimmedEmail);
+    setIsCheckingEmail(false);
+    if (ok) {
+      setEmailError(null);
+      setEmailAvailable(true);
+    }
+  };
+
+  const handleCheckNickname = async () => {
+    const trimmedNickname = draft.nickname.trim();
+    setErrorMessage(null);
+    setNicknameError(null);
+    setNicknameAvailable(null);
+    if (!trimmedNickname) {
+      setNicknameError("닉네임을 입력해 주세요.");
+      return;
+    }
+    setIsCheckingNickname(true);
+    const ok = await checkNicknameAvailability(trimmedNickname);
+    setIsCheckingNickname(false);
+    if (ok) {
+      setNicknameError(null);
+      setNicknameAvailable(true);
+    }
+  };
+
+  const ensurePasswordLength = () => {
+    if (draft.password.length < 8) {
+      setErrorMessage("비밀번호는 8자 이상이어야 합니다.");
+      return false;
+    }
+    return true;
+  };
+
+  React.useEffect(() => {
+    if (!draft.password || !confirmPassword) {
+      setConfirmMatch(null);
+      return;
+    }
+    if (confirmPassword.length < draft.password.length) {
+      setConfirmMatch(null);
+      return;
+    }
+    setConfirmMatch(confirmPassword === draft.password);
+  }, [confirmPassword, draft.password]);
 
   const handleNext = async () => {
     const trimmedEmail = draft.email.trim();
@@ -42,189 +156,277 @@ export default function SignupScreen() {
     setErrorMessage(null);
     setEmailError(null);
     setNicknameError(null);
+    setEmailAvailable(null);
+    setNicknameAvailable(null);
 
     if (!trimmedEmail) {
-      setEmailError("이메일(아이디)을 입력해주세요.");
+      setEmailError("이메일(아이디)를 입력해 주세요.");
       return;
     }
     if (!trimmedNickname) {
-      setNicknameError("닉네임을 입력해주세요.");
+      setNicknameError("닉네임을 입력해 주세요.");
       return;
     }
-    if (draft.password.length < 8) {
-      setErrorMessage("비밀번호는 8자 이상이어야 합니다.");
+    if (!ensurePasswordLength()) {
       return;
     }
     if (draft.password !== confirmPassword) {
-      setErrorMessage("비밀번호가 일치하지 않습니다.");
+      setErrorMessage(null);
+      setConfirmMatch(false);
       return;
     }
 
     setIsCheckingEmail(true);
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/auth/check-email?email=${encodeURIComponent(
-          trimmedEmail
-        )}`
-      );
-      if (response.status === 409) {
-        setEmailError("이미 사용 중인 이메일입니다.");
-        return;
-      }
-      if (!response.ok) {
-        setErrorMessage("이메일 확인에 실패했습니다.");
-        return;
-      }
-    } catch {
-      setErrorMessage("이메일 확인에 실패했습니다.");
+    const emailOk = await checkEmailAvailability(trimmedEmail);
+    setIsCheckingEmail(false);
+    if (!emailOk) {
       return;
-    } finally {
-      setIsCheckingEmail(false);
     }
 
     setIsCheckingNickname(true);
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/auth/check-nickname?nickname=${encodeURIComponent(
-          trimmedNickname
-        )}`
-      );
-      if (response.status === 409) {
-        setNicknameError("이미 사용 중인 닉네임입니다.");
-        return;
-      }
-      if (!response.ok) {
-        setErrorMessage("닉네임 확인에 실패했습니다.");
-        return;
-      }
-    } catch {
-      setErrorMessage("닉네임 확인에 실패했습니다.");
+    const nicknameOk = await checkNicknameAvailability(trimmedNickname);
+    setIsCheckingNickname(false);
+    if (!nicknameOk) {
       return;
-    } finally {
-      setIsCheckingNickname(false);
     }
+
     router.push("/signup-diabetes");
   };
 
+  const isChecking = isCheckingEmail || isCheckingNickname;
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        contentContainerStyle={styles.page}
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 16 : 0}
       >
-        <View style={styles.headerRow}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.backText}>{"<"}</Text>
-          </TouchableOpacity>
-          <Text style={styles.pageTitle}>회원가입</Text>
-          <View style={styles.backSpacer} />
-        </View>
-        <Text style={styles.subtitle}>기본 정보를 입력해주세요.</Text>
+        <ScrollView
+          contentContainerStyle={styles.page}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.headerRow}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Ionicons name="chevron-back" size={18} color={palette.text} />
+            </TouchableOpacity>
+            <Text style={styles.pageTitle}>회원가입</Text>
+            <View style={styles.backSpacer} />
+          </View>
+          <Text style={styles.subtitle}>기본 정보를 입력해주세요.</Text>
 
-        <View style={styles.formCard}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>이름</Text>
+        <View style={styles.formArea}>
+          <View style={styles.inputPill}>
+            <View style={styles.inputIcon}>
+              <Ionicons name="person-outline" size={18} color={palette.textMuted} />
+            </View>
             <TextInput
               style={styles.input}
-              placeholder="홍길동"
+              placeholder="이름"
               placeholderTextColor={palette.textMuted}
               value={draft.name}
               onChangeText={(value) => updateDraft({ name: value })}
             />
           </View>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>닉네임</Text>
+
+          <View style={styles.inputPill}>
+            <View style={styles.inputIcon}>
+              <Ionicons name="happy-outline" size={18} color={palette.textMuted} />
+            </View>
             <TextInput
               style={styles.input}
-              placeholder="닉네임 입력"
+              placeholder="닉네임"
               placeholderTextColor={palette.textMuted}
               value={draft.nickname}
-              onChangeText={(value) => updateDraft({ nickname: value })}
+              onChangeText={(value) => {
+                updateDraft({ nickname: value });
+                setNicknameAvailable(null);
+                setNicknameError(null);
+              }}
             />
-            {nicknameError && <Text style={styles.errorText}>{nicknameError}</Text>}
+            <TouchableOpacity
+              style={[
+                styles.checkButton,
+                isCheckingNickname && styles.checkButtonDisabled,
+              ]}
+              onPress={handleCheckNickname}
+              disabled={isCheckingNickname}
+            >
+              <Text
+                style={[
+                  styles.checkButtonText,
+                  isCheckingNickname && styles.checkButtonTextDisabled,
+                ]}
+              >
+                {isCheckingNickname ? "확인 중..." : "중복확인"}
+              </Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>이메일(아이디)</Text>
+          {nicknameError && <Text style={styles.errorText}>{nicknameError}</Text>}
+          {nicknameAvailable && !nicknameError && (
+            <Text style={styles.successText}>사용 가능한 닉네임입니다.</Text>
+          )}
+
+          <View style={styles.inputPill}>
+            <View style={styles.inputIcon}>
+              <Ionicons name="mail-outline" size={18} color={palette.textMuted} />
+            </View>
             <TextInput
               style={styles.input}
-              placeholder="you@example.com"
+              placeholder="이메일(아이디)"
               placeholderTextColor={palette.textMuted}
               autoCapitalize="none"
               keyboardType="email-address"
               value={draft.email}
-              onChangeText={(value) => updateDraft({ email: value })}
+              onChangeText={(value) => {
+                updateDraft({ email: value });
+                setEmailAvailable(null);
+                setEmailError(null);
+              }}
             />
-            {emailError && <Text style={styles.errorText}>{emailError}</Text>}
+            <TouchableOpacity
+              style={[
+                styles.checkButton,
+                isCheckingEmail && styles.checkButtonDisabled,
+              ]}
+              onPress={handleCheckEmail}
+              disabled={isCheckingEmail}
+            >
+              <Text
+                style={[
+                  styles.checkButtonText,
+                  isCheckingEmail && styles.checkButtonTextDisabled,
+                ]}
+              >
+                {isCheckingEmail ? "확인 중..." : "중복확인"}
+              </Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>비밀번호</Text>
+          {emailError && <Text style={styles.errorText}>{emailError}</Text>}
+          {emailAvailable && !emailError && (
+            <Text style={styles.successText}>사용 가능한 이메일입니다.</Text>
+          )}
+
+          <View style={styles.inputPill}>
+            <View style={styles.inputIcon}>
+              <Ionicons
+                name="lock-closed-outline"
+                size={18}
+                color={palette.textMuted}
+              />
+            </View>
             <TextInput
               style={styles.input}
-              placeholder="8자 이상 입력하세요"
+              placeholder="비밀번호 (8자 이상)"
               placeholderTextColor={palette.textMuted}
-              secureTextEntry
+              secureTextEntry={!showPassword}
               value={draft.password}
-              onChangeText={(value) => updateDraft({ password: value })}
+              onChangeText={(value) => {
+                updateDraft({ password: value });
+                setErrorMessage(null);
+                setConfirmMatch(null);
+              }}
+              onSubmitEditing={ensurePasswordLength}
             />
-          </View>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>비밀번호 확인</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="비밀번호를 다시 입력하세요"
-              placeholderTextColor={palette.textMuted}
-              secureTextEntry
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-            />
+            <TouchableOpacity
+              style={styles.eyeButton}
+              onPress={() => setShowPassword((prev) => !prev)}
+              accessibilityLabel={showPassword ? "비밀번호 숨기기" : "비밀번호 보기"}
+            >
+              <Ionicons
+                name={showPassword ? "eye-off-outline" : "eye-outline"}
+                size={18}
+                color={palette.textMuted}
+              />
+            </TouchableOpacity>
           </View>
 
-          {errorMessage && (
-            <Text style={styles.errorText}>{errorMessage}</Text>
+          {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
+
+          <View style={styles.inputPill}>
+            <View style={styles.inputIcon}>
+              <Ionicons
+                name="shield-checkmark-outline"
+                size={18}
+                color={palette.textMuted}
+              />
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="비밀번호 확인"
+              placeholderTextColor={palette.textMuted}
+              secureTextEntry={!showConfirmPassword}
+              value={confirmPassword}
+              onChangeText={(value) => {
+                setConfirmPassword(value);
+              }}
+              onFocus={ensurePasswordLength}
+            />
+            <TouchableOpacity
+              style={styles.eyeButton}
+              onPress={() => setShowConfirmPassword((prev) => !prev)}
+              accessibilityLabel={
+                showConfirmPassword ? "비밀번호 숨기기" : "비밀번호 보기"
+              }
+            >
+              <Ionicons
+                name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+                size={18}
+                color={palette.textMuted}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {confirmMatch === false && (
+            <Text style={styles.errorText}>비밀번호가 일치하지 않습니다.</Text>
+          )}
+          {confirmMatch === true && (
+            <Text style={styles.successText}>비밀번호가 일치합니다.</Text>
           )}
 
           <TouchableOpacity
             style={[
               styles.primaryButton,
-              (isCheckingEmail || isCheckingNickname) &&
-                styles.primaryButtonDisabled,
+              isChecking && styles.primaryButtonDisabled,
             ]}
             onPress={handleNext}
-            disabled={isCheckingEmail || isCheckingNickname}
+            disabled={isChecking}
           >
             <Text
               style={[
                 styles.primaryButtonText,
-                (isCheckingEmail || isCheckingNickname) &&
-                  styles.primaryButtonTextDisabled,
+                isChecking && styles.primaryButtonTextDisabled,
               ]}
             >
-              {isCheckingEmail || isCheckingNickname ? "확인 중..." : "다음"}
+              {isChecking ? "확인 중..." : "다음"}
             </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.helperRow}>
-          <Text style={styles.helperText}>이미 계정이 있나요?</Text>
-          <TouchableOpacity onPress={() => router.push("/login")}>
-            <Text style={styles.helperTextAccent}>로그인</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+          <View style={styles.helperRow}>
+            <Text style={styles.helperText}>이미 계정이 있나요?</Text>
+            <TouchableOpacity onPress={() => router.push("/login")}>
+              <Text style={styles.helperTextAccent}>로그인</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
+  container: { flex: 1 },
   page: { padding: 20, paddingBottom: 40 },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: 24,
     marginBottom: 10,
   },
   backButton: {
@@ -235,39 +437,71 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backText: { fontSize: 16, color: palette.text },
   backSpacer: { width: 36 },
   pageTitle: { fontSize: 22, fontWeight: "800", color: palette.text },
   subtitle: { color: palette.textMuted, marginBottom: 18 },
-  formCard: {
-    backgroundColor: palette.card,
-    borderRadius: 22,
-    padding: 18,
+  formArea: {
+    marginTop: 4,
+  },
+  inputPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F1E7D6",
+    borderRadius: 26,
+    padding: 6,
     borderWidth: 1,
     borderColor: palette.border,
+    marginBottom: 12,
   },
-  inputGroup: { marginBottom: 14 },
-  inputLabel: {
-    color: palette.textMuted,
-    fontSize: 12,
-    fontWeight: "600",
-    marginBottom: 8,
+  inputIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#E6DCC6",
+    alignItems: "center",
+    justifyContent: "center",
   },
   input: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: palette.text,
+    fontSize: 15,
+  },
+  eyeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 6,
+  },
+  checkButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: "#E6DCC6",
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: palette.text,
-    backgroundColor: "#F9F5E9",
+    marginLeft: 8,
+  },
+  checkButtonDisabled: {
+    backgroundColor: "#EFE9D9",
+  },
+  checkButtonText: {
+    color: palette.accentDark,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  checkButtonTextDisabled: {
+    color: "#A5AE9C",
   },
   primaryButton: {
     backgroundColor: palette.accent,
-    borderRadius: 18,
-    paddingVertical: 14,
+    borderRadius: 26,
+    paddingVertical: 16,
     alignItems: "center",
-    marginTop: 6,
+    marginTop: 8,
     shadowColor: palette.ink,
     shadowOpacity: 0.15,
     shadowRadius: 10,
@@ -288,5 +522,11 @@ const styles = StyleSheet.create({
   },
   helperText: { color: palette.textMuted, fontSize: 12, marginRight: 6 },
   helperTextAccent: { color: palette.accentDark, fontSize: 12, fontWeight: "700" },
-  errorText: { color: "#C24A4A", fontSize: 12, marginBottom: 8 },
+  errorText: { color: "#C24A4A", fontSize: 12, marginTop: -4, marginBottom: 10 },
+  successText: {
+    color: palette.accentDark,
+    fontSize: 12,
+    marginTop: -4,
+    marginBottom: 10,
+  },
 });

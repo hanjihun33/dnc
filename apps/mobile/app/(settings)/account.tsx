@@ -12,6 +12,8 @@ import {
 import { useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   clearAuthSession,
   getAuthHeaders,
@@ -20,12 +22,12 @@ import {
 } from "@/session";
 
 const palette = {
-  background: "#FAF8F0",
-  card: "#F6F1E3",
-  border: "#E7E0CC",
-  text: "#1F241F",
-  textMuted: "#6B7466",
-  accentDark: "#4E7C5B",
+  background: "#F4E8D6",
+  card: "#F8F0E1",
+  border: "#E6DCC6",
+  text: "#2F3B30",
+  textMuted: "#6F7A6A",
+  accentDark: "#24573F",
 };
 
 const API_BASE_URL =
@@ -33,6 +35,7 @@ const API_BASE_URL =
 
 export default function AccountScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [profileName, setProfileName] = React.useState("");
@@ -47,6 +50,7 @@ export default function AccountScreen() {
 
   const initials =
     profileName.trim().length > 0 ? profileName.trim()[0] : "U";
+  const headerPaddingTop = Math.max(12, insets.top + 8);
 
   const loadProfile = React.useCallback(async () => {
     setIsProfileLoading(true);
@@ -145,7 +149,7 @@ export default function AccountScreen() {
     } finally {
       setIsLoggingOut(false);
       await clearAuthSession();
-      router.replace("/login?from=logout");
+      router.replace("/(auth)");
     }
   };
 
@@ -177,7 +181,7 @@ export default function AccountScreen() {
       setIsDeleting(false);
     }
     await clearAuthSession();
-    router.replace("/login?from=logout");
+    router.replace("/(auth)");
   };
 
   const confirmDeleteAccount = () => {
@@ -195,10 +199,13 @@ export default function AccountScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.container}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backIcon}>←</Text>
-        </Pressable>
-        <Text style={styles.title}>계정 정보</Text>
+        <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+          <Pressable style={styles.headerSide} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={20} color={palette.text} />
+          </Pressable>
+          <Text style={styles.headerTitle}>계정 정보</Text>
+          <View style={styles.headerSide} />
+        </View>
 
         <Pressable
           style={styles.profileRow}
@@ -225,7 +232,7 @@ export default function AccountScreen() {
               {isProfileLoading ? "" : profileEmail}
             </Text>
           </View>
-          <Text style={styles.chevron}>›</Text>
+          <Ionicons name="chevron-forward" style={styles.chevron} />
         </Pressable>
 
         <View style={styles.section}>
@@ -265,22 +272,21 @@ export default function AccountScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
-  container: { padding: 20, paddingBottom: 40 },
+  container: { paddingHorizontal: 16, paddingBottom: 40 },
 
-  backButton: {
-    width: 36,
-    height: 36,
+  header: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 0,
+    paddingBottom: 12,
+  },
+  headerSide: {
+    minWidth: 72,
+    minHeight: 40,
     justifyContent: "center",
-    marginBottom: 6,
   },
-  backIcon: { fontSize: 20, color: palette.text },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: palette.text,
-    marginBottom: 20,
-  },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: palette.text },
 
   profileRow: {
     flexDirection: "row",
@@ -291,7 +297,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#E7E0CC",
+    backgroundColor: "#E6DCC6",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useRouter } from "expo-router";
 import Svg, { Path } from "react-native-svg";
@@ -78,7 +78,15 @@ const renderSocialIcon = (provider: SocialProvider, size: number) => {
   );
 };
 
-export default function SocialLoginSection() {
+type SocialLoginSectionProps = {
+  showTitle?: boolean;
+  compact?: boolean;
+};
+
+export default function SocialLoginSection({
+  showTitle = true,
+  compact = false,
+}: SocialLoginSectionProps) {
   const router = useRouter();
   const [loadingProvider, setLoadingProvider] = useState<SocialProvider | null>(
     null
@@ -107,8 +115,8 @@ export default function SocialLoginSection() {
         params,
       });
     } catch (error) {
-      // Always show a clear Korean message instead of raw error text.
-      const message = "소셜 로그인에 실패했어요. 잠시 후 다시 시도해주세요.";
+      const message =
+        "소셜 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.";
       setErrorMessage(message);
       setSocialLoginPending(false);
       setSocialLoginProcessing(false);
@@ -118,8 +126,8 @@ export default function SocialLoginSection() {
   };
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>소셜 로그인</Text>
+    <View style={[styles.section, compact && styles.sectionCompact]}>
+      {showTitle && <Text style={styles.sectionTitle}>소셜 로그인</Text>}
       <View style={styles.buttonStack}>
         {(["kakao", "google", "naver"] as SocialProvider[]).map((provider) => (
           <TouchableOpacity
@@ -158,6 +166,7 @@ export default function SocialLoginSection() {
 
 const styles = StyleSheet.create({
   section: { width: "100%", marginTop: 24 },
+  sectionCompact: { marginTop: 12 },
   sectionTitle: {
     color: palette.textMuted,
     fontSize: 13,

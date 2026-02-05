@@ -19,15 +19,17 @@ import {
   setAlertSetting,
   setAlertValue,
 } from "@/alert-store";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const palette = {
-  background: "#FAF8F0",
-  card: "#F6F1E3",
-  border: "#E7E0CC",
-  text: "#1F241F",
-  textMuted: "#6B7466",
-  accent: "#7FAF7B",
-  accentInk: "#1F2A1F",
+  background: "#F4E8D6",
+  card: "#F8F0E1",
+  border: "#E6DCC6",
+  text: "#2F3B30",
+  textMuted: "#6F7A6A",
+  accent: "#2F6B4F",
+  accentInk: "#233327",
 };
 
 const ITEM_HEIGHT = 52;
@@ -38,6 +40,7 @@ const formatInterval = (minutes: number) =>
 
 export default function AlertDetailScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { type, interval } = useLocalSearchParams<{
     type?: string;
     interval?: string;
@@ -89,16 +92,19 @@ export default function AlertDetailScreen() {
 
   const currentType = routeType;
   const maxIndex = values.length - 1;
+  const headerPaddingTop = Math.max(12, insets.top + 8);
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.container}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backIcon}>←</Text>
-        </Pressable>
-
-        <Text style={styles.title}>{config.title}</Text>
+        <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+          <Pressable style={styles.headerSide} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={20} color={palette.text} />
+          </Pressable>
+          <Text style={styles.headerTitle}>{config.title}</Text>
+          <View style={styles.headerSide} />
+        </View>
 
         <View style={styles.row}>
           <Text style={styles.rowLabel}>알림</Text>
@@ -109,8 +115,8 @@ export default function AlertDetailScreen() {
               setAlertSetting(routeType, { enabled: next });
               void updateAlertSetting(routeType, { enabled: next });
             }}
-            trackColor={{ false: "#E7E0CC", true: palette.accent }}
-            thumbColor={enabled ? palette.accentInk : "#F6F1E3"}
+            trackColor={{ false: "#E6DCC6", true: palette.accent }}
+            thumbColor={enabled ? palette.accentInk : "#F8F0E1"}
           />
         </View>
 
@@ -181,7 +187,7 @@ export default function AlertDetailScreen() {
               <Text style={styles.listValueText}>
                 {formatInterval(intervalMinutes)}마다
               </Text>
-              <Text style={styles.chevron}>›</Text>
+              <Ionicons name="chevron-forward" style={styles.chevron} />
             </View>
           </Pressable>
         </View>
@@ -192,22 +198,21 @@ export default function AlertDetailScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
-  container: { padding: 20, paddingBottom: 40 },
+  container: { paddingHorizontal: 16, paddingBottom: 40 },
 
-  backButton: {
-    width: 36,
-    height: 36,
+  header: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 0,
+    paddingBottom: 12,
+  },
+  headerSide: {
+    minWidth: 72,
+    minHeight: 40,
     justifyContent: "center",
-    marginBottom: 6,
   },
-  backIcon: { fontSize: 20, color: palette.text },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: palette.text,
-    marginBottom: 14,
-  },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: palette.text },
 
   row: {
     flexDirection: "row",

@@ -4,6 +4,7 @@ import com.djjko.dnc.alert.entity.UserAlertSetting;
 import com.djjko.dnc.alert.model.AlertType;
 import com.djjko.dnc.auth.entity.User;
 import com.djjko.dnc.glucose.entity.GlucoseData;
+import com.djjko.dnc.notification.service.UserNotificationService;
 import com.djjko.dnc.push.entity.UserPushToken;
 import com.djjko.dnc.push.service.FcmService;
 import com.djjko.dnc.push.service.PushTokenService;
@@ -29,6 +30,7 @@ public class GlucoseAlertService {
     private final UserAlertSettingService userAlertSettingService;
     private final PushTokenService pushTokenService;
     private final FcmService fcmService;
+    private final UserNotificationService userNotificationService;
 
     public void evaluate(User user, GlucoseData data) {
         List<UserAlertSetting> settings = userAlertSettingService.getOrCreateSettings(user);
@@ -54,7 +56,10 @@ public class GlucoseAlertService {
 
         markNotified(user.getUserId(), setting.getAlertType());
         boolean attachRapidRise = triggered == AlertType.HIGH && rapidRiseActive;
-        sendPush(user, setting.getAlertType(), data, attachRapidRise);
+        String title = "혈당 알림";
+        String body = buildBody(setting.getAlertType(), data.getValue(), attachRapidRise);
+        userNotificationService.create(user, setting.getAlertType().getCode(), title, body);
+        sendPush(user, setting.getAlertType(), data.getValue(), title, body);
     }
 
     private AlertType selectAlertType(Map<AlertType, UserAlertSetting> settings, GlucoseData data) {
@@ -142,17 +147,14 @@ public class GlucoseAlertService {
         return LAST_ALERT_KEY_PREFIX + userId + ":" + type.name();
     }
 
-    private void sendPush(User user, AlertType type, GlucoseData data, boolean attachRapidRise) {
+    private void sendPush(User user, AlertType type, Integer value, String title, String body) {
         List<UserPushToken> tokens = pushTokenService.getEnabledTokens(user.getUserId());
         if (tokens.isEmpty()) {
             return;
         }
-
-        String title = "혈당 알림";
-        String body = buildBody(type, data.getValue(), attachRapidRise);
         Map<String, String> payload = Map.of(
                 "type", type.getCode(),
-                "value", String.valueOf(data.getValue() == null ? 0 : data.getValue())
+                "value", String.valueOf(value == null ? 0 : value)
         );
 
         List<String> tokenValues = tokens.stream().map(UserPushToken::getToken).toList();

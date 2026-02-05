@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
 import {
   bumpProfileRevision,
@@ -24,12 +26,12 @@ import {
 } from "@/session";
 
 const palette = {
-  background: "#FAF8F0",
-  card: "#F6F1E3",
-  border: "#E7E0CC",
-  text: "#1F241F",
-  textMuted: "#6B7466",
-  accent: "#7FAF7B",
+  background: "#F4E8D6",
+  card: "#F8F0E1",
+  border: "#E6DCC6",
+  text: "#2F3B30",
+  textMuted: "#6F7A6A",
+  accent: "#2F6B4F",
   danger: "#EF4444",
   dangerSoft: "#FEE2E2",
   overlayBackdrop: "rgba(31, 36, 31, 0.25)",
@@ -40,10 +42,12 @@ const API_BASE_URL =
 
 export default function SensorConnectScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [isConnecting, setIsConnecting] = React.useState(false);
   const [isDisconnecting, setIsDisconnecting] = React.useState(false);
   const [sensorConnected, setSensorConnected] = React.useState(false);
   const isOverlayVisible = isDisconnecting;
+  const headerPaddingTop = Math.max(12, insets.top + 8);
   const overlayTitle = "연동 해제 중";
 
   const loadProfile = React.useCallback(async () => {
@@ -156,11 +160,13 @@ export default function SensorConnectScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.container}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backIcon}>{"<"}</Text>
-        </Pressable>
-
-        <Text style={styles.title}>센서 연결 정보</Text>
+        <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+          <Pressable style={styles.headerSide} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={20} color={palette.text} />
+          </Pressable>
+          <Text style={styles.headerTitle}>센서 연결 정보</Text>
+          <View style={styles.headerSide} />
+        </View>
         <Text style={styles.subtitle}>
           센서는 실시간으로 혈당을 모니터링하는{"\n"}
           연속혈당측정기(CGM)를 의미합니다.
@@ -226,22 +232,21 @@ export default function SensorConnectScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
-  container: { padding: 20, paddingBottom: 40 },
+  container: { paddingHorizontal: 16, paddingBottom: 40 },
 
-  backButton: {
-    width: 36,
-    height: 36,
+  header: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 0,
+    paddingBottom: 12,
+  },
+  headerSide: {
+    minWidth: 72,
+    minHeight: 40,
     justifyContent: "center",
-    marginBottom: 12,
   },
-  backIcon: { fontSize: 20, color: palette.text },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: palette.text,
-    marginBottom: 8,
-  },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: palette.text },
   subtitle: {
     color: palette.textMuted,
     lineHeight: 22,
@@ -256,7 +261,7 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     paddingVertical: 24,
     paddingHorizontal: 20,
-    shadowColor: "#1F241F",
+    shadowColor: "#2F3B30",
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.08,
     shadowRadius: 18,
@@ -275,7 +280,7 @@ const styles = StyleSheet.create({
     height: 52,
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
-    backgroundColor: "#E7E0CC",
+    backgroundColor: "#E6DCC6",
   },
   deviceBody: {
     width: 86,
@@ -296,7 +301,7 @@ const styles = StyleSheet.create({
     width: 90,
     height: 18,
     borderRadius: 9,
-    backgroundColor: "#E7E0CC",
+    backgroundColor: "#E6DCC6",
     marginTop: -6,
   },
   sensorName: {
@@ -348,7 +353,7 @@ const styles = StyleSheet.create({
     maxWidth: 280,
     borderWidth: 1,
     borderColor: palette.border,
-    shadowColor: "#1F241F",
+    shadowColor: "#2F3B30",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.16,
     shadowRadius: 12,

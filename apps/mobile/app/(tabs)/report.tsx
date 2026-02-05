@@ -1,6 +1,5 @@
 ﻿import React, { useMemo, useState, useCallback } from "react";
 import {
-  Dimensions,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -10,37 +9,38 @@ import {
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
-  Pressable,
   Image,
   Modal,
   Alert
 } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { getAuthHeaders, loadAuthSession } from "../../session";
-import { MaterialIcons, Ionicons, FontAwesome5 } from "@expo/vector-icons";
+import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { DailySummaryCard } from "../../components/DailySummaryCard";
 import { TimelineHistoryModal } from "../../components/TimelineHistoryModal";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-const { width } = Dimensions.get("window");
 
 const palette = {
-  background: "#F8FAFC",
-  card: "#FFFFFF",
-  text: "#0F172A",
-  textMuted: "#64748B",
-  navy: "#0F172A",
-  accent: "#FACC15",
-  danger: "#EF4444",
-  warning: "#F59E0B",
-  success: "#22C55E",
-  border: "#E2E8F0",
-  chartLow: "#EF4444",
-  chartNormal: "#22C55E",
-  chartHigh: "#F59E0B",
-  primaryBtn: "#0F172A",
-  successBg: "#DCFCE7",
-  accentDark: "#B45309"
+  background: "#F6E9D3",
+  card: "#F8F0E1",
+  text: "#1F241F",
+  textMuted: "#6B7466",
+  navy: "#1F241F",
+  accent: "#7FAF7B",
+  danger: "#C65555",
+  warning: "#C18A2D",
+  success: "#4E7C5B",
+  border: "#E5D9C4",
+  chartLow: "#D66A6A",
+  chartNormal: "#7FAF7B",
+  chartHigh: "#D7A84C",
+  primaryBtn: "#4E7C5B",
+  successBg: "#E3EEDB",
+  accentDark: "#4E7C5B",
+  ink: "#1F2A1F",
+  panel: "#E7C17A"
 };
 
 interface SensorResponse {
@@ -82,10 +82,10 @@ interface MealResponse {
 }
 
 const getGlucoseStatus = (glucose?: number) => {
-  if (glucose === undefined || glucose === null) return { label: '분석중', color: palette.textMuted, bg: '#f1f5f9' };
-  if (glucose < 140) return { label: '좋음', color: '#166534', bg: '#DCFCE7' };
-  if (glucose < 180) return { label: '보통', color: '#854D0E', bg: '#FEF9C3' };
-  return { label: '나쁨', color: '#991B1B', bg: '#FEE2E2' };
+  if (glucose === undefined || glucose === null) return { label: '분석중', color: palette.textMuted, bg: '#EFE6D6' };
+  if (glucose < 140) return { label: '좋음', color: '#2F6B43', bg: '#DDEDD8' };
+  if (glucose < 180) return { label: '보통', color: '#7E5A1F', bg: '#F4E6BF' };
+  return { label: '나쁨', color: '#8E3F3F', bg: '#F5DAD5' };
 };
 
 const getImageUrl = (url?: string) => {
@@ -97,7 +97,8 @@ const getImageUrl = (url?: string) => {
 };
 
 export default function ReportScreen() {
-  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const headerPaddingTop = Math.max(12, insets.top + 8);
 
 
   // Sensor State
@@ -280,11 +281,13 @@ export default function ReportScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" backgroundColor={palette.background} />
-        <View style={styles.header}>
-          <View style={{ alignItems: 'center', width: '100%' }}>
+        <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+          <View style={styles.headerSide} />
+          <View style={styles.headerCenter}>
             <Text style={styles.headerTitle}>{headerInfo.title}</Text>
             <Text style={styles.headerSubtitle}>{headerInfo.subtitle}</Text>
           </View>
+          <View style={styles.headerSide} />
         </View>
         <View style={styles.emptyContainer}>
           <ActivityIndicator size="large" color={palette.accent} style={{ marginBottom: 20 }} />
@@ -293,7 +296,7 @@ export default function ReportScreen() {
             혈당 데이터를 수집하기 위해 대기 중입니다.{"\n"}
             (최대 30분 ~ 2시간 소요)
           </Text>
-          <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: palette.background, borderWidth: 1, borderColor: palette.border }]} onPress={onRefresh}>
+          <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border }]} onPress={onRefresh}>
             <Text style={[styles.emptyBtnText, { color: palette.text }]}>새로고침</Text>
           </TouchableOpacity>
         </View>
@@ -306,31 +309,41 @@ export default function ReportScreen() {
       <StatusBar barStyle="dark-content" backgroundColor={palette.background} />
 
       {/* Header Section (Navigation Style) */}
-      <View style={styles.header}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          {/* Prev Button (Older) -> Index increases */}
-          <TouchableOpacity
-            onPress={() => shiftSensor(1)}
-            disabled={currentIndex >= sensors.length - 1}
-            style={[styles.headerNavButton, currentIndex >= sensors.length - 1 && styles.headerNavButtonDisabled]}
-          >
-            <Text style={[styles.headerNavText, currentIndex >= sensors.length - 1 && styles.headerNavTextDisabled]}>{"<"}</Text>
-          </TouchableOpacity>
-
-          <View style={{ alignItems: 'center' }}>
-            <Text style={styles.headerTitle}>{headerInfo.title}</Text>
-            <Text style={styles.headerSubtitle}>{headerInfo.subtitle}</Text>
+      <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+        {/* Prev Button (Older) -> Index increases */}
+        <TouchableOpacity
+          onPress={() => shiftSensor(1)}
+          disabled={currentIndex >= sensors.length - 1}
+          style={styles.headerSide}
+        >
+          <View style={[styles.headerNavButton, currentIndex >= sensors.length - 1 && styles.headerNavButtonDisabled]}>
+            <Ionicons
+              name="chevron-back"
+              size={16}
+              color={currentIndex >= sensors.length - 1 ? "rgba(107, 116, 102, 0.45)" : palette.textMuted}
+            />
           </View>
+        </TouchableOpacity>
 
-          {/* Next Button (Newer) -> Index decreases */}
-          <TouchableOpacity
-            onPress={() => shiftSensor(-1)}
-            disabled={currentIndex <= 0}
-            style={[styles.headerNavButton, currentIndex <= 0 && styles.headerNavButtonDisabled]}
-          >
-            <Text style={[styles.headerNavText, currentIndex <= 0 && styles.headerNavTextDisabled]}>{">"}</Text>
-          </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>{headerInfo.title}</Text>
+          <Text style={styles.headerSubtitle}>{headerInfo.subtitle}</Text>
         </View>
+
+        {/* Next Button (Newer) -> Index decreases */}
+        <TouchableOpacity
+          onPress={() => shiftSensor(-1)}
+          disabled={currentIndex <= 0}
+          style={styles.headerSide}
+        >
+          <View style={[styles.headerNavButton, currentIndex <= 0 && styles.headerNavButtonDisabled]}>
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={currentIndex <= 0 ? "rgba(107, 116, 102, 0.45)" : palette.textMuted}
+            />
+          </View>
+        </TouchableOpacity>
       </View>
 
       {/* Content Area */}
@@ -399,7 +412,7 @@ export default function ReportScreen() {
                 {modalMeal.imageUrl ? (
                   <Image source={{ uri: getImageUrl(modalMeal.imageUrl) }} style={styles.modalMealImage} />
                 ) : (
-                  <View style={[styles.modalMealImage, { backgroundColor: '#f1f5f9' }]}>
+                  <View style={[styles.modalMealImage, { backgroundColor: '#EFE6D6' }]}>
                     <Ionicons name="fast-food-outline" size={32} color={palette.textMuted} />
                   </View>
                 )}
@@ -472,12 +485,12 @@ const MacroBar = ({ c = 0, p = 0, f = 0 }: { c?: number, p?: number, f?: number 
   // If no data, render 1:1:1 segments in coloring (or gray?) - Index.tsx uses colors even for placeholder
   const flexValues = hasData ? [carbPercent, proteinPercent, fatPercent] : [1, 1, 1];
 
-  const color = { c: '#86EFAC', p: '#FDE68A', f: '#93C5FD' };
+  const color = { c: '#9DCB98', p: '#E8C97E', f: '#9BB9D9' };
 
   return (
     <View style={{ marginTop: 4, width: '100%' }}>
       {/* Bar */}
-      <View style={{ flexDirection: 'row', height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#F1F5F9', marginBottom: 4 }}>
+      <View style={{ flexDirection: 'row', height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#EFE6D6', marginBottom: 4 }}>
         <View style={{ flex: flexValues[0], backgroundColor: color.c }} />
         <View style={{ flex: flexValues[1], backgroundColor: color.p }} />
         <View style={{ flex: flexValues[2], backgroundColor: color.f }} />
@@ -589,26 +602,41 @@ const getMealTypeText = (type: string) => {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
-  header: { padding: 20, paddingBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: palette.text },
-  headerSubtitle: { fontSize: 14, color: palette.textMuted, marginBottom: 4 },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 0,
+    paddingBottom: 12,
+  },
+  headerSide: {
+    minWidth: 72,
+    minHeight: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: palette.text },
+  headerSubtitle: { fontSize: 12, color: palette.textMuted, marginTop: 4 },
 
   // Header Navigation Styles
   headerNavButton: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "rgba(148, 163, 184, 0.18)",
+    backgroundColor: "rgba(127, 175, 123, 0.22)",
     alignItems: "center",
     justifyContent: "center",
   },
   headerNavButtonDisabled: {
-    opacity: 0.3,
+    opacity: 0.45,
   },
-  headerNavText: { color: "#94A3B8", fontSize: 12, fontWeight: "700" },
-  headerNavTextDisabled: { color: "rgba(148, 163, 184, 0.4)" },
 
-  sensorIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FEF3C7', justifyContent: 'center', alignItems: 'center' },
+  sensorIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#EFE6D6', justifyContent: 'center', alignItems: 'center' },
 
 
 
@@ -618,8 +646,8 @@ const styles = StyleSheet.create({
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyTitle: { fontSize: 20, fontWeight: '700', color: palette.text, marginTop: 20, marginBottom: 10 },
   emptySubtitle: { fontSize: 14, color: palette.textMuted, textAlign: 'center', marginBottom: 30 },
-  emptyBtn: { backgroundColor: palette.navy, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 12 },
-  emptyBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  emptyBtn: { backgroundColor: palette.accent, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 14 },
+  emptyBtnText: { color: palette.ink, fontSize: 16, fontWeight: '700' },
   emptyText: { textAlign: 'center', color: palette.textMuted, marginTop: 40 },
 
 
@@ -627,15 +655,15 @@ const styles = StyleSheet.create({
   // Stats
   sectionTitle: { fontSize: 18, fontWeight: "700", color: palette.text, marginBottom: 12, marginTop: 8 },
   gridContainer: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginBottom: 10 },
-  statCard: { width: "48%", backgroundColor: palette.card, borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: palette.border },
+  statCard: { width: "48%", backgroundColor: palette.card, borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: "#1F241F", shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2, borderWidth: 1, borderColor: palette.border },
   statLabel: { fontSize: 12, color: palette.textMuted, marginBottom: 8, fontWeight: "600" },
   valueRow: { flexDirection: "row", alignItems: "baseline" },
   statValue: { fontSize: 24, fontWeight: "800", color: palette.text, marginRight: 4 },
   statUnit: { fontSize: 12, color: palette.textMuted },
 
   // TIR
-  card: { backgroundColor: palette.card, borderRadius: 20, padding: 20, marginBottom: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2, borderWidth: 1, borderColor: palette.border },
-  tirBarContainer: { flexDirection: 'row', height: 24, width: '100%', borderRadius: 8, overflow: 'hidden', backgroundColor: '#f1f5f9' },
+  card: { backgroundColor: palette.card, borderRadius: 20, padding: 20, marginBottom: 20, shadowColor: "#1F241F", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2, borderWidth: 1, borderColor: palette.border },
+  tirBarContainer: { flexDirection: 'row', height: 24, width: '100%', borderRadius: 8, overflow: 'hidden', backgroundColor: '#EFE6D6' },
   tirSegment: { height: '100%' },
   tirLegendContainer: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 12 },
   legendItem: { flexDirection: 'row', alignItems: 'center' },
@@ -643,12 +671,12 @@ const styles = StyleSheet.create({
   legendText: { fontSize: 12, color: palette.textMuted, fontWeight: '600' },
 
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, minHeight: 300 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(31,36,31,0.38)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: palette.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, minHeight: 300, borderWidth: 1, borderColor: palette.border },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: palette.text },
   modalDesc: { fontSize: 14, color: palette.textMuted, textAlign: 'center', marginTop: 20 },
-  mealPrevCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', padding: 16, borderRadius: 16, width: '100%' },
+  mealPrevCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1E8D8', padding: 16, borderRadius: 16, width: '100%', borderWidth: 1, borderColor: palette.border },
   modalMealImage: { width: 60, height: 60, borderRadius: 12, marginRight: 16 },
   mealName: { fontSize: 16, fontWeight: '700', color: palette.text, marginBottom: 4 },
   mealTime: { fontSize: 13, color: palette.textMuted },

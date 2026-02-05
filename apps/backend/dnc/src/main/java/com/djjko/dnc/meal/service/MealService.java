@@ -52,6 +52,8 @@ public class MealService {
             MultipartFile image,
             String foodName,
             Double carbsGrams,
+            Double weightGrams,
+            Double servingCount,
             String mealType,
             String eatenAt,
             String memo,
@@ -60,6 +62,8 @@ public class MealService {
         record.setUserId(userId);
         record.setFoodName(foodName);
         record.setCarbsGrams(carbsGrams);
+        record.setWeightGrams(weightGrams);
+        record.setServingCount(servingCount);
         record.setMealType(MealType.from(mealType));
         record.setEatenAt(parseDateTime(eatenAt));
         record.setMemo(memo);
@@ -113,6 +117,12 @@ public class MealService {
             }
             if (request.carbsGrams() != null) {
                 record.setCarbsGrams(request.carbsGrams());
+            }
+            if (request.weightGrams() != null) {
+                record.setWeightGrams(request.weightGrams());
+            }
+            if (request.servingCount() != null) {
+                record.setServingCount(request.servingCount());
             }
             if (request.peakGlucose() != null) {
                 record.setPeakGlucose(request.peakGlucose());
@@ -233,7 +243,9 @@ public class MealService {
         FoodMetadata meta = metadata.get();
         Double resolvedWeight = resolveWeight(
                 meta.getBaseWeight(),
-                analysis.map(FoodAnalysis::getEstimatedWeight).orElse(null));
+                analysis.map(FoodAnalysis::getEstimatedWeight).orElse(null),
+                record.getWeightGrams(),
+                record.getServingCount());
         double ratio = resolveRatio(meta.getBaseWeight(), resolvedWeight);
 
         Integer calories = scale(meta.getCaloriesPerBase(), ratio);
@@ -248,7 +260,17 @@ public class MealService {
         return new NutritionSummary(calories, carbs, protein, fat, meta.getFoodName());
     }
 
-    private Double resolveWeight(Double baseWeight, Double estimatedWeight) {
+    private Double resolveWeight(
+            Double baseWeight,
+            Double estimatedWeight,
+            Double manualWeight,
+            Double servingCount) {
+        if (manualWeight != null && manualWeight > 0) {
+            return manualWeight;
+        }
+        if (servingCount != null && servingCount > 0 && baseWeight != null && baseWeight > 0) {
+            return baseWeight * servingCount;
+        }
         if (estimatedWeight != null && estimatedWeight > 0) {
             return estimatedWeight;
         }

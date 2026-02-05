@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   bumpProfileRevision,
   getAuthHeaders,
@@ -20,14 +22,14 @@ import {
 } from "@/session";
 
 const palette = {
-  background: "#FAF8F0",
-  card: "#F6F1E3",
-  text: "#1F241F",
-  textMuted: "#6B7466",
-  border: "#E7E0CC",
-  accent: "#7FAF7B",
-  accentDark: "#4E7C5B",
-  ink: "#1F2A1F",
+  background: "#F4E8D6",
+  card: "#F8F0E1",
+  text: "#2F3B30",
+  textMuted: "#6F7A6A",
+  border: "#E6DCC6",
+  accent: "#2F6B4F",
+  accentDark: "#24573F",
+  ink: "#233327",
 };
 
 const API_BASE_URL =
@@ -64,6 +66,7 @@ const mapRequestType = (value: DiabetesStatus) => {
 export default function DiagnosisScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
   const isOnboarding = params.onboarding === "1";
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -82,6 +85,7 @@ export default function DiagnosisScreen() {
   const [tempStatus, setTempStatus] = useState<DiabetesStatus>("none");
   const [tempYear, setTempYear] = useState(diagnosisYear);
   const [tempMonth, setTempMonth] = useState(diagnosisMonth);
+  const headerPaddingTop = Math.max(12, insets.top + 8);
   const yearScrollRef = useRef<ScrollView | null>(null);
   const monthScrollRef = useRef<ScrollView | null>(null);
   const statusScrollRef = useRef<ScrollView | null>(null);
@@ -273,15 +277,12 @@ export default function DiagnosisScreen() {
         contentContainerStyle={styles.page}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.headerRow}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={handleBack}
-          >
-            <Text style={styles.backText}>{"<"}</Text>
+        <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+          <TouchableOpacity style={styles.headerSide} onPress={handleBack}>
+            <Ionicons name="chevron-back" size={20} color={palette.text} />
           </TouchableOpacity>
-          <Text style={styles.pageTitle}>진단 유형 설정</Text>
-          <View style={styles.backSpacer} />
+          <Text style={styles.headerTitle}>진단 유형 설정</Text>
+          <View style={styles.headerSide} />
         </View>
 
         <View style={styles.card}>
@@ -522,24 +523,20 @@ export default function DiagnosisScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
-  page: { padding: 20, paddingBottom: 40 },
-  headerRow: {
+  page: { paddingHorizontal: 16, paddingBottom: 40 },
+  header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
+    paddingTop: 0,
+    paddingBottom: 12,
   },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#E7E0CC",
-    alignItems: "center",
+  headerSide: {
+    minWidth: 72,
+    minHeight: 40,
     justifyContent: "center",
   },
-  backText: { fontSize: 16, color: palette.text },
-  backSpacer: { width: 36 },
-  pageTitle: { fontSize: 22, fontWeight: "800", color: palette.text },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: palette.text },
   card: {
     marginTop: 10,
     backgroundColor: palette.card,
@@ -563,7 +560,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: "#FAF8F0",
+    backgroundColor: "#F4E8D6",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -572,7 +569,7 @@ const styles = StyleSheet.create({
   inputButtonChevron: { color: palette.textMuted, fontSize: 12 },
   targetCard: {
     marginTop: 14,
-    backgroundColor: "#1F241F",
+    backgroundColor: "#2F3B30",
     borderRadius: 16,
     padding: 14,
   },
@@ -583,7 +580,7 @@ const styles = StyleSheet.create({
   },
   targetValue: {
     marginTop: 6,
-    color: "#FAF8F0",
+    color: "#F4E8D6",
     fontSize: 18,
     fontWeight: "800",
   },
@@ -600,7 +597,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   primaryButtonDisabled: {
-    backgroundColor: "#E7E0CC",
+    backgroundColor: "#E6DCC6",
     shadowOpacity: 0,
     elevation: 0,
   },

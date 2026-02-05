@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   bumpProfileRevision,
   getAuthHeaders,
@@ -21,14 +23,14 @@ import {
 } from "@/session";
 
 const palette = {
-  background: "#FAF8F0",
-  card: "#F6F1E3",
-  text: "#1F241F",
-  textMuted: "#6B7466",
-  border: "#E7E0CC",
-  accent: "#7FAF7B",
-  accentDark: "#4E7C5B",
-  ink: "#1F2A1F",
+  background: "#F4E8D6",
+  card: "#F8F0E1",
+  text: "#2F3B30",
+  textMuted: "#6F7A6A",
+  border: "#E6DCC6",
+  accent: "#2F6B4F",
+  accentDark: "#24573F",
+  ink: "#233327",
 };
 
 const API_BASE_URL =
@@ -51,6 +53,7 @@ const getDaysInMonth = (year: number, month: number) =>
 export default function BodyInfoScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
   const isOnboarding = params.onboarding === "1";
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -70,6 +73,7 @@ export default function BodyInfoScreen() {
   const [tempYear, setTempYear] = useState(defaultYear);
   const [tempMonth, setTempMonth] = useState(1);
   const [tempDay, setTempDay] = useState(1);
+  const headerPaddingTop = Math.max(12, insets.top + 8);
   const yearScrollRef = useRef<ScrollView | null>(null);
   const monthScrollRef = useRef<ScrollView | null>(null);
   const dayScrollRef = useRef<ScrollView | null>(null);
@@ -293,12 +297,12 @@ export default function BodyInfoScreen() {
         contentContainerStyle={styles.page}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.headerRow}>
-          <Pressable style={styles.backButton} onPress={handleBack}>
-            <Text style={styles.backText}>{"<"}</Text>
+        <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+          <Pressable style={styles.headerSide} onPress={handleBack}>
+            <Ionicons name="chevron-back" size={20} color={palette.text} />
           </Pressable>
-          <Text style={styles.pageTitle}>신체 정보 설정</Text>
-          <View style={styles.backSpacer} />
+          <Text style={styles.headerTitle}>신체 정보 설정</Text>
+          <View style={styles.headerSide} />
         </View>
         <Text style={styles.subtitle}>
           생년월일, 성별, 키, 체중을 다시 입력하세요.
@@ -536,24 +540,20 @@ export default function BodyInfoScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
-  page: { padding: 20, paddingBottom: 40 },
-  headerRow: {
+  page: { paddingHorizontal: 16, paddingBottom: 40 },
+  header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
+    paddingTop: 0,
+    paddingBottom: 12,
   },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#E7E0CC",
-    alignItems: "center",
+  headerSide: {
+    minWidth: 72,
+    minHeight: 40,
     justifyContent: "center",
   },
-  backText: { fontSize: 16, color: palette.text },
-  backSpacer: { width: 36 },
-  pageTitle: { fontSize: 22, fontWeight: "800", color: palette.text },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: palette.text },
   subtitle: { color: palette.textMuted, marginBottom: 18 },
   card: {
     backgroundColor: palette.card,
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     color: palette.text,
-    backgroundColor: "#FAF8F0",
+    backgroundColor: "#F4E8D6",
   },
   inputButton: {
     borderWidth: 1,
@@ -584,7 +584,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: "#FAF8F0",
+    backgroundColor: "#F4E8D6",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -604,7 +604,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: "center",
-    backgroundColor: "#FAF8F0",
+    backgroundColor: "#F4E8D6",
   },
   choiceButtonActive: {
     backgroundColor: palette.accent,
@@ -625,7 +625,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   primaryButtonDisabled: {
-    backgroundColor: "#E7E0CC",
+    backgroundColor: "#E6DCC6",
     shadowOpacity: 0,
     elevation: 0,
   },
