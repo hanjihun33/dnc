@@ -281,24 +281,18 @@ CREATE TABLE glucose_predictions (
 -- ---------------------------------------------------------
 
 -- 3-1. daily_reports (주간/월간 꺾은선 그래프의 기본 소스)
-CREATE TABLE daily_reports (
-    report_id          BIGINT NOT NULL AUTO_INCREMENT,
-    user_id            BIGINT NOT NULL,
-    report_date        DATE   NOT NULL,
-    record_count       INT    NULL,
-    average_glucose    INT    NULL,
-    max_glucose        INT    NULL,
-    min_glucose        INT    NULL,
-    standard_deviation FLOAT  NULL,
-    in_range_percent   FLOAT  NULL, 
-    created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    -- 이 부분에 CURRENT_TIMESTAMP가 추가되었습니다.
-    updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (report_id),
-    UNIQUE KEY uk_daily_reports (user_id, report_date),
-    CONSTRAINT fk_daily_reports_user
-        FOREIGN KEY (user_id) REFERENCES users (user_id)
-        ON DELETE CASCADE
+-- 3-1. daily_report (AI Daily Report)
+CREATE TABLE daily_report (
+    daily_report_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id         BIGINT NOT NULL,
+    sensor_id       BIGINT,
+    target_date     DATE NOT NULL,
+    summary_text    TEXT,
+    health_score    INT,
+    report_type     VARCHAR(20),
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
 ) ENGINE=InnoDB;
 
 -- 3-2. weekly_reports (주 단위 요약 리포트)

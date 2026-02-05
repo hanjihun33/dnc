@@ -140,6 +140,11 @@ public class UserService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     }
 
+    public User getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    }
+
     private UserProfileResponse toResponse(User user) {
         boolean sensorConnected = isSensorConnected(user);
         return new UserProfileResponse(
