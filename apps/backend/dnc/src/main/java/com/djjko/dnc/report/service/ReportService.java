@@ -11,6 +11,7 @@ import com.djjko.dnc.report.repository.GlucoseDataRepository;
 import com.djjko.dnc.report.repository.MonthlyReportRepository;
 import com.djjko.dnc.report.repository.WeeklyReportRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j; // Added import
 import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.IntSummaryStatistics;
 import java.util.ArrayList;
 
+@Slf4j // Added annotation
 @Service
 @RequiredArgsConstructor
 public class ReportService {
@@ -135,10 +137,13 @@ public class ReportService {
             Long sensorId) {
         List<GlucoseData> data;
         if (sensorId != null) {
+            log.info("Fetching data by SensorID: {}, UserID: {}", sensorId, userId);
             data = glucoseDataRepository.findAllByUser_UserIdAndSensor_SensorId(userId, sensorId);
         } else {
+            log.info("Fetching data by DateRange: {} ~ {}, UserID: {}", start, end, userId);
             data = glucoseDataRepository.findAllByUser_UserIdAndMeasuredAtBetween(userId, start, end);
         }
+        log.info("Fetched {} glucose records", data.size());
         return buildGlucoseReport(userId, data, start, end, period);
     }
 
@@ -148,6 +153,9 @@ public class ReportService {
             LocalDateTime start,
             LocalDateTime end,
             String period) {
+
+        log.info("Building Glucose Report for user: {}, count: {}", userId, data.size());
+
         if (data.isEmpty()) {
             return GlucoseReportDto.builder()
                     .userId(userId)
@@ -190,6 +198,10 @@ public class ReportService {
                 .highPercent(calculatePercent(highCount, count))
                 .veryHighPercent(calculatePercent(veryHighCount, count))
                 .build();
+
+        log.info("TIR Calculation Results: VeryLow={}, Low={}, InRange={}, High={}, VeryHigh={}",
+                tirDto.getVeryLowPercent(), tirDto.getLowPercent(), tirDto.getInRangePercent(),
+                tirDto.getHighPercent(), tirDto.getVeryHighPercent());
 
         return GlucoseReportDto.builder()
                 .userId(userId)

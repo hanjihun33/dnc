@@ -26,9 +26,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain)
-        throws ServletException, IOException {
+            HttpServletResponse response,
+            FilterChain filterChain)
+            throws ServletException, IOException {
 
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
@@ -41,12 +41,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 if (SecurityContextHolder.getContext().getAuthentication() == null) {
                     String email = jwtUtil.getEmail(token);
                     userRepository.findByEmail(email).ifPresentOrElse(user -> {
-                        UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(
+                        // UserDetails 객체 생성 (Spring Security의 User 클래스 사용)
+                        org.springframework.security.core.userdetails.User userDetails = new org.springframework.security.core.userdetails.User(
                                 user.getEmail(),
+                                "", // password는 JWT 인증에서 사용하지 않음
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                                userDetails, // UserDetails 객체를 principal로 설정
                                 null,
-                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
-                            );
+                                userDetails.getAuthorities());
                         SecurityContextHolder.getContext().setAuthentication(authentication);
                     }, SecurityContextHolder::clearContext);
                 }

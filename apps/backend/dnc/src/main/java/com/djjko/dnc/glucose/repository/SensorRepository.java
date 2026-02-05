@@ -29,4 +29,7 @@ public interface SensorRepository extends JpaRepository<Sensor, Long> {
     List<Sensor> findAllByUserOrderByStartedAtDesc(User user);
 
     Optional<Sensor> findByUserAndDeviceIdAndStatus(User user, String deviceId, Sensor.SensorStatus status);
+
+    // [New] 모든 활성 센서 조회 (배치용)
+    List<Sensor> findAllByStatus(Sensor.SensorStatus status);
 }
