@@ -1,6 +1,6 @@
 # DB 덤프 및 스키마 정보 (DB_DUMP_INFO)
 
-## 1. ERD 요약 및 엔티티 구조
+## ERD 요약 및 엔티티 구조
 현재 `com.djjko.dnc.*.entity` 패키지 분석 결과, 주요 테이블 구조는 다음과 같습니다.
 
 ### 핵심 테이블 (Core Domain)
@@ -26,33 +26,3 @@
 ### 인증 및 기타 (Auth & Etc)
 - **`social_account`, `oauth_token`**: 소셜 로그인 연동 정보 및 토큰 관리.
 - **`user_alert_setting`, `push_token`**: 알림 설정 및 FCM 토큰.
-
----
-
-## 2. 데이터 덤프 및 복구 가이드
-
-### 덤프 (Backup)
-Docker 컨테이너 내부의 MySQL 데이터베이스를 덤프하는 명령어입니다.
-
-```bash
-# 전체 데이터베이스 덤프 (스키마 + 데이터)
-docker exec djk-db mysqldump -u root -p${DB_ROOT_PASSWORD} dnc_db > backup_full_$(date +%Y%m%d).sql
-
-# 스키마만 덤프 (테이블 구조 백업)
-docker exec djk-db mysqldump -u root -p${DB_ROOT_PASSWORD} --no-data dnc_db > backup_schema.sql
-```
-
-### 복구 (Restore)
-생성된 SQL 파일을 사용하여 데이터베이스를 복원합니다. **주의: 기존 데이터가 덮어씌워질 수 있습니다.**
-
-```bash
-# 데이터베이스 복원
-cat backup_full_2024XXXX.sql | docker exec -i djk-db mysql -u root -p${DB_ROOT_PASSWORD} dnc_db
-```
-
----
-
-## 3. 데이터 관리 제언
-1. **민감 정보 제외**: 백업 시 `users` 테이블의 `password` 컬럼이나 `oauth_token` 테이블의 토큰 정보는 제외하거나 마스킹하는 것이 보안상 권장됩니다.
-2. **정기 백업**: `Jenkins` 또는 `Cron` 작업을 통해 매일 새벽 유휴 시간에 자동 백업을 수행하고 S3 등으로 이관하는 스크립트가 필요합니다.
-3. **볼륨 영속성**: 현재 `docker-compose.yml` 상에 `./mysql_data:/var/lib/mysql`로 볼륨이 마운트되어 있어, 컨테이너가 삭제되어도 데이터는 호스트에 유지됩니다.
