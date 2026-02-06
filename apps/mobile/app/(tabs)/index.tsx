@@ -688,7 +688,6 @@ export default function HomeScreen() {
     );
 
     setShowDatePicker(true);
-
   };
 
 
@@ -982,33 +981,21 @@ export default function HomeScreen() {
 
 
   const fetchMeals = React.useCallback(async () => {
-
     await loadAuthSession();
+    const headers = getAuthHeaders();
+    const dateKey = formatDateKey(selectedDate);
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/meals`, {
-
-      headers: getAuthHeaders(),
-
-    });
-
+    const response = await fetch(`${API_BASE_URL}/api/v1/meals`, { headers });
     if (!response.ok) return;
 
     const meals = (await response.json()) as MealSummary[];
-
     setAllMeals(meals ?? []);
 
-    const dateKey = formatDateKey(selectedDate);
-
     const filtered = meals.filter((meal) => {
-
       const parsed = parseLocalDateTime(meal.eatenAt ?? null);
-
       return parsed ? formatDateKey(parsed) === dateKey : false;
-
     });
-
     setTodayMeals(filtered);
-
   }, [selectedDate]);
 
 
@@ -1028,6 +1015,7 @@ export default function HomeScreen() {
       const start = startOfDay(selectedDate);
 
       await fetchRealtime(start, end, "replace");
+      await fetchMeals();
 
       setLastRefreshAt(new Date());
 
@@ -1146,14 +1134,10 @@ export default function HomeScreen() {
   useFocusEffect(
 
     React.useCallback(() => {
-
+      // focus 시에는 프로필/알림만 가볍게 체크 (식사는 useEffect에서 담당)
       void fetchProfile();
-
-      void fetchMeals();
-
       void fetchUnreadNotifications();
-
-    }, [fetchMeals, fetchProfile, fetchUnreadNotifications])
+    }, [fetchProfile, fetchUnreadNotifications])
 
   );
 
@@ -1214,11 +1198,8 @@ export default function HomeScreen() {
 
 
   React.useEffect(() => {
-
     void fetchMeals();
-
     void loadInitial();
-
   }, [fetchMeals, loadInitial]);
 
 

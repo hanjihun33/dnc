@@ -225,7 +225,6 @@ export default function ReportScreen() {
     }
   };
 
-  // Initial load
   useFocusEffect(useCallback(() => {
     loadAuthSession().then(() => {
       fetchSensorHistory();
@@ -550,7 +549,6 @@ const MacroBar = ({ c = 0, p = 0, f = 0 }: { c?: number, p?: number, f?: number 
 
 const ReportTab = ({ report, loading, isAnalyzing, onMaxGlucosePress }: { report: GlucoseReportDto | null, loading: boolean, isAnalyzing: boolean, onMaxGlucosePress: () => Promise<void> }) => {
   if (!report) {
-    if (loading) return <View style={{ height: 200 }} />; // 로딩 중에는 빈 공간 유지하여 덜컹거림 방지
     return <Text style={styles.emptyText}>리포트 데이터가 없습니다.</Text>;
   }
 
