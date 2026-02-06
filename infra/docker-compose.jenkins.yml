@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  jenkins-controller:
+    image: jenkins/jenkins:lts
+    container_name: jenkins-controller
+    user: root
+    restart: always
+    
+    # [추가됨] 로깅 설정: 최대 10MB 파일 3개까지만 보관
+    # Jenkins는 빌드 로그가 매우 크므로 이 설정이 특히 중요합니다.
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      - TZ=Asia/Seoul
+      - JENKINS_OPTS=--prefix=/jenkins
+    
+    ports:
+      - "18088:8080"
+      - "50000:50000"
+      
+    volumes:
+      - ./jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker
+      - /usr/libexec/docker/cli-plugins/docker-compose:/usr/bin/docker-compose
+      
+      # [추가] 호스트의 배포 폴더를 젠킨스 컨테이너 내부와 연결 (매핑)
+      - /home/ubuntu/dang-nang-kong:/home/ubuntu/dang-nang-kong
+    
+    networks:
+      - dang-nang-kong_network
+
+networks:
+  dang-nang-kong_network:
+    external: true

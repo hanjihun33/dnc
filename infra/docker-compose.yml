@@ -1,0 +1,200 @@
+services:
+
+  # [NEW] Redis 캐시 서버
+  djk-redis:
+    image: redis:alpine
+    container_name: djk-redis
+    restart: always
+    # [추가됨] 로깅 설정: 최대 10MB 파일 3개까지만 보관
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # [핵심] 비밀번호 설정 제거 (--requirepass 삭제)
+    command: >
+      redis-server 
+      --port 16380 
+      --appendonly yes
+    volumes:
+      - ./redis_data:/data
+    environment:
+      - TZ=Asia/Seoul
+    networks:
+      - dang-nang-kong_network
+
+  # [1] 데이터베이스: MySQL 8.0
+  djk-db:
+    image: mysql:8.0
+    container_name: djk-db
+    restart: always
+    # [추가됨] 로깅 설정
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      - "13306:13306"
+    environment:
+      - MYSQL_TCP_PORT=13306
+      - MYSQL_DATABASE=${DB_NAME}
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MYSQL_USER=${DB_USER}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - TZ=Asia/Seoul
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+      - ./mysql_init:/docker-entrypoint-initdb.d
+    networks:
+      - dang-nang-kong_network
+
+  # [2] 백엔드 서비스: Spring Boot
+  backend:
+    image: ${DOCKER_IMAGE_BE}
+    # [중요] 빌드 경로 추가
+    build:
+      context: ./apps/backend/dnc
+      dockerfile: Dockerfile
+    container_name: djk-backend
+    restart: always
+    # [추가됨] 로깅 설정 (로그량이 많으므로 필수)
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    expose:
+      - "18080"
+    environment:
+      - SERVER_PORT=18080
+      - SPRING_PROFILES_ACTIVE=prod
+      # DB
+      - DB_URL=jdbc:mysql://djk-db:13306/${DB_NAME}?serverTimezone=Asia/Seoul
+      - DB_USERNAME=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      # JWT
+      - JWT_SECRET=${JWT_SECRET}
+      # Redis (비밀번호 제거)
+      - SPRING_DATA_REDIS_HOST=djk-redis
+      - SPRING_DATA_REDIS_PORT=16380
+      - SPRING_DATA_REDIS_PASSWORD=
+      # [S3 설정]
+      - STORAGE_TYPE=s3
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_REGION=${S3_REGION}
+      - S3_PUBLIC_URL=${S3_PUBLIC_URL}
+      # [AWS 인증]
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      # [NEW] Dexcom OAuth 설정
+      - DEXCOM_CLIENT_ID=${DEXCOM_CLIENT_ID}
+      - DEXCOM_CLIENT_SECRET=${DEXCOM_CLIENT_SECRET}
+      - DEXCOM_REDIRECT_URI=${DEXCOM_REDIRECT_URI}
+      # [GMS]
+      - GMS_API_KEY=${GMS_API_KEY}
+      # [AI Server]
+      - AI_SERVER_BASE_URL=${AI_SERVER_BASE_URL}
+      # [Social Login] - 구글, 카카오, 네이버
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+      - KAKAO_CLIENT_ID=${KAKAO_CLIENT_ID}
+      - KAKAO_CLIENT_SECRET=${KAKAO_CLIENT_SECRET}
+      - KAKAO_REDIRECT_URI=${KAKAO_REDIRECT_URI}
+      - NAVER_CLIENT_ID=${NAVER_CLIENT_ID}
+      - NAVER_CLIENT_SECRET=${NAVER_CLIENT_SECRET}
+      - NAVER_REDIRECT_URI=${NAVER_REDIRECT_URI}
+      # [ETC]
+      - FIREBASE_SERVICE_ACCOUNT=${FIREBASE_SERVICE_ACCOUNT} # 푸시 알림 사용 시 필수
+      # - CARESENSE_CLIENT_ID=${CARESENSE_CLIENT_ID} # 케어센스 사용 시 필요 (선택)
+      - APP_SOCIAL_LOGIN_REDIRECT_URI=${APP_SOCIAL_LOGIN_REDIRECT_URI}
+      - APP_OAUTH_REDIRECT_URI=${APP_OAUTH_REDIRECT_URI}
+      - APP_SOCIAL_LOGIN_REDIRECT_URI_WEB=${APP_SOCIAL_LOGIN_REDIRECT_URI_WEB}
+    volumes:
+      # [실제 파일 이름] : [컨테이너 내부 경로]
+      - ./djk-dnc-d8b29-firebase-adminsdk-fbsvc-1a6db8010c.json:/app/firebase-service-account.json
+    depends_on:
+      - djk-db
+    networks:
+      - dang-nang-kong_network
+    
+
+  # [3] AI 연산 서버: FastAPI
+  ai:
+    image: ${DOCKER_IMAGE_AI}
+    # [중요] 빌드 경로 추가
+    build:
+      context: ./apps/ai-server
+      dockerfile: Dockerfile
+    container_name: djk-ai
+    restart: always
+    # [추가됨] 로깅 설정 (AI 로그량이 많으므로 필수)
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    expose:
+      - "18000"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+    environment:
+      - YOLO_MODEL_PATH=/app/ai-server/ai/models/best1to40.pt
+      - RESNET_MODEL_PATH=/app/ai-server/ai/models/new_opencv_ckpt_b84_e200.pth
+    networks:
+      - dang-nang-kong_network
+
+  # [4] 프론트엔드: React Native for Web
+  frontend:
+    image: ${DOCKER_IMAGE_FE}
+    # [중요] 빌드 경로 추가
+    build:
+      context: ./apps/mobile
+      dockerfile: Dockerfile
+      args:
+        - EXPO_PUBLIC_API_BASE_URL=${EXPO_PUBLIC_API_BASE_URL}
+    container_name: djk-frontend
+    restart: always
+    # [추가됨] 로깅 설정
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    expose:
+      - "180"   
+    networks:
+      - dang-nang-kong_network
+
+  # [5] Nginx 리버스 프록시
+  nginx:
+    image: nginx:latest
+    container_name: djk-nginx
+    restart: always
+    # [추가됨] 로깅 설정 (Access Log가 매우 빠르게 쌓이므로 필수)
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      - "80:80"
+      - "443:443" # HTTPS 포트 추가
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/.htpasswd:/etc/nginx/.htpasswd
+      # [핵심] 호스트의 인증서 경로를 컨테이너 내부로 연결 (읽기 전용 :ro)
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - ai
+      - frontend
+      - backend
+    networks:
+      - dang-nang-kong_network
+
+networks:
+  dang-nang-kong_network:
+    external: true
