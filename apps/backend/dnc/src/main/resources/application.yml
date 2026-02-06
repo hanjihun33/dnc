@@ -3,6 +3,13 @@ file:
     dir: ${user.dir}/uploads/
     url-path: /images/
 
+server:
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
 storage:
   type: ${STORAGE_TYPE:local}
   s3:

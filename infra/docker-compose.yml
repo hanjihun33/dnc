@@ -13,9 +13,7 @@ services:
         max-file: "3"
     # [핵심] 비밀번호 설정 제거 (--requirepass 삭제)
     command: >
-      redis-server 
-      --port 16380 
-      --appendonly yes
+      redis-server  --port 16380  --appendonly yes
     volumes:
       - ./redis_data:/data
     environment:
@@ -70,7 +68,7 @@ services:
       - SERVER_PORT=18080
       - SPRING_PROFILES_ACTIVE=prod
       # DB
-      - DB_URL=jdbc:mysql://djk-db:13306/${DB_NAME}?serverTimezone=Asia/Seoul
+      - DB_URL=jdbc:mysql://djk-db:13306/${DB_NAME}?serverTimezone=Asia/Seoul&useUnicode=true&characterEncoding=UTF-8
       - DB_USERNAME=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       # JWT
@@ -118,7 +116,6 @@ services:
       - djk-db
     networks:
       - dang-nang-kong_network
-    
 
   # [3] AI 연산 서버: FastAPI
   ai:
@@ -165,7 +162,7 @@ services:
         max-size: "10m"
         max-file: "3"
     expose:
-      - "180"   
+      - "180"
     networks:
       - dang-nang-kong_network
 
