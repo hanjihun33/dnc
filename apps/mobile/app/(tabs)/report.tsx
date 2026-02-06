@@ -14,7 +14,7 @@ import {
   Alert,
   Animated
 } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { getAuthHeaders, loadAuthSession } from "../../session";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { DailySummaryCard } from "../../components/DailySummaryCard";
@@ -98,6 +98,7 @@ const getImageUrl = (url?: string) => {
 };
 
 export default function ReportScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerPaddingTop = Math.max(12, insets.top + 8);
 
@@ -291,7 +292,7 @@ export default function ReportScreen() {
           <MaterialIcons name="sensors-off" size={64} color={palette.textMuted} />
           <Text style={styles.emptyTitle}>연동된 센서가 없습니다</Text>
           <Text style={styles.emptySubtitle}>새로운 센서를 연동하여 관리를 시작해보세요.</Text>
-          <TouchableOpacity style={styles.emptyBtn} onPress={() => Alert.alert("준비 중", "센서 연동 화면으로 이동")}>
+          <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push("/(settings)/sensor-connect")}>
             <Text style={styles.emptyBtnText}>센서 연동하기</Text>
           </TouchableOpacity>
         </View>
