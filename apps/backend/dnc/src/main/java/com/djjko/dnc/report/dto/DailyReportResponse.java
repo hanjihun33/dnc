@@ -14,6 +14,7 @@ public class DailyReportResponse {
     private String summaryText;
     private Integer healthScore;
     private String reportType; // DAILY or SENSOR_FINAL
+    private Integer dayCount; // Added field for day sequence (e.g. 1일차)
 
     public static DailyReportResponse from(DailyReport report) {
         return DailyReportResponse.builder()

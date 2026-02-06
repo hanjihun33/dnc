@@ -87,8 +87,8 @@ public class OAuthController {
     @GetMapping("/{provider}/authorize")
     @Operation(summary = "OAuth authorize URL redirect")
     public ResponseEntity<Void> authorize(
-            @PathVariable String provider,
-            @RequestParam(required = false) String state,
+            @PathVariable("provider") String provider,
+            @RequestParam(value = "state", required = false) String state,
             HttpServletRequest request) {
         String clientState = (state == null || state.isBlank()) ? UUID.randomUUID().toString() : state;
         String resolvedState = resolveAuthenticatedUserOrHeader(request)
@@ -106,8 +106,8 @@ public class OAuthController {
     @GetMapping("/{provider}/authorize-url")
     @Operation(summary = "OAuth authorize URL")
     public OAuthAuthorizeResponse authorizeUrl(
-            @PathVariable String provider,
-            @RequestParam(required = false) String state,
+            @PathVariable("provider") String provider,
+            @RequestParam(value = "state", required = false) String state,
             HttpServletRequest request) {
         String clientState = (state == null || state.isBlank()) ? UUID.randomUUID().toString() : state;
         String resolvedState = resolveAuthenticatedUserOrHeader(request)
@@ -120,10 +120,10 @@ public class OAuthController {
     @GetMapping("/{provider}/callback")
     @Operation(summary = "OAuth callback handler")
     public ResponseEntity<?> callback(
-            @PathVariable String provider,
-            @RequestParam(required = false) String code,
-            @RequestParam(required = false) String state,
-            @RequestParam(required = false) String error,
+            @PathVariable("provider") String provider,
+            @RequestParam(value = "code", required = false) String code,
+            @RequestParam(value = "state", required = false) String state,
+            @RequestParam(value = "error", required = false) String error,
             @RequestParam(required = false, name = "error_description") String errorDescription,
             @RequestParam(required = false, name = "format") String format,
             @RequestHeader(value = "Accept", required = false) String accept) {
@@ -186,8 +186,8 @@ public class OAuthController {
     @PostMapping("/{provider}/token")
     @Operation(summary = "OAuth token exchange")
     public OAuthTokenResponse exchangeAndStore(
-            @PathVariable String provider,
-            @RequestParam String code) {
+            @PathVariable("provider") String provider,
+            @RequestParam("code") String code) {
         OAuthTokenResponse response = oAuthService.exchangeCodeForToken(provider, code);
         User user = resolveRequiredUser();
         updateProviderIdIfDexcom(user, provider, response);
@@ -197,7 +197,7 @@ public class OAuthController {
 
     @PostMapping("/{provider}/refresh")
     @Operation(summary = "OAuth token refresh")
-    public OAuthTokenResponse refreshToken(@PathVariable String provider) {
+    public OAuthTokenResponse refreshToken(@PathVariable("provider") String provider) {
         com.djjko.dnc.auth.entity.User user = resolveRequiredUser();
         String refreshToken = oAuthTokenService.getToken(user, provider).getRefreshToken();
         if (refreshToken == null || refreshToken.isBlank()) {
@@ -212,8 +212,8 @@ public class OAuthController {
     @Operation(summary = "OAuth disconnect")
     @Transactional
     public ResponseEntity<Void> disconnect(
-            @PathVariable String provider,
-            @RequestParam(defaultValue = "false") boolean deleteData) {
+            @PathVariable("provider") String provider,
+            @RequestParam(value = "deleteData", defaultValue = "false") boolean deleteData) {
         User user = resolveRequiredUser();
 
         oAuthTokenService.findToken(user, provider)
@@ -237,9 +237,9 @@ public class OAuthController {
     @GetMapping("/{provider}/egvs")
     @Operation(summary = "CGM EGV data")
     public ResponseEntity<String> fetchEgvs(
-            @PathVariable String provider,
-            @Parameter(description = "Start date (YYYY-MM-DDTHH:mm:ss)", example = "2026-01-27T00:00:00") @RequestParam String startDate,
-            @Parameter(description = "End date (YYYY-MM-DDTHH:mm:ss)", example = "2026-01-27T23:59:59") @RequestParam String endDate) {
+            @PathVariable("provider") String provider,
+            @Parameter(description = "Start date (YYYY-MM-DDTHH:mm:ss)", example = "2026-01-27T00:00:00") @RequestParam("startDate") String startDate,
+            @Parameter(description = "End date (YYYY-MM-DDTHH:mm:ss)", example = "2026-01-27T23:59:59") @RequestParam("endDate") String endDate) {
         com.djjko.dnc.auth.entity.User user = resolveRequiredUser();
         String accessToken = oAuthTokenService.getToken(user, provider).getAccessToken();
         String body = oAuthService.fetchEgvData(provider, accessToken, startDate, endDate);
@@ -249,8 +249,8 @@ public class OAuthController {
     @GetMapping("/{provider}/data-range")
     @Operation(summary = "CGM data range")
     public ResponseEntity<String> fetchDataRange(
-            @PathVariable String provider,
-            @RequestParam(required = false) String lastSyncTime) {
+            @PathVariable("provider") String provider,
+            @RequestParam(value = "lastSyncTime", required = false) String lastSyncTime) {
         com.djjko.dnc.auth.entity.User user = resolveRequiredUser();
         String accessToken = oAuthTokenService.getToken(user, provider).getAccessToken();
         String body = oAuthService.fetchDataRange(provider, accessToken, lastSyncTime);

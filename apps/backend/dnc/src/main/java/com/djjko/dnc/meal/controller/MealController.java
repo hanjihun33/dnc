@@ -92,7 +92,7 @@ public class MealController {
 
     @GetMapping("/{mealId}")
     @Operation(summary = "식사 기록 단건 조회")
-    public ResponseEntity<MealResponse> get(@PathVariable Long mealId) {
+    public ResponseEntity<MealResponse> get(@PathVariable("mealId") Long mealId) {
         return mealService.findOne(mealId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
@@ -101,7 +101,7 @@ public class MealController {
     @PatchMapping("/{mealId}")
     @Operation(summary = "식사 기록 수정")
     public ResponseEntity<MealResponse> update(
-            @PathVariable Long mealId,
+            @PathVariable("mealId") Long mealId,
             @RequestBody MealUpdateRequest request) {
         return mealService.update(mealId, request)
                 .map(ResponseEntity::ok)
@@ -112,7 +112,7 @@ public class MealController {
             RequestMethod.POST }, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Update meal image")
     public ResponseEntity<MealResponse> updateImage(
-            @PathVariable Long mealId,
+            @PathVariable("mealId") Long mealId,
             @RequestPart(value = "image") MultipartFile image) {
         if (image == null || image.isEmpty()) {
             return ResponseEntity.badRequest().build();
@@ -125,7 +125,7 @@ public class MealController {
 
     @DeleteMapping("/{mealId}")
     @Operation(summary = "식사 기록 삭제")
-    public void delete(@PathVariable Long mealId) {
+    public void delete(@PathVariable("mealId") Long mealId) {
         mealService.delete(mealId);
     }
 }

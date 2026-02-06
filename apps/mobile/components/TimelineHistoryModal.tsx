@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, FlatList } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, FlatList, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const palette = {
@@ -18,6 +18,24 @@ interface TimelineModalProps {
 
 export const TimelineHistoryModal = ({ visible, onClose, history }: TimelineModalProps) => {
     const [expandedItems, setExpandedItems] = React.useState<Set<number>>(new Set());
+    const slideAnim = useRef(new Animated.Value(600)).current;
+
+    useEffect(() => {
+        if (visible) {
+            Animated.spring(slideAnim, {
+                toValue: 0,
+                useNativeDriver: true,
+                friction: 8,
+                tension: 40
+            }).start();
+        } else {
+            Animated.timing(slideAnim, {
+                toValue: 600,
+                duration: 250,
+                useNativeDriver: true
+            }).start();
+        }
+    }, [visible, slideAnim]);
 
     const toggleExpand = (id: number) => {
         setExpandedItems(prev => {
@@ -32,9 +50,9 @@ export const TimelineHistoryModal = ({ visible, onClose, history }: TimelineModa
     };
 
     return (
-        <Modal animationType="slide" transparent={true} visible={visible} onRequestClose={onClose}>
+        <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={onClose}>
             <View style={styles.overlay}>
-                <View style={styles.container}>
+                <Animated.View style={[styles.container, { transform: [{ translateY: slideAnim }] }]}>
                     {/* Header */}
                     <View style={styles.header}>
                         <Text style={styles.title}>지난 리포트 기록</Text>
@@ -101,9 +119,9 @@ export const TimelineHistoryModal = ({ visible, onClose, history }: TimelineModa
                             );
                         }}
                     />
-                </View>
+                </Animated.View>
             </View>
-        </Modal>
+        </Modal >
     );
 };
 

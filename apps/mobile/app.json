@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "test-app",
-    "slug": "test-app",
+    "name": "dang-nang-kong",
+    "slug": "dang-nang-kong",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -29,8 +29,8 @@
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -53,7 +53,8 @@
           }
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-barcode-scanner"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -62,7 +63,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "538c3901-b4ba-458c-b72c-fdc8451a6db7"
+        "projectId": "7005e01d-c9b1-4dcb-b06e-891d715cdffd"
       }
     }
   }
