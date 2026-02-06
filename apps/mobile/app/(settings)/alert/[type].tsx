@@ -3,7 +3,6 @@ import {
   FlatList,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Switch,
@@ -97,7 +96,7 @@ export default function AlertDetailScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
-      <ScrollView contentContainerStyle={styles.container}>
+      <View style={styles.container}>
         <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
           <Pressable style={styles.headerSide} onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={20} color={palette.text} />
@@ -191,14 +190,18 @@ export default function AlertDetailScreen() {
             </View>
           </Pressable>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
-  container: { paddingHorizontal: 16, paddingBottom: 40 },
+  container: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 40
+  },
 
   header: {
     flexDirection: "row",
