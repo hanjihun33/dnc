@@ -50,7 +50,7 @@ public class GlucoseController {
     // 임시 테스트용 최신 데이터 가져오기 엔드포인트
     @GetMapping("/fetch-latest-data/{userId}")
     @Operation(summary = "최신 혈당 데이터 수집")
-    public String fetchLatestData(@PathVariable Long userId) {
+    public String fetchLatestData(@PathVariable("userId") Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(
                         () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + userId));

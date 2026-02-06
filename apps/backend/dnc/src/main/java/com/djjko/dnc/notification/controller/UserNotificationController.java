@@ -1,7 +1,5 @@
 package com.djjko.dnc.notification.controller;
 
-
-
 import com.djjko.dnc.auth.service.CurrentUserService;
 
 import com.djjko.dnc.notification.dto.UserNotificationResponse;
@@ -26,21 +24,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import org.springframework.web.bind.annotation.RestController;
 
-
-
 @RestController
 
 @RequestMapping("/api/v1/users/me/notifications")
 
 public class UserNotificationController {
 
-
-
     private final UserNotificationService userNotificationService;
 
     private final CurrentUserService currentUserService;
-
-
 
     public UserNotificationController(
 
@@ -53,8 +45,6 @@ public class UserNotificationController {
         this.currentUserService = currentUserService;
 
     }
-
-
 
     @Operation(summary = "알림 목록 조회")
 
@@ -72,21 +62,17 @@ public class UserNotificationController {
 
     }
 
-
-
     @Operation(summary = "알림 읽음 처리")
 
     @PatchMapping("/{notificationId}/read")
 
-    public UserNotificationResponse markRead(@PathVariable Long notificationId) {
+    public UserNotificationResponse markRead(@PathVariable("notificationId") Long notificationId) {
 
         Long userId = currentUserService.getRequiredUserId();
 
         return userNotificationService.markRead(userId, notificationId);
 
     }
-
-
 
     @Operation(summary = "알림 전체 읽음 처리")
 
@@ -103,4 +89,3 @@ public class UserNotificationController {
     }
 
 }
-

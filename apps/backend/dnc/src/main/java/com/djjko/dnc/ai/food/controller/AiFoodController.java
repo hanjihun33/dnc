@@ -40,7 +40,7 @@ public class AiFoodController {
 
     @GetMapping("/guides/{requestId}")
     @Operation(summary = "Get async AI guide status")
-    public ResponseEntity<AiGuideStatusResponse> getGuideStatus(@PathVariable String requestId) {
+    public ResponseEntity<AiGuideStatusResponse> getGuideStatus(@PathVariable("requestId") String requestId) {
         Long userId = currentUserService.getRequiredUserId();
         return aiFoodService.getGuideStatus(userId, requestId)
                 .map(ResponseEntity::ok)
