@@ -8,6 +8,8 @@ import com.djjko.dnc.report.domain.DailyReport;
 import com.djjko.dnc.report.service.DailyReportService; // Added
 import com.djjko.dnc.auth.entity.User;
 import com.djjko.dnc.user.service.UserService;
+import com.djjko.dnc.glucose.repository.SensorRepository; // Added
+import com.djjko.dnc.glucose.entity.Sensor; // Added
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate; // Added
 import java.time.LocalDateTime; // Added
+import java.time.temporal.ChronoUnit; // Added
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -31,6 +34,7 @@ public class ReportController {
     private final UserService userService;
     private final DailyReportService dailyReportService;
     private final ReportService reportService; // Added
+    private final SensorRepository sensorRepository; // Added
 
     /**
      * 가장 최신(어제) 리포트 1건 조회
@@ -53,7 +57,8 @@ public class ReportController {
             return ResponseEntity.noContent().build();
         }
 
-        return ResponseEntity.ok(DailyReportResponse.from(reports.get(0)));
+        DailyReport latestReport = reports.get(0);
+        return ResponseEntity.ok(convertToResponseWithDayCount(latestReport));
     }
 
     /**
@@ -62,13 +67,13 @@ public class ReportController {
     @GetMapping("/history/{sensorId}")
     public ResponseEntity<List<DailyReportResponse>> getReportHistory(
             @AuthenticationPrincipal UserDetails userDetails,
-            @PathVariable Long sensorId) {
+            @PathVariable("sensorId") Long sensorId) {
         if (userDetails == null)
             return ResponseEntity.status(401).build();
 
         List<DailyReport> reports = dailyReportRepository.findBySensorIdOrderByTargetDateDesc(sensorId);
         List<DailyReportResponse> dtos = reports.stream()
-                .map(DailyReportResponse::from)
+                .map(this::convertToResponseWithDayCount)
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(dtos);
@@ -155,5 +160,45 @@ public class ReportController {
             log.error("Failed to generate glucose report", e);
             return ResponseEntity.badRequest().build();
         }
+    }
+
+    private DailyReportResponse convertToResponseWithDayCount(DailyReport report) {
+        DailyReportResponse response = DailyReportResponse.from(report);
+
+        if (report.getSensorId() != null) {
+            sensorRepository.findById(report.getSensorId()).ifPresent(sensor -> {
+                if (sensor.getStartedAt() != null) {
+                    long days = ChronoUnit.DAYS.between(sensor.getStartedAt().toLocalDate(), report.getTargetDate())
+                            + 1;
+                    try {
+                        // Reflection to set dayCount field since it's private and no setter might be
+                        // available in builder pattern usage from `from` method
+                        // Or better, update DailyReportResponse to have a builder or setter we can use.
+                        // Since we have Builder on the DTO and `from` creates a new instance, let's
+                        // create a NEW instance with the builder including dayCount.
+                        // Wait, `from` returns a built object. We should probably modify `from` or
+                        // creating a new builder here.
+                        // Let's modify `DailyReportResponse` to allow setting it or use reflection?
+                        // No, let's just make `dayCount` settable or rebuild.
+                        // Since `DailyReportResponse` uses Lombok @Builder, we can't easily modify an
+                        // existing instance if it doesn't have @Setter.
+                        // I'll assume we can't modify it easily without reflection or rebuilding.
+                        // Rebuilding using reflection for specific field or just constructing manually.
+
+                        // Actually, let's modify `from` in DailyReportResponse.java?
+                        // No, the instruction was to modify Controller.
+                        // Let's use reflection here for simplicity if @Setter is not present, BUT I
+                        // added @Getter to DTO.
+                        // Let's use reflection to set 'dayCount' field.
+                        java.lang.reflect.Field field = DailyReportResponse.class.getDeclaredField("dayCount");
+                        field.setAccessible(true);
+                        field.set(response, (int) days);
+                    } catch (Exception e) {
+                        log.error("Failed to set dayCount", e);
+                    }
+                }
+            });
+        }
+        return response;
     }
 }

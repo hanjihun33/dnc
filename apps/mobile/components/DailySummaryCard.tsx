@@ -16,6 +16,7 @@ interface DailyReportProps {
         summaryText: string;
         targetDate: string;
         reportType: string;
+        dayCount?: number;
     };
     onPressHistory: () => void;
 }
@@ -43,7 +44,7 @@ export const DailySummaryCard = ({ report, onPressHistory }: DailyReportProps) =
                         <Text style={styles.scoreText}>{report.healthScore}점</Text>
                     </View>
                     <Text style={styles.dateText}>{dateStr} 요약</Text>
-                    <Text style={styles.dayCounter}>1일차</Text>
+                    <Text style={styles.dayCounter}>{report.dayCount ? `${report.dayCount}일차` : '1일차'}</Text>
                 </View>
                 <TouchableOpacity onPress={onPressHistory} style={styles.moreBtn}>
                     <Text style={styles.moreText}>더보기</Text>
