@@ -33,6 +33,7 @@ type QuickResult = {
   id: string;
   foodName: string;
   risk: RiskLevel;
+  isFailed: boolean;
   photoUri: string;
   capturedAt: string;
 };
@@ -92,6 +93,7 @@ export default function MealCameraScreen() {
   const [isLiveAnalyzing, setIsLiveAnalyzing] = React.useState(false);
   const [sessionReady, setSessionReady] = React.useState(false);
   const [quickResults, setQuickResults] = React.useState<QuickResult[]>([]);
+  const [retryingId, setRetryingId] = React.useState<string | null>(null);
 
   const headerPaddingTop = Math.max(12, insets.top + 8);
 
@@ -104,30 +106,27 @@ export default function MealCameraScreen() {
     }
   }, [permission?.granted]);
 
-  const handleQuickAnalyze = async () => {
-    if (!permission?.granted) return;
+  const normalizeFoodName = (name?: string | null) => {
+    const trimmed = (name ?? "").trim();
+    if (!trimmed) return { label: "분석 실패", failed: true };
+    if (/unknown/i.test(trimmed)) return { label: "분석 실패", failed: true };
+    return { label: trimmed, failed: false };
+  };
+
+  const runQuickAnalyze = async (
+    photoUri: string,
+    capturedAt: string,
+    replaceId?: string
+  ) => {
     if (!sessionReady) return;
-    if (isCapturing) return;
-    const camera = cameraRef.current as unknown as {
-      takePictureAsync?: (options?: Record<string, unknown>) => Promise<{ uri: string }>;
-    } | null;
-    if (!camera?.takePictureAsync) return;
-
-    setIsCapturing(true);
     setIsLiveAnalyzing(true);
+    if (replaceId) {
+      setRetryingId(replaceId);
+    }
     try {
-      const photo = await camera.takePictureAsync({
-        quality: 0.7,
-        skipProcessing: false,
-        exif: false,
-      });
-      if (!photo?.uri) {
-        return;
-      }
-
       const formData = new FormData();
       formData.append("image", {
-        uri: photo.uri,
+        uri: photoUri,
         name: `quick-${Date.now()}.jpg`,
         type: "image/jpeg",
       } as unknown as Blob);
@@ -142,6 +141,21 @@ export default function MealCameraScreen() {
       );
 
       if (!response.ok) {
+        const fallback = { label: "분석 실패", failed: true };
+        setQuickResults((prev) => {
+          const nextItem: QuickResult = {
+            id: replaceId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            foodName: fallback.label,
+            risk: null,
+            isFailed: true,
+            photoUri,
+            capturedAt,
+          };
+          if (replaceId) {
+            return prev.map((item) => (item.id === replaceId ? nextItem : item));
+          }
+          return [nextItem, ...prev];
+        });
         return;
       }
 
@@ -153,26 +167,60 @@ export default function MealCameraScreen() {
       };
 
       const detectedName =
-        data.foodName ??
-        data.result?.[0]?.food_name ??
-        "Unknown food";
+        data.foodName ?? data.result?.[0]?.food_name ?? "Unknown food";
+      const normalized = normalizeFoodName(detectedName);
+      const risk = normalized.failed
+        ? null
+        : computeRiskLevel({ values: data.values, nutrition: data.nutrition });
 
-      const risk = computeRiskLevel({ values: data.values, nutrition: data.nutrition });
-
-      setQuickResults((prev) => [
-        {
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          foodName: detectedName,
+      setQuickResults((prev) => {
+        const nextItem: QuickResult = {
+          id: replaceId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          foodName: normalized.label,
           risk,
-          photoUri: photo.uri,
-          capturedAt: new Date().toISOString(),
-        },
-        ...prev,
-      ]);
+          isFailed: normalized.failed,
+          photoUri,
+          capturedAt,
+        };
+        if (replaceId) {
+          return prev.map((item) => (item.id === replaceId ? nextItem : item));
+        }
+        return [nextItem, ...prev];
+      });
     } finally {
       setIsLiveAnalyzing(false);
+      setRetryingId(null);
+    }
+  };
+
+  const handleQuickAnalyze = async () => {
+    if (!permission?.granted) return;
+    if (!sessionReady) return;
+    if (isCapturing) return;
+    const camera = cameraRef.current as unknown as {
+      takePictureAsync?: (options?: Record<string, unknown>) => Promise<{ uri: string }>;
+    } | null;
+    if (!camera?.takePictureAsync) return;
+
+    setIsCapturing(true);
+    try {
+      const photo = await camera.takePictureAsync({
+        quality: 0.7,
+        skipProcessing: false,
+        exif: false,
+      });
+      if (!photo?.uri) {
+        return;
+      }
+      await runQuickAnalyze(photo.uri, new Date().toISOString());
+    } finally {
       setIsCapturing(false);
     }
+  };
+
+  const handleRetryAnalyze = (item: QuickResult) => {
+    if (retryingId || isCapturing) return;
+    void runQuickAnalyze(item.photoUri, item.capturedAt, item.id);
   };
 
   const handleDetailAnalyze = (item: QuickResult) => {
@@ -259,30 +307,49 @@ export default function MealCameraScreen() {
           >
             {quickResults.map((item) => (
               <View key={item.id} style={styles.quickCard}>
-                <View style={styles.quickTitleRow}>
-                  <Text style={styles.quickTitle}>{item.foodName}</Text>
-                </View>
-                <View style={styles.quickBottomRow}>
-                  {item.risk && (
-                    <View
-                      style={[
-                        styles.quickRiskBadge,
-                        { backgroundColor: resolveRiskColor(item.risk) },
-                      ]}
+                {item.isFailed ? (
+                  <View style={styles.quickFailedRow}>
+                    <Text style={styles.quickTitle}>{item.foodName}</Text>
+                    <Pressable
+                      style={styles.retryButton}
+                      onPress={() => handleRetryAnalyze(item)}
+                      disabled={retryingId === item.id}
                     >
-                      <Text style={styles.quickRiskText}>
-                        {resolveRiskLabel(item.risk)}
-                      </Text>
+                      {retryingId === item.id ? (
+                        <ActivityIndicator size="small" color={palette.danger} />
+                      ) : (
+                        <Text style={styles.retryButtonText}>재시도</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                ) : (
+                  <>
+                    <View style={styles.quickTitleRow}>
+                      <Text style={styles.quickTitle}>{item.foodName}</Text>
                     </View>
-                  )}
-                  <Pressable
-                    style={styles.detailButton}
-                    onPress={() => handleDetailAnalyze(item)}
-                  >
-                    <Text style={styles.detailButtonText}>자세히 분석</Text>
-                    <Ionicons name="chevron-forward" size={16} color={palette.text} />
-                  </Pressable>
-                </View>
+                    <View style={styles.quickBottomRow}>
+                      {item.risk && (
+                        <View
+                          style={[
+                            styles.quickRiskBadge,
+                            { backgroundColor: resolveRiskColor(item.risk) },
+                          ]}
+                        >
+                          <Text style={styles.quickRiskText}>
+                            {resolveRiskLabel(item.risk)}
+                          </Text>
+                        </View>
+                      )}
+                      <Pressable
+                        style={styles.detailButton}
+                        onPress={() => handleDetailAnalyze(item)}
+                      >
+                        <Text style={styles.detailButtonText}>자세히 분석</Text>
+                        <Ionicons name="chevron-forward" size={16} color={palette.text} />
+                      </Pressable>
+                    </View>
+                  </>
+                )}
               </View>
             ))}
           </ScrollView>
@@ -416,6 +483,12 @@ const styles = StyleSheet.create({
   quickTitleRow: {
     marginBottom: 10,
   },
+  quickFailedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
   quickTitle: {
     color: palette.text,
     fontSize: 15,
@@ -451,6 +524,26 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 13,
     fontWeight: "600",
+  },
+  retryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "rgba(217, 109, 91, 0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(217, 109, 91, 0.35)",
+  },
+  retryButtonRight: {
+    marginLeft: "auto",
+  },
+  retryButtonText: {
+    color: palette.danger,
+    fontSize: 13,
+    fontWeight: "700",
   },
   footer: {
     alignItems: "center",

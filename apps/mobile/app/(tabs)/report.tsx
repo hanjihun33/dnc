@@ -372,7 +372,7 @@ export default function ReportScreen() {
             }} />
 
             {/* AI Daily Summary Section */}
-            <View style={{ marginTop: 20 }}>
+            <View style={{ marginTop: -10 }}>
               <Text style={styles.sectionTitle}>AI 브리핑</Text>
               {dailyReport ? (
                 <DailySummaryCard
@@ -530,7 +530,7 @@ const ReportTab = ({ report, onMaxGlucosePress }: { report: GlucoseReportDto | n
   return (
     <View>
       {/* Stats Grid */}
-      <Text style={styles.sectionTitle}>핵심 수치</Text>
+      <Text style={[styles.sectionTitle, styles.sectionTitleFirst]}>핵심 수치</Text>
       <View style={styles.gridContainer}>
         <StatBox label="평균 혈당" value={report.averageGlucose} unit="mg/dL" />
         <StatBox label="변동성" value={report.standardDeviation?.toFixed(1)} unit="SD" />
@@ -554,7 +554,7 @@ const ReportTab = ({ report, onMaxGlucosePress }: { report: GlucoseReportDto | n
       </View>
 
       {/* TIR Bar */}
-      <Text style={styles.sectionTitle}>범위 내 비율 (TIR)</Text>
+      <Text style={[styles.sectionTitle, styles.sectionTitleTir]}>범위 내 비율 (TIR)</Text>
       <View style={styles.card}>
         <View style={styles.tirBarContainer}>
           {tirData.low > 0 && <View style={[styles.tirSegment, { flex: tirData.low, backgroundColor: palette.chartLow, borderTopLeftRadius: 8, borderBottomLeftRadius: 8 }]} />}
@@ -654,6 +654,8 @@ const styles = StyleSheet.create({
 
   // Stats
   sectionTitle: { fontSize: 18, fontWeight: "700", color: palette.text, marginBottom: 12, marginTop: 8 },
+  sectionTitleFirst: { marginTop: -24 },
+  sectionTitleTir: { marginTop: -3 },
   gridContainer: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginBottom: 10 },
   statCard: { width: "48%", backgroundColor: palette.card, borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: "#1F241F", shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2, borderWidth: 1, borderColor: palette.border },
   statLabel: { fontSize: 12, color: palette.textMuted, marginBottom: 8, fontWeight: "600" },

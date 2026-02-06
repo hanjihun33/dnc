@@ -332,7 +332,7 @@ export default function MealDetailScreen() {
               )}
             </View>
 
-            <View style={styles.section}>
+            <View style={[styles.section, styles.macroSection]}>
               <Text style={styles.sectionTitle}>탄단지 비율</Text>
               <View style={styles.macroCard}>
                 {macroItems.map((item) => {
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 16,
-    paddingBottom: 140,
+    paddingBottom: 24,
   },
   actionBar: {
     flexDirection: "row",
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.card,
     borderWidth: 1,
     borderColor: palette.border,
-    marginBottom: 20,
+    marginBottom: 10,
   },
   photoImage: {
     width: "100%",
@@ -597,6 +597,9 @@ const styles = StyleSheet.create({
   photoPlaceholderText: { fontSize: 28, color: palette.textMuted },
   section: {
     marginTop: 18,
+  },
+  macroSection: {
+    marginTop: 10,
   },
   sectionTitle: {
     fontSize: 14,

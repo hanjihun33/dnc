@@ -9,7 +9,6 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import SocialLoginSection from "@/components/social-login-section";
 
 const palette = {
@@ -26,14 +25,6 @@ const logoImage = require("@/assets/images/icon.png");
 
 export default function AuthEntryScreen() {
   const router = useRouter();
-
-  const handleResetOnboarding = async () => {
-    await AsyncStorage.multiRemove([
-      "onboarding_completed",
-      "onboarding_version",
-    ]);
-    router.replace("/onboarding");
-  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -69,14 +60,6 @@ export default function AuthEntryScreen() {
           </TouchableOpacity>
         </View>
 
-        {__DEV__ && (
-          <TouchableOpacity
-            style={styles.devReset}
-            onPress={handleResetOnboarding}
-          >
-            <Text style={styles.devResetText}>Reset onboarding</Text>
-          </TouchableOpacity>
-        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -126,13 +109,4 @@ const styles = StyleSheet.create({
   },
   loginHint: { color: palette.textMuted, fontSize: 13, marginRight: 6 },
   loginLink: { color: palette.accent, fontSize: 13, fontWeight: "700" },
-  devReset: {
-    marginTop: 18,
-    alignItems: "center",
-  },
-  devResetText: {
-    fontSize: 12,
-    color: palette.textMuted,
-    textDecorationLine: "underline",
-  },
 });
