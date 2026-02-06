@@ -195,18 +195,21 @@ export default function ReportScreen() {
     }
   }, [sensors, currentIndex]);
 
-  const fetchDailyReport = async () => {
+  const fetchDailyReport = async (sensorId?: number) => {
     try {
       const headers = getAuthHeaders();
-      // 1. 최신 리포트 조회
-      const res = await fetch(`${API_BASE_URL}/api/v1/reports/daily/latest`, { headers });
+      const url = sensorId
+        ? `${API_BASE_URL}/api/v1/reports/daily/latest/${sensorId}`
+        : `${API_BASE_URL}/api/v1/reports/daily/latest`;
+
+      const res = await fetch(url, { headers });
       if (res.ok && res.status !== 204) {
         setDailyReport(await res.json());
       } else {
         setDailyReport(null);
       }
     } catch (e) {
-      console.log('Failed to fetch daily report');
+      console.log('Failed to fetch daily report', e);
     }
   };
 
@@ -235,7 +238,9 @@ export default function ReportScreen() {
   // Reload data when sensor selection changes or on refresh
   React.useEffect(() => {
     if (sensors.length > 0) {
+      const sid = sensors[currentIndex].sensorId;
       fetchReportData();
+      fetchDailyReport(sid);
     }
   }, [sensors, currentIndex, fetchReportData]);
 

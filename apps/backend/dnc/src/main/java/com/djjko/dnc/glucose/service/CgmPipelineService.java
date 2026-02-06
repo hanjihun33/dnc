@@ -235,7 +235,6 @@ public class CgmPipelineService {
     private Sensor getOrRotateSensor(User user, DexcomResponse.Record record) {
         String incomingDeviceId = record.getTransmitterId();
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime endsAt = now.plusDays(10);
 
         // 현재 ACTIVE 상태인 동일 기기 확인 (User 조건 추가)
         return sensorRepository
@@ -262,7 +261,7 @@ public class CgmPipelineService {
                                 : now;
                         LocalDateTime end = activeSensor.getEndedAt() != null
                                 ? activeSensor.getEndedAt()
-                                : start.plusDays(10);
+                                : start.plusDays(9);
                         activeSensor.updatePeriod(start, end);
                         return sensorRepository.save(activeSensor);
                     }
@@ -303,7 +302,7 @@ public class CgmPipelineService {
                 .provider("Dexcom")
                 .status(Sensor.SensorStatus.ACTIVE)
                 .startedAt(now)
-                .endedAt(now.plusDays(10))
+                .endedAt(now.plusDays(9))
                 .build();
         return sensorRepository.save(newSensor);
     }

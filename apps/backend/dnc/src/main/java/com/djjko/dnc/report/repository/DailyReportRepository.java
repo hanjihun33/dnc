@@ -21,6 +21,10 @@ public interface DailyReportRepository extends JpaRepository<DailyReport, Long> 
         List<DailyReport> findLatestReportByUser(@Param("user") User user, @Param("type") DailyReport.ReportType type,
                         org.springframework.data.domain.Pageable pageable);
 
+        // 특정 센서의 가장 최신 리포트 1건 조회
+        Optional<DailyReport> findFirstBySensorIdAndReportTypeOrderByTargetDateDesc(Long sensorId,
+                        DailyReport.ReportType reportType);
+
         // 특정 센서 기간 동안의 리포트 목록 조회 (히스토리용)
         List<DailyReport> findBySensorIdOrderByTargetDateDesc(Long sensorId);
 }

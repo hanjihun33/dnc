@@ -52,13 +52,28 @@ public class ReportController {
                 PageRequest.of(0, 1));
 
         if (reports.isEmpty()) {
-            // 204 No Content 대신 200 OK + null 리턴하거나, 204 유지
-            // 프론트 처리에 따라 다르지만 일단 204
             return ResponseEntity.noContent().build();
         }
 
         DailyReport latestReport = reports.get(0);
         return ResponseEntity.ok(convertToResponseWithDayCount(latestReport));
+    }
+
+    /**
+     * 특정 센서의 가장 최신 리포트 1건 조회
+     */
+    @GetMapping("/daily/latest/{sensorId}")
+    public ResponseEntity<DailyReportResponse> getLatestReportBySensor(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable("sensorId") Long sensorId) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        return dailyReportRepository
+                .findFirstBySensorIdAndReportTypeOrderByTargetDateDesc(sensorId, DailyReport.ReportType.DAILY)
+                .map(report -> ResponseEntity.ok(convertToResponseWithDayCount(report)))
+                .orElse(ResponseEntity.noContent().build());
     }
 
     /**
