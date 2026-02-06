@@ -63,7 +63,7 @@ logging:
     org.hibernate.SQL: ERROR        # 쿼리 로그는 에러 날 때만!
     org.hibernate.type: ERROR       # 파라미터 값 로그 숨기기
     com.zaxxer.hikari: ERROR        # DB 연결 로그 숨기기
-    org.springframework.security: DEBUG
+    org.springframework.security: INFO
     com.djjko.dnc.glucose: WARN     # 로그 숨기기
 
 jwt:

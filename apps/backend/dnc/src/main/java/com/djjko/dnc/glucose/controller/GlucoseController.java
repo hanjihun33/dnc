@@ -42,7 +42,7 @@ public class GlucoseController {
     @PostMapping("/fetch-history")
     @Operation(summary = "혈당 이력 수집")
     public String fetchHistory(@RequestParam("userId") Long userId,
-                               @RequestParam(value = "days", defaultValue = "30") int days) {
+            @RequestParam(value = "days", defaultValue = "30") int days) {
 
         return cgmPipelineService.fetchHistoricalData(userId, days);
     }
@@ -52,7 +52,8 @@ public class GlucoseController {
     @Operation(summary = "최신 혈당 데이터 수집")
     public String fetchLatestData(@PathVariable Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + userId));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + userId));
 
         cgmPipelineService.fetchLatestDataForUser(user);
         return "Latest Dexcom data fetch initiated for user " + userId + ". Check logs for details.";
@@ -61,13 +62,8 @@ public class GlucoseController {
     @GetMapping("/realtime")
     @Operation(summary = "실시간 혈당 그래프 데이터 조회 (현재 로그인 유저)")
     public RealtimeGlucoseResponse getRealtime(
-        @RequestParam(required = false)
-        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-        LocalDateTime start,
-        @RequestParam(required = false)
-        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-        LocalDateTime end
-    ) {
+            @RequestParam(value = "start", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam(value = "end", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
         Long userId = currentUserService.getRequiredUserId();
         LocalDateTime now = LocalDateTime.now();
 
@@ -86,40 +82,39 @@ public class GlucoseController {
         }
 
         List<GlucosePointDto> points = glucoseDataRepository
-            .findAllByUser_UserIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(userId, rangeStart, rangeEnd)
-            .stream()
-            .map(data -> new GlucosePointDto(
-                data.getMeasuredAt() == null ? null : data.getMeasuredAt().format(FORMATTER),
-                data.getValue(),
-                data.getTrend(),
-                data.getTrendRate()
-            ))
-            .toList();
+                .findAllByUser_UserIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(userId, rangeStart, rangeEnd)
+                .stream()
+                .map(data -> new GlucosePointDto(
+                        data.getMeasuredAt() == null ? null : data.getMeasuredAt().format(FORMATTER),
+                        data.getValue(),
+                        data.getTrend(),
+                        data.getTrendRate()))
+                .toList();
 
         boolean hasMore = glucoseDataRepository.existsByUser_UserIdAndMeasuredAtBefore(userId, rangeStart);
         Integer targetMax = resolveTargetMax(userId);
 
         var latest = glucoseDataRepository.findTopByUser_UserIdOrderByMeasuredAtDesc(userId);
         String latestMeasuredAt = latest == null || latest.getMeasuredAt() == null
-            ? null
-            : latest.getMeasuredAt().format(FORMATTER);
+                ? null
+                : latest.getMeasuredAt().format(FORMATTER);
         Integer latestValue = latest == null ? null : latest.getValue();
 
         return new RealtimeGlucoseResponse(
-            rangeStart.format(FORMATTER),
-            rangeEnd.format(FORMATTER),
-            DEFAULT_TARGET_MIN,
-            targetMax,
-            latestMeasuredAt,
-            latestValue,
-            hasMore,
-            points
-        );
+                rangeStart.format(FORMATTER),
+                rangeEnd.format(FORMATTER),
+                DEFAULT_TARGET_MIN,
+                targetMax,
+                latestMeasuredAt,
+                latestValue,
+                hasMore,
+                points);
     }
 
     private Integer resolveTargetMax(Long userId) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + userId));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + userId));
         DiabetesType diabetesType = user.getDiabetesType();
         if (diabetesType == DiabetesType.TYPE1 || diabetesType == DiabetesType.TYPE2) {
             return DIABETES_TARGET_MAX;

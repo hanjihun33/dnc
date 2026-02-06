@@ -114,16 +114,7 @@ public class ReportController {
             @RequestParam("endDate") String endDateStr,
             @RequestParam(value = "sensorId", required = false) Long sensorId) {
 
-        log.info("=== /glucose endpoint called ===");
-        log.info("UserDetails: {}", userDetails);
-
-        if (userDetails == null) {
-            log.warn("Unauthorized access attempt to /glucose - userDetails is null");
-            return ResponseEntity.status(401).build();
-        }
-
         User user = userService.getUserByEmail(userDetails.getUsername());
-        log.info("User authenticated: userId={}, email={}", user.getUserId(), user.getEmail());
 
         try {
             // ISO-8601 string parsing (e.g., "2024-02-04T10:00:00")
@@ -138,22 +129,8 @@ public class ReportController {
             LocalDateTime start = LocalDateTime.parse(startDateStr.replace("Z", ""));
             LocalDateTime end = LocalDateTime.parse(endDateStr.replace("Z", ""));
 
-            log.info("Requesting Glucose Report: userId={}, sensorId={}, start={}, end={}",
-                    user.getUserId(), sensorId, startDateStr, endDateStr);
-
             GlucoseReportDto report = reportService.generateGlucoseReport(user.getUserId(), start, end, "custom",
                     sensorId);
-
-            if (report.getTimeInRange() != null) {
-                log.info("Controller returning report with TIR: veryLow={}, low={}, inRange={}, high={}, veryHigh={}",
-                        report.getTimeInRange().getVeryLowPercent(),
-                        report.getTimeInRange().getLowPercent(),
-                        report.getTimeInRange().getInRangePercent(),
-                        report.getTimeInRange().getHighPercent(),
-                        report.getTimeInRange().getVeryHighPercent());
-            } else {
-                log.warn("Controller returning report with NULL TIR");
-            }
 
             return ResponseEntity.ok(report);
         } catch (Exception e) {

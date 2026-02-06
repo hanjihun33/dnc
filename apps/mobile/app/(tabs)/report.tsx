@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState, useCallback } from "react";
+﻿import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -11,7 +11,8 @@ import {
   TouchableOpacity,
   Image,
   Modal,
-  Alert
+  Alert,
+  Animated
 } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { getAuthHeaders, loadAuthSession } from "../../session";
@@ -110,6 +111,7 @@ export default function ReportScreen() {
   // Data State
   const [report, setReport] = useState<GlucoseReportDto | null>(null);
   const [meals, setMeals] = useState<MealResponse[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false); // 분석 중 로딩 상태
 
   // Modal State for Analysis (Tab 2 interaction)
   const [modalVisible, setModalVisible] = useState(false);
@@ -119,6 +121,26 @@ export default function ReportScreen() {
   const [dailyReport, setDailyReport] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
+
+  // Animation Value for Modal Content
+  const slideAnim = useRef(new Animated.Value(400)).current;
+
+  useEffect(() => {
+    if (modalVisible) {
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        friction: 8,
+        tension: 50
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: 400,
+        duration: 200,
+        useNativeDriver: true
+      }).start();
+    }
+  }, [modalVisible, slideAnim]);
 
   const fetchSensorHistory = async () => {
     try {
@@ -157,16 +179,13 @@ export default function ReportScreen() {
         `${API_BASE_URL}/api/v1/reports/glucose?startDate=${startDate}&endDate=${endDateIso}&sensorId=${targetSensor.sensorId}`,
         { headers }
       );
+
       if (reportRes.ok) setReport(await reportRes.json());
       else setReport(null);
 
-      // 3. Fetch Meals
-      const mealsRes = await fetch(
-        `${API_BASE_URL}/api/v1/meals/search?startDate=${startDate}&endDate=${endDateIso}`,
-        { headers }
-      );
-      if (mealsRes.ok) setMeals(await mealsRes.json());
-      else setMeals([]);
+      // 3. Fetch Meals block removed for performance optimization.
+      // Meals will be fetched on-demand when clicking stats.
+      setMeals([]);
 
     } catch (e) {
       console.error(e);
@@ -348,58 +367,71 @@ export default function ReportScreen() {
 
       {/* Content Area */}
       <ScrollView contentContainerStyle={styles.contentContainer} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-        {loading ? (
-          <ActivityIndicator size="large" color={palette.accent} style={{ marginTop: 40 }} />
-        ) : (
-          <>
-            <ReportTab report={report} onMaxGlucosePress={() => {
-              // Find meal before max glucose
-              if (!report?.maxGlucoseDateTime) return;
-              const maxTime = new Date(report.maxGlucoseDateTime);
-              // Find closest meal before maxTime within 2 hours
-              const targetMeal = meals.find(m => {
-                const mealTime = new Date(m.eatenAt);
-                const diff = maxTime.getTime() - mealTime.getTime();
-                return diff > 0 && diff <= 2 * 60 * 60 * 1000;
-              });
+        <ReportTab report={report} loading={loading} isAnalyzing={isAnalyzing} onMaxGlucosePress={async () => {
+          if (!report?.maxGlucoseDateTime) return;
+
+          try {
+            setIsAnalyzing(true);
+            await loadAuthSession();
+            const headers = getAuthHeaders();
+
+            // 최고 혈당 기준 2시간 전 범위 계산
+            const maxTime = new Date(report.maxGlucoseDateTime);
+            const startTime = new Date(maxTime.getTime() - 2 * 60 * 60 * 1000); // 2시간 전
+
+            const startIso = startTime.toISOString().replace(".000Z", "Z");
+            const endIso = maxTime.toISOString().replace(".000Z", "Z");
+
+            // 특정 범위 식사만 fetch
+            const res = await fetch(`${API_BASE_URL}/api/v1/meals/search?startDate=${startIso}&endDate=${endIso}`, { headers });
+
+            if (res.ok) {
+              const mealData: MealResponse[] = await res.json();
+              // 시간 순으로 정렬하여 최고 혈당에 가장 가까운 식사 선택
+              const targetMeal = mealData.sort((a, b) => new Date(b.eatenAt).getTime() - new Date(a.eatenAt).getTime())[0];
 
               if (targetMeal) {
                 setModalMeal(targetMeal);
                 setModalVisible(true);
               } else {
-                Alert.alert("알림", "해당 시간 2시간 전의 식사 기록을 찾을 수 없습니다.");
+                Alert.alert("알림", "최고 혈당 발생 직전(2시간 내)의 식사 기록을 찾을 수 없습니다.");
               }
-            }} />
+            }
+          } catch (e) {
+            console.error("Failed to fetch spike meal", e);
+            Alert.alert("에러", "식사 정보를 가져오는 데 실패했습니다.");
+          } finally {
+            setIsAnalyzing(false);
+          }
+        }} />
 
-            {/* AI Daily Summary Section */}
-            <View style={{ marginTop: -10 }}>
-              <Text style={styles.sectionTitle}>AI 브리핑</Text>
-              {dailyReport ? (
-                <DailySummaryCard
-                  report={dailyReport}
-                  onPressHistory={fetchHistory}
-                />
-              ) : (
-                <View style={styles.card}>
-                  <Text style={{ textAlign: 'center', color: palette.textMuted, padding: 20 }}>
-                    아직 생성된 리포트가 없습니다.{'\n'}내일 아침을 기대해주세요! 🌙
-                  </Text>
-                </View>
-              )}
+        {/* AI Daily Summary Section */}
+        <View style={{ marginTop: -10 }}>
+          <Text style={styles.sectionTitle}>AI 브리핑</Text>
+          {dailyReport ? (
+            <DailySummaryCard
+              report={dailyReport}
+              onPressHistory={fetchHistory}
+            />
+          ) : (
+            <View style={styles.card}>
+              <Text style={{ textAlign: 'center', color: palette.textMuted, padding: 20 }}>
+                {loading ? "리포트를 불러오는 중입니다..." : "아직 생성된 리포트가 없습니다.\n내일 아침을 기대해주세요! 🌙"}
+              </Text>
             </View>
-          </>
-        )}
+          )}
+        </View>
       </ScrollView>
 
       {/* Interaction Modal (Reused) */}
       <Modal
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnim }] }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>혈당 스파이크 원인</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
@@ -440,7 +472,7 @@ export default function ReportScreen() {
                 </View>
               </View>
             )}
-          </View>
+          </Animated.View>
         </View>
       </Modal>
 
@@ -516,8 +548,11 @@ const MacroBar = ({ c = 0, p = 0, f = 0 }: { c?: number, p?: number, f?: number 
 
 // --- Tab Components ---
 
-const ReportTab = ({ report, onMaxGlucosePress }: { report: GlucoseReportDto | null, onMaxGlucosePress: () => void }) => {
-  if (!report) return <Text style={styles.emptyText}>리포트 데이터가 없습니다.</Text>;
+const ReportTab = ({ report, loading, isAnalyzing, onMaxGlucosePress }: { report: GlucoseReportDto | null, loading: boolean, isAnalyzing: boolean, onMaxGlucosePress: () => Promise<void> }) => {
+  if (!report) {
+    if (loading) return <View style={{ height: 200 }} />; // 로딩 중에는 빈 공간 유지하여 덜컹거림 방지
+    return <Text style={styles.emptyText}>리포트 데이터가 없습니다.</Text>;
+  }
 
   // TIR Logic
   const tir = report.timeInRange;
@@ -539,14 +574,19 @@ const ReportTab = ({ report, onMaxGlucosePress }: { report: GlucoseReportDto | n
           style={[styles.statCard, { borderColor: palette.warning, borderWidth: 1 }]}
           onPress={onMaxGlucosePress}
           activeOpacity={0.7}
+          disabled={isAnalyzing}
         >
           <Text style={[styles.statLabel, { color: palette.warning }]}>최고 혈당</Text>
           <View style={styles.valueRow}>
-            <Text style={[styles.statValue, { color: palette.warning }]}>{report.maxGlucose}</Text>
+            {isAnalyzing ? (
+              <ActivityIndicator size="small" color={palette.warning} />
+            ) : (
+              <Text style={[styles.statValue, { color: palette.warning }]}>{report.maxGlucose}</Text>
+            )}
             <Text style={styles.statUnit}>mg/dL</Text>
           </View>
           <View style={{ position: 'absolute', right: 10, top: 10 }}>
-            <MaterialIcons name="touch-app" size={16} color={palette.warning} />
+            {isAnalyzing ? null : <MaterialIcons name="touch-app" size={16} color={palette.warning} />}
           </View>
         </TouchableOpacity>
 

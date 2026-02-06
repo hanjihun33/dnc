@@ -197,7 +197,7 @@ public class MealService {
         if (record.getImageUrl() != null) {
             String originalUrl = record.getImageUrl();
             resolvedImageUrl = fileStorageService.resolveMappedUrl(originalUrl);
-            log.info("Image URL Resolution - Original: {}, Resolved: {}", originalUrl, resolvedImageUrl);
+            log.debug("Image URL Resolution - Original: {}, Resolved: {}", originalUrl, resolvedImageUrl);
             // record.setImageUrl(resolvedUrl); // DO NOT MODIFY ENTITY - Causes dirty check
             // update!
         }
