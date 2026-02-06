@@ -6,6 +6,7 @@ import {
 
   Image,
 
+  Platform,
 
   Pressable,
 
@@ -2418,10 +2419,12 @@ export default function HomeScreen() {
 
               </Text>
 
-              <Text style={styles.statHint}>
-
+              <Text
+                style={[styles.statHint, styles.statHintSingle]}
+                numberOfLines={1}
+                ellipsizeMode="clip"
+              >
                 {targetRange.min}-{targetRange.max} mg/dL
-
               </Text>
 
             </View>
@@ -2441,19 +2444,11 @@ export default function HomeScreen() {
               </Text>
 
               <Text
-
-                style={styles.statHint}
-
+                style={[styles.statHint, styles.statHintSingle]}
                 numberOfLines={1}
-
-                adjustsFontSizeToFit
-
-                minimumFontScale={0.8}
-
+                ellipsizeMode="clip"
               >
-
                 최근 24시간 최고치
-
               </Text>
 
             </View>
@@ -2472,10 +2467,12 @@ export default function HomeScreen() {
 
               </Text>
 
-              <Text style={styles.statHint}>
-
-                최근 24시간 평균
-
+              <Text
+                style={[styles.statHint, styles.statHintSingle]}
+                numberOfLines={1}
+                ellipsizeMode="clip"
+              >
+                최근 24시간 평균치
               </Text>
 
             </View>
@@ -3888,17 +3885,21 @@ const styles = StyleSheet.create({
 
     borderRadius: 18,
 
-    padding: 14,
+    padding: Platform.OS === "android" ? 12 : 14,
 
     borderWidth: 1,
 
     borderColor: palette.border,
 
+    minHeight: Platform.OS === "android" ? 126 : undefined,
+
+    justifyContent: "space-between",
+
   },
 
   statCardSpacing: {
 
-    marginHorizontal: 10,
+    marginHorizontal: Platform.OS === "android" ? 6 : 10,
 
   },
 
@@ -3909,6 +3910,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
 
     fontWeight: "600",
+
+    includeFontPadding: false,
+
+    lineHeight: 17,
 
   },
 
@@ -3922,18 +3927,29 @@ const styles = StyleSheet.create({
 
     marginTop: 6,
 
+    includeFontPadding: false,
+
+    lineHeight: 24,
+
   },
 
   statHint: {
 
     color: palette.textMuted,
 
-    fontSize: 11,
+    fontSize: Platform.OS === "android" ? 10 : 11,
 
     marginTop: 4,
 
     flexShrink: 1,
 
+    includeFontPadding: false,
+
+    lineHeight: Platform.OS === "android" ? 14 : 15,
+
+  },
+  statHintSingle: {
+    letterSpacing: Platform.OS === "android" ? -0.2 : 0,
   },
 
   sectionTitle: {
@@ -3958,7 +3974,7 @@ const styles = StyleSheet.create({
 
     justifyContent: "space-between",
 
-    marginTop: 18,
+    marginTop: 0,
 
     marginBottom: 12,
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+﻿import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -91,6 +91,7 @@ interface PredictionData {
   };
   guide: string;
   foodName: string;
+  foodNameFailed?: boolean;
   foodBox?: {
     x_min?: number;
     y_min?: number;
@@ -140,8 +141,9 @@ const buildFallbackPrediction = (): PredictionData => ({
     ],
   },
   guide:
-    "사진 기준으로 혈당 상승 폭이 크지 않은 편이에요. 단백질과 채소를 함께 섭취하고, 식사 후 20분 정도 가볍게 움직이면 더 안정적이에요.",
-  foodName: "닭갈비",
+    "사진 분석이 어려워 기본 가이드를 보여드려요. 채소와 단백질을 먼저 섭취하고, 식후 20분 정도 가볍게 움직여주세요.",
+  foodName: "분석 실패",
+  foodNameFailed: true,
   nutrition: fallbackNutrition,
 });
 
@@ -281,9 +283,20 @@ const getPredictionSummary = (type: string | null, values: number[]) => {
     return "일시적인 상승이 예상돼요.";
   }
   if (delta >= 60 || twoHour > targetMax) {
-    return "급격한 상승이 예상돼요. 식후 관리에 유의하세요.";
+    return "급격한 상승이 예상돼요. 섭취 후 관리에 주의해요.";
   }
   return "혈당 반응이 다소 변동될 수 있어요.";
+};
+
+const normalizeFoodName = (value?: string | null) => {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) {
+    return { label: "분석 실패", failed: true };
+  }
+  if (/unknown/i.test(trimmed)) {
+    return { label: "분석 실패", failed: true };
+  }
+  return { label: trimmed, failed: false };
 };
 
 export default function MealScreen() {
@@ -332,6 +345,7 @@ export default function MealScreen() {
   const [editCarbsGrams, setEditCarbsGrams] = useState<number | null>(null);
   const [editAiGuide, setEditAiGuide] = useState<string | null>(null);
   const [imageLayout, setImageLayout] = useState({ width: 0, height: 0 });
+  const [foodTagSize, setFoodTagSize] = useState({ width: 0, height: 0 });
   const [mealType, setMealType] = useState(() => getMealTypeByTime(new Date()));
   const [isMealTypeAuto, setIsMealTypeAuto] = useState(true);
   const [mealDate, setMealDate] = useState(new Date());
@@ -616,7 +630,7 @@ export default function MealScreen() {
         replaceResolverRef.current = resolve;
         setReplacePrompt({
           visible: true,
-          message: `${formatDate(targetDate)} ${targetMealLabel} 기록이 이미 있어요. 교체할까요?`,
+          message: `${formatDate(targetDate)} ${targetMealLabel} 기록이 있어요. 덮어쓸까요?`,
         });
       }),
     []
@@ -1067,10 +1081,12 @@ export default function MealScreen() {
         };
         nutrition?: NutritionData;
       };
-      setAnalysisSnapshot({
-        foodName: data.foodName,
-        nutrition: data.nutrition,
-      });
+      const normalizedName = normalizeFoodName(data.foodName);
+      setAnalysisSnapshot(
+        normalizedName.failed
+          ? { nutrition: data.nutrition }
+          : { foodName: normalizedName.label, nutrition: data.nutrition }
+      );
       const labels =
         data.labels?.map((label) =>
           label.endsWith("분") ? label : `${label}분`
@@ -1101,7 +1117,8 @@ export default function MealScreen() {
           ],
         },
         guide: resolvedGuide,
-        foodName: data.foodName ?? buildFallbackPrediction().foodName,
+        foodName: normalizedName.label,
+        foodNameFailed: normalizedName.failed,
         foodBox: data.foodBox,
         nutrition: data.nutrition ?? fallbackNutrition,
       });
@@ -1109,7 +1126,8 @@ export default function MealScreen() {
       console.warn(error);
       setAiGuideRequestId(null);
       setIsAiGuidePending(false);
-      setPredictionData(buildFallbackPrediction());
+      const fallback = buildFallbackPrediction();
+      setPredictionData({ ...fallback, foodName: "분석 실패", foodNameFailed: true });
       setAnalysisSnapshot(null);
     } finally {
       setIsAnalyzing(false);
@@ -1163,11 +1181,6 @@ export default function MealScreen() {
   
   const calendarCells = getMonthMatrix(calendarMonth);
   const isTimePicker = pickerMode === "time";
-  /*
-  const isSubmitDisabled = !selectedAsset || isSubmitting;
-  const footerButtonLabel = isSubmitting ? "저장 중..." : "기록 완료";
-
-  */
   const isSubmitDisabled =
     isSubmitting || isEditLoading || (!isEditMode && !selectedAsset);
   const showFooter = isEditMode || !!selectedImage;
@@ -1296,26 +1309,33 @@ export default function MealScreen() {
           <View style={styles.imagePickerCard}>
             <Text style={styles.imagePickerTitle}>{"\uc74c\uc2dd \uc0ac\uc9c4\uc744 \ucd94\uac00\ud574\ubcf4\uc138\uc694"}</Text>
             <Text style={styles.imagePickerSubtitle}>
-              {"\uac24\ub7ec\ub9ac\uc5d0\uc11c \uc120\ud0dd\ud558\uac70\ub098 \uc9c0\uae08 \ucd2c\uc601\ud560 \uc218 \uc788\uc5b4\uc694."}
+              {isEditMode
+                ? "\uac24\ub7ec\ub9ac\uc5d0\uc11c \uc0ac\uc9c4\uc744 \uc120\ud0dd\ud560 \uc218 \uc788\uc5b4\uc694."
+                : "\uac24\ub7ec\ub9ac\uc5d0\uc11c \uc120\ud0dd\ud558\uac70\ub098 \uc9c0\uae08 \ucd2c\uc601\ud560 \uc218 \uc788\uc5b4\uc694."}
             </Text>
             <View style={styles.imagePickerActions}>
+              {!isEditMode && (
+                <TouchableOpacity
+                  style={styles.imagePickerButton}
+                  onPress={pickImageFromCamera}
+                >
+                  <Text style={styles.imagePickerButtonText}>{"\ucd2c\uc601\ud558\uae30"}</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
-                style={styles.imagePickerButton}
-                onPress={pickImageFromCamera}
-              >
-                <Text style={styles.imagePickerButtonText}>{"\ucd2c\uc601\ud558\uae30"}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.imagePickerButton, styles.imagePickerButtonSecondary]}
+                style={[
+                  styles.imagePickerButton,
+                  !isEditMode && styles.imagePickerButtonSecondary,
+                ]}
                 onPress={pickImage}
               >
                 <Text
                   style={[
                     styles.imagePickerButtonText,
-                    styles.imagePickerButtonTextSecondary,
+                    !isEditMode && styles.imagePickerButtonTextSecondary,
                   ]}
                 >
-                  {"\uc0ac\uc9c4"}
+                  {isEditMode ? "\uc0ac\uc9c4 \ubcc0\uacbd" : "\uc0ac\uc9c4"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1341,23 +1361,55 @@ export default function MealScreen() {
             )}
             {predictionData?.foodName ? (
               <View
+                onLayout={(event) => {
+                  const { width, height } = event.nativeEvent.layout;
+                  if (width && height) {
+                    setFoodTagSize({ width, height });
+                  }
+                }}
                 style={[
                   styles.imageTag,
                   predictionData.foodBox &&
                     imageLayout.width > 0 &&
                     imageLayout.height > 0 &&
                     predictionData.foodBox.x_min != null &&
-                    predictionData.foodBox.y_min != null
+                    predictionData.foodBox.y_min != null &&
+                    predictionData.foodBox.x_max != null &&
+                    predictionData.foodBox.y_max != null
                     ? {
-                      left: Math.max(
-                        8,
-                        predictionData.foodBox.x_min * imageLayout.width
+                      left: Math.min(
+                        Math.max(
+                          8,
+                          ((predictionData.foodBox.x_min +
+                            predictionData.foodBox.x_max) /
+                            2) *
+                            imageLayout.width
+                        ),
+                        imageLayout.width - 8
                       ),
-                      top: Math.max(
-                        8,
-                        predictionData.foodBox.y_min * imageLayout.height
+                      top: Math.min(
+                        Math.max(
+                          8,
+                          ((predictionData.foodBox.y_min +
+                            predictionData.foodBox.y_max) /
+                            2) *
+                            imageLayout.height
+                        ),
+                        imageLayout.height - 8
                       ),
                       bottom: "auto",
+                      transform: [
+                        {
+                          translateX: foodTagSize.width
+                            ? -foodTagSize.width / 2
+                            : 0,
+                        },
+                        {
+                          translateY: foodTagSize.height
+                            ? -foodTagSize.height / 2
+                            : 0,
+                        },
+                      ],
                     }
                     : null,
                 ]}
@@ -1369,26 +1421,26 @@ export default function MealScreen() {
             ) : null}
           </View>
         )}
+        {selectedAsset &&
+          predictionData?.foodNameFailed &&
+          !isAnalyzing && (
+            <View style={styles.imageRetryRow}>
+              <TouchableOpacity
+                style={styles.imageRetryButton}
+                onPress={() => analyzeImage(selectedAsset)}
+              >
+                <Ionicons name="refresh" size={16} color={palette.accentDark} />
+                <Text style={styles.imageRetryText}>재분석</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         {isEditMode && (
           <View style={styles.imagePickerActions}>
             <TouchableOpacity
               style={styles.imagePickerButton}
-              onPress={pickImageFromCamera}
-            >
-              <Text style={styles.imagePickerButtonText}>{"\ucd2c\uc601\ud558\uae30"}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.imagePickerButton, styles.imagePickerButtonSecondary]}
               onPress={pickImage}
             >
-              <Text
-                style={[
-                  styles.imagePickerButtonText,
-                  styles.imagePickerButtonTextSecondary,
-                ]}
-              >
-                {"\uc0ac\uc9c4"}
-              </Text>
+              <Text style={styles.imagePickerButtonText}>{"\uc0ac\uc9c4 \ubcc0\uacbd"}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1466,7 +1518,12 @@ export default function MealScreen() {
             >
               AI 섭취 가이드
             </Text>
-            <View style={styles.aiGuideCard}>
+            <View
+              style={[
+                styles.aiGuideCard,
+                isEditMode && styles.editSectionCardSpacing,
+              ]}
+            >
               <View style={styles.aiGuideHeader}>
                 <View style={styles.aiChip}>
                   <View style={styles.aiChipDot} />
@@ -1486,8 +1543,8 @@ export default function MealScreen() {
                 <View style={styles.aiPulse} />
                 <Text style={styles.aiFooterText}>
                   {isAiGuidePending
-                    ? "맞춤 코칭을 생성하고 있어요."
-                    : "AI가 생성한 개인 맞춤 추천입니다."}
+                    ? "맞춤 코칭 생성 중..."
+                    : "AI가 생성한 맞춤 코칭을 참고하세요."}
                 </Text>
               </View>
             </View>
@@ -1551,7 +1608,12 @@ export default function MealScreen() {
             >
               AI 섭취 가이드
             </Text>
-            <View style={styles.aiGuideCard}>
+            <View
+              style={[
+                styles.aiGuideCard,
+                isEditMode && styles.editSectionCardSpacing,
+              ]}
+            >
               <View style={styles.aiGuideHeader}>
                 <View style={styles.aiChip}>
                   <View style={styles.aiChipDot} />
@@ -1564,7 +1626,7 @@ export default function MealScreen() {
               <View style={styles.aiGuideFooter}>
                 <View style={styles.aiPulse} />
                 <Text style={styles.aiFooterText}>
-                  AI가 생성한 개인 맞춤 추천입니다.
+                  AI가 생성한 맞춤 코칭을 참고하세요.
                 </Text>
               </View>
             </View>
@@ -1622,7 +1684,12 @@ export default function MealScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.portionCard}>
+            <View
+              style={[
+                styles.portionCard,
+                isEditMode && styles.editSectionCardSpacing,
+              ]}
+            >
               {portionInputMode === "serving" ? (
                 <>
                   <Text style={styles.portionFieldLabel}>섭취 인분</Text>
@@ -1630,7 +1697,7 @@ export default function MealScreen() {
                     <TextInput
                       value={servingCountInput}
                       onChangeText={setServingCountInput}
-                      placeholder="예: 1.0"
+                      placeholder="예) 1.0"
                       placeholderTextColor={palette.textMuted}
                       keyboardType="decimal-pad"
                       style={styles.portionInput}
@@ -1648,7 +1715,7 @@ export default function MealScreen() {
                     <TextInput
                       value={weightGramsInput}
                       onChangeText={setWeightGramsInput}
-                      placeholder="예: 200"
+                      placeholder="예) 200"
                       placeholderTextColor={palette.textMuted}
                       keyboardType="decimal-pad"
                       style={styles.portionInput}
@@ -1668,11 +1735,16 @@ export default function MealScreen() {
             >
               메모
             </Text>
-            <View style={styles.memoCard}>
+            <View
+              style={[
+                styles.memoCard,
+                isEditMode && styles.editSectionCardSpacing,
+              ]}
+            >
               <TextInput
                 value={memo}
                 onChangeText={setMemo}
-                placeholder="자유로운 메모를 남겨보세요."
+                placeholder="자유롭게 메모를 남겨보세요."
                 placeholderTextColor={palette.textMuted}
                 multiline
                 maxLength={1000}
@@ -1711,9 +1783,9 @@ export default function MealScreen() {
           animationType="fade"
           onRequestClose={() => closeReplacePrompt(false)}
         >
-          <View style={styles.modalBackdrop}>
+            <View style={styles.modalBackdrop}>
             <View style={styles.confirmCard}>
-              <Text style={styles.confirmTitle}>기록 교체</Text>
+              <Text style={styles.confirmTitle}>기록 덮어쓰기</Text>
               <Text style={styles.confirmMessage}>{replacePrompt.message}</Text>
               <View style={styles.confirmActions}>
                 <TouchableOpacity
@@ -1732,7 +1804,7 @@ export default function MealScreen() {
                       styles.confirmButtonTextPrimary,
                     ]}
                   >
-                    교체
+                    덮어쓰기
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1779,7 +1851,7 @@ export default function MealScreen() {
                       isTimePicker && styles.modalActionAccent,
                     ]}
                   >
-                    완료
+                    확인
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1796,8 +1868,7 @@ export default function MealScreen() {
                       <Ionicons name="chevron-back" size={16} color={palette.textMuted} />
                     </TouchableOpacity>
                     <Text style={styles.calendarTitle}>
-                      {`${calendarMonth.getFullYear()}년 ${calendarMonth.getMonth() + 1
-                        }월`}
+                      {`${calendarMonth.getFullYear()}년 ${calendarMonth.getMonth() + 1}월`}
                     </Text>
                     <TouchableOpacity
                       style={styles.calendarNavButton}
@@ -2080,11 +2151,14 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   sectionTitleEdit: {
-    marginTop: 4,
-    marginBottom: 6,
+    marginTop: 10,
+    marginBottom: 10,
   },
   sectionTitleFirstEdit: {
     marginTop: 8,
+  },
+  editSectionCardSpacing: {
+    marginBottom: 6,
   },
   mealTypeRow: {
     flexDirection: "row",
@@ -2316,6 +2390,26 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   imageTagText: { color: "#FAF8F0", fontWeight: "600", fontSize: 12 },
+  imageRetryRow: {
+    marginTop: 10,
+    alignItems: "flex-end",
+  },
+  imageRetryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: "rgba(127, 175, 123, 0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(127, 175, 123, 0.35)",
+  },
+  imageRetryText: {
+    color: palette.accentDark,
+    fontSize: 13,
+    fontWeight: "700",
+  },
   imageAnalyzingOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
