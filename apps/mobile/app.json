@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "dang-nang-kong",
-    "slug": "dang-nang-kong",
-    "version": "1.0.0",
+    "name": "당낭콩",
+    "slug": "당낭콩",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "testapp",
@@ -34,7 +34,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/icon.png"
     },
     "plugins": [
       "expo-router",
