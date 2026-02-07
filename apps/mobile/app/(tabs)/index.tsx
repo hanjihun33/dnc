@@ -1137,7 +1137,8 @@ export default function HomeScreen() {
       // focus 시에는 프로필/알림만 가볍게 체크 (식사는 useEffect에서 담당)
       void fetchProfile();
       void fetchUnreadNotifications();
-    }, [fetchProfile, fetchUnreadNotifications])
+      void fetchMeals();
+    }, [fetchProfile, fetchUnreadNotifications, fetchMeals])
 
   );
 
