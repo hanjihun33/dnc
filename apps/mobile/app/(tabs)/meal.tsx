@@ -379,6 +379,7 @@ export default function MealScreen() {
   const periodScrollRef = useRef<ScrollView | null>(null);
   const hourScrollRef = useRef<ScrollView | null>(null);
   const minuteScrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollView | null>(null);
   const wasEditModeRef = useRef(false);
 
   useEffect(() => {
@@ -588,6 +589,7 @@ export default function MealScreen() {
     setTimePeriod(parts.period);
     setTimeHour(parts.hour);
     setTimeMinute(parts.minute);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
   }, [clearImage]);
 
   const applyMealTypeByTime = React.useCallback(
@@ -664,8 +666,19 @@ export default function MealScreen() {
     [mealDate, mealType]
   );
 
+  /* Add this ref near other refs */
+  const shouldResetOnFocusRef = useRef(false);
+
+  /* ... existing code ... */
+
   useFocusEffect(
     React.useCallback(() => {
+      if (shouldResetOnFocusRef.current) {
+        shouldResetOnFocusRef.current = false;
+        resetForm();
+        return;
+      }
+
       if (isEditMode) {
         return;
       }
@@ -893,6 +906,7 @@ export default function MealScreen() {
       }
 
       resetForm();
+      shouldResetOnFocusRef.current = true;
       router.replace("/(tabs)");
     } catch (error) {
       console.warn(error);
@@ -1177,8 +1191,8 @@ export default function MealScreen() {
     router.push("/(tabs)/meal-camera");
   };
 
-  
-  
+
+
   const calendarCells = getMonthMatrix(calendarMonth);
   const isTimePicker = pickerMode === "time";
   const isSubmitDisabled =
@@ -1201,8 +1215,13 @@ export default function MealScreen() {
         <View style={styles.backgroundPanel} />
       </View>
       <ScrollView
+        ref={scrollRef}
         style={styles.container}
-        contentContainerStyle={[styles.page, isEditMode && styles.pageEdit]}
+        contentContainerStyle={[
+          styles.page,
+          isEditMode && styles.pageEdit,
+          { paddingBottom: insets.bottom + 20 },
+        ]}
       >
         <View
           style={[
@@ -1383,7 +1402,7 @@ export default function MealScreen() {
                           ((predictionData.foodBox.x_min +
                             predictionData.foodBox.x_max) /
                             2) *
-                            imageLayout.width
+                          imageLayout.width
                         ),
                         imageLayout.width - 8
                       ),
@@ -1393,7 +1412,7 @@ export default function MealScreen() {
                           ((predictionData.foodBox.y_min +
                             predictionData.foodBox.y_max) /
                             2) *
-                            imageLayout.height
+                          imageLayout.height
                         ),
                         imageLayout.height - 8
                       ),
@@ -1783,7 +1802,7 @@ export default function MealScreen() {
           animationType="fade"
           onRequestClose={() => closeReplacePrompt(false)}
         >
-            <View style={styles.modalBackdrop}>
+          <View style={styles.modalBackdrop}>
             <View style={styles.confirmCard}>
               <Text style={styles.confirmTitle}>기록 덮어쓰기</Text>
               <Text style={styles.confirmMessage}>{replacePrompt.message}</Text>
