@@ -634,46 +634,33 @@ export default function HomeScreen() {
 
 
   const mergePoints = React.useCallback(
-
     (incoming: GlucosePoint[], mode: "replace" | "prepend") => {
-
       setPoints((prev) => {
-
         const combined = mode === "replace" ? incoming : [...incoming, ...prev];
-
         const map = new Map<string, GlucosePoint>();
-
         combined.forEach((point) => {
-
           if (!point.measuredAt) return;
-
           map.set(point.measuredAt, point);
-
         });
 
         const sorted = Array.from(map.values()).sort((a, b) => {
-
           const timeA = parseLocalDateTime(a.measuredAt)?.getTime() ?? 0;
-
           const timeB = parseLocalDateTime(b.measuredAt)?.getTime() ?? 0;
-
           return timeA - timeB;
-
         });
 
-        const latest = sorted[sorted.length - 1];
-
-        setLatestPoint(latest ?? null);
-
         return sorted;
-
       });
-
     },
-
     []
-
   );
+
+  React.useEffect(() => {
+    if (points.length > 0) {
+      const last = points[points.length - 1];
+      setLatestPoint(last);
+    }
+  }, [points]);
 
 
 
@@ -1031,6 +1018,15 @@ export default function HomeScreen() {
 
   }, [fetchRealtime, selectedDate]);
 
+  /* Scroll to end when refreshed to avoid blank screen */
+  React.useEffect(() => {
+    if (lastRefreshAt) {
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      });
+    }
+  }, [lastRefreshAt]);
+
 
 
   const handleRefresh = React.useCallback(async () => {
@@ -1067,67 +1063,52 @@ export default function HomeScreen() {
 
 
 
-  const loadMore = React.useCallback(async () => {
+  /* Add ref for synchronous locking */
+  const isLoadingMoreRef = React.useRef(false);
+  const isPrependingRef = React.useRef(false);
+  const prependWidthRef = React.useRef(0);
 
-    if (!rangeStart || !rangeEnd || isLoadingMore) return;
+  const loadMore = React.useCallback(async () => {
+    if (!rangeStart || !rangeEnd || isLoadingMoreRef.current) return;
 
     const now = new Date();
-
     const earliestAllowed = new Date(
-
       now.getTime() - maxPastDays * 24 * 60 * 60 * 1000
-
     );
 
     let nextStart = new Date(rangeStart.getTime() - loadMoreHours * 60 * 60 * 1000);
-
     if (nextStart < earliestAllowed) {
-
       nextStart = earliestAllowed;
-
     }
 
     if (nextStart >= rangeStart) {
-
       setHasMore(false);
-
       return;
-
     }
 
+    isLoadingMoreRef.current = true;
     setIsLoadingMore(true);
 
     const addedHours = (rangeStart.getTime() - nextStart.getTime()) / 3600000;
-
     const addedWidth = addedHours * pixelsPerHour;
 
+    isPrependingRef.current = true;
+    prependWidthRef.current = addedWidth;
+
     try {
-
       await fetchRealtime(nextStart, rangeStart, "prepend");
-
-      requestAnimationFrame(() => {
-
-        scrollRef.current?.scrollTo({
-
-          x: scrollXRef.current + addedWidth,
-
-          animated: false,
-
-        });
-
-      });
-
+      // Scroll adjustment is now handled in onContentSizeChange
     } catch {
-
+      isPrependingRef.current = false;
       // Ignore load-more errors.
-
     } finally {
-
       setIsLoadingMore(false);
-
+      // Slight delay to prevent immediate re-trigger
+      setTimeout(() => {
+        isLoadingMoreRef.current = false;
+      }, 500);
     }
-
-  }, [fetchRealtime, isLoadingMore, rangeEnd, rangeStart]);
+  }, [fetchRealtime, rangeEnd, rangeStart]);
 
 
 
@@ -1137,7 +1118,8 @@ export default function HomeScreen() {
       // focus 시에는 프로필/알림만 가볍게 체크 (식사는 useEffect에서 담당)
       void fetchProfile();
       void fetchUnreadNotifications();
-    }, [fetchProfile, fetchUnreadNotifications])
+      void fetchMeals();
+    }, [fetchProfile, fetchUnreadNotifications, fetchMeals])
 
   );
 
@@ -1644,7 +1626,7 @@ export default function HomeScreen() {
 
       }
 
-      const point = { x: toX(index, length), y: toY(value) };
+      const point = { x: toX(index, length), y: toY(value as number) };
 
       if (currentKey && key !== currentKey) {
 
@@ -2223,14 +2205,21 @@ export default function HomeScreen() {
                 showsHorizontalScrollIndicator={false}
 
                 onScroll={onChartScroll}
-
                 scrollEventThrottle={16}
-
+                onContentSizeChange={(w, h) => {
+                  if (isPrependingRef.current) {
+                    isPrependingRef.current = false;
+                    scrollRef.current?.scrollTo({
+                      x: scrollXRef.current + prependWidthRef.current,
+                      animated: false,
+                    });
+                  }
+                }}
               >
 
                 <View style={[styles.chartScrollFrame, { width: chartWidth }]}>
 
-                  <Svg width={chartWidth} height={plotHeight} style={styles.heroChartCanvas}>
+                  <Svg key={rangeEnd?.toString()} width={chartWidth} height={plotHeight} style={styles.heroChartCanvas}>
 
                     {yAxisLabels.map((label) => (
 

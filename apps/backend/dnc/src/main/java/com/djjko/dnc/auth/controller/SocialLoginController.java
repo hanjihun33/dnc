@@ -61,13 +61,20 @@ public class SocialLoginController {
       @PathVariable("provider") String provider,
       @RequestParam("code") String code,
       @RequestParam(value = "state", required = false) String state,
+      @RequestParam(value = "redirect_uri", required = false) String redirectUri,
       @RequestParam(required = false, name = "format") String format,
       @RequestHeader(value = "Accept", required = false) String accept) {
     SocialLoginResponse response = socialLoginService.login(provider, code, state);
     if (wantsJson(format, accept)) {
       return ResponseEntity.ok(response);
     }
-    String redirectUrl = buildRedirectUrl(response, resolveRedirectBase(state));
+
+    // 요청된 redirect_uri가 있으면 우선 사용, 없으면 기본 설정값 사용
+    String targetRedirectUri = (redirectUri != null && !redirectUri.isBlank())
+        ? redirectUri
+        : resolveRedirectBase(state);
+
+    String redirectUrl = buildRedirectUrl(response, targetRedirectUri);
     HttpHeaders headers = new HttpHeaders();
     headers.setLocation(URI.create(redirectUrl));
     return new ResponseEntity<>(headers, HttpStatus.FOUND);

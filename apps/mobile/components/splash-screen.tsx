@@ -98,7 +98,6 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={styles.appName}>DNC</Text>
       </View>
 
       {/* 로딩 인디케이터 */}
@@ -144,7 +143,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#0D47A1',
+    backgroundColor: '#F4E8D6',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,
@@ -154,15 +153,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logo: {
-    width: 120,
-    height: 120,
-  },
-  appName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginTop: 15,
-    letterSpacing: 2,
+    width: 200,
+    height: 200,
   },
   loaderContainer: {
     position: 'absolute',
@@ -175,7 +167,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#2F6B4F',
   },
 });
 
