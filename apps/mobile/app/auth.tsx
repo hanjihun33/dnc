@@ -225,6 +225,18 @@ export default function AuthCallbackScreen() {
         {errorMessage && (
           <View style={styles.card}>
             <Text style={styles.errorText}>{errorMessage}</Text>
+            
+            {/* [DEBUG] 디버깅용 정보 표시 */}
+            <View style={{ marginBottom: 16, padding: 8, backgroundColor: '#f1f5f9', borderRadius: 8, width: '100%' }}>
+              <Text style={{ fontSize: 10, fontWeight: 'bold', marginBottom: 4 }}>[DEBUG INFO]</Text>
+              <Text style={{ fontSize: 10, fontFamily: 'monospace' }}>
+                API_URL: {API_BASE_URL}
+              </Text>
+              <Text style={{ fontSize: 10, fontFamily: 'monospace', marginTop: 4 }}>
+                PARAMS: {JSON.stringify(params, null, 2)}
+              </Text>
+            </View>
+
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => router.replace("/login")}
