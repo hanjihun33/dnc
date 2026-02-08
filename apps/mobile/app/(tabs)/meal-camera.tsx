@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { Swipeable } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -233,6 +234,18 @@ export default function MealCameraScreen() {
     });
   };
 
+  const handleDelete = (id: string) => {
+    setQuickResults((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const renderRightActions = (id: string) => {
+    return (
+      <Pressable style={styles.deleteAction} onPress={() => handleDelete(id)}>
+        <Ionicons name="trash-outline" size={24} color="#FAF8F0" />
+      </Pressable>
+    );
+  };
+
   if (!permission) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -306,51 +319,57 @@ export default function MealCameraScreen() {
             showsVerticalScrollIndicator={false}
           >
             {quickResults.map((item) => (
-              <View key={item.id} style={styles.quickCard}>
-                {item.isFailed ? (
-                  <View style={styles.quickFailedRow}>
-                    <Text style={styles.quickTitle}>{item.foodName}</Text>
-                    <Pressable
-                      style={styles.retryButton}
-                      onPress={() => handleRetryAnalyze(item)}
-                      disabled={retryingId === item.id}
-                    >
-                      {retryingId === item.id ? (
-                        <ActivityIndicator size="small" color={palette.danger} />
-                      ) : (
-                        <Text style={styles.retryButtonText}>재시도</Text>
-                      )}
-                    </Pressable>
-                  </View>
-                ) : (
-                  <>
-                    <View style={styles.quickTitleRow}>
+              <Swipeable
+                key={item.id}
+                renderRightActions={() => renderRightActions(item.id)}
+                containerStyle={styles.swipeableContainer}
+              >
+                <View style={styles.quickCard}>
+                  {item.isFailed ? (
+                    <View style={styles.quickFailedRow}>
                       <Text style={styles.quickTitle}>{item.foodName}</Text>
-                    </View>
-                    <View style={styles.quickBottomRow}>
-                      {item.risk && (
-                        <View
-                          style={[
-                            styles.quickRiskBadge,
-                            { backgroundColor: resolveRiskColor(item.risk) },
-                          ]}
-                        >
-                          <Text style={styles.quickRiskText}>
-                            {resolveRiskLabel(item.risk)}
-                          </Text>
-                        </View>
-                      )}
                       <Pressable
-                        style={styles.detailButton}
-                        onPress={() => handleDetailAnalyze(item)}
+                        style={styles.retryButton}
+                        onPress={() => handleRetryAnalyze(item)}
+                        disabled={retryingId === item.id}
                       >
-                        <Text style={styles.detailButtonText}>자세히 분석</Text>
-                        <Ionicons name="chevron-forward" size={16} color={palette.text} />
+                        {retryingId === item.id ? (
+                          <ActivityIndicator size="small" color={palette.danger} />
+                        ) : (
+                          <Text style={styles.retryButtonText}>재시도</Text>
+                        )}
                       </Pressable>
                     </View>
-                  </>
-                )}
-              </View>
+                  ) : (
+                    <>
+                      <View style={styles.quickTitleRow}>
+                        <Text style={styles.quickTitle}>{item.foodName}</Text>
+                      </View>
+                      <View style={styles.quickBottomRow}>
+                        {item.risk && (
+                          <View
+                            style={[
+                              styles.quickRiskBadge,
+                              { backgroundColor: resolveRiskColor(item.risk) },
+                            ]}
+                          >
+                            <Text style={styles.quickRiskText}>
+                              {resolveRiskLabel(item.risk)}
+                            </Text>
+                          </View>
+                        )}
+                        <Pressable
+                          style={styles.detailButton}
+                          onPress={() => handleDetailAnalyze(item)}
+                        >
+                          <Text style={styles.detailButtonText}>자세히 분석</Text>
+                          <Ionicons name="chevron-forward" size={16} color={palette.text} />
+                        </Pressable>
+                      </View>
+                    </>
+                  )}
+                </View>
+              </Swipeable>
             ))}
           </ScrollView>
         )}
@@ -601,5 +620,14 @@ const styles = StyleSheet.create({
   },
   permissionGhostText: {
     color: palette.textMuted,
+  },
+  swipeableContainer: {},
+  deleteAction: {
+    backgroundColor: palette.danger,
+    alignItems: "center",
+    justifyContent: "center",
+    width: 64,
+    borderRadius: 16,
+    marginLeft: 8,
   },
 });
