@@ -17,12 +17,15 @@ let session: AuthSession = {
 let profileRevision = 0;
 const profileListeners = new Set<() => void>();
 
+const listeners = new Set<(session: AuthSession) => void>();
+
 export const loadAuthSession = async () => {
   try {
     const stored = await AsyncStorage.getItem(SESSION_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as Partial<AuthSession>;
       session = { ...session, ...parsed };
+      listeners.forEach((listener) => listener(session));
     }
   } catch {
     // Ignore storage errors.
@@ -39,10 +42,18 @@ const persistSession = async () => {
 
 export const setAuthSession = async (patch: Partial<AuthSession>) => {
   session = { ...session, ...patch };
+  listeners.forEach((listener) => listener(session));
   await persistSession();
 };
 
 export const getAuthSession = () => session;
+
+export const subscribeAuthSession = (listener: (session: AuthSession) => void) => {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+};
 
 export const clearAuthSession = async () => {
   session = {
@@ -50,6 +61,7 @@ export const clearAuthSession = async () => {
     tokenType: "Bearer",
     userId: null,
   };
+  listeners.forEach((listener) => listener(session));
   try {
     await AsyncStorage.removeItem(SESSION_KEY);
   } catch {

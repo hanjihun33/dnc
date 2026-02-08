@@ -15,15 +15,12 @@ import {
   ScrollView,
 
   StatusBar,
-
   StyleSheet,
-
   Text,
-
+  ToastAndroid,
+  BackHandler,
   TouchableOpacity,
-
   View,
-
 } from "react-native";
 
 import { useRouter } from "expo-router";
@@ -505,6 +502,32 @@ export default function HomeScreen() {
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
+
+  // [Android] Double Back Press to Exit
+  const [exitApp, setExitApp] = React.useState(false);
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (Platform.OS !== 'android') return false;
+
+        if (exitApp) {
+          return false; // let default behavior (exit) happen
+        }
+
+        setExitApp(true);
+        ToastAndroid.show("'뒤로' 버튼을 한 번 더 누르면 종료됩니다.", ToastAndroid.SHORT);
+
+        setTimeout(() => {
+          setExitApp(false);
+        }, 2000); // 2 seconds timeout
+
+        return true; // prevent default behavior
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [exitApp])
+  );
 
   const [selectedDate, setSelectedDate] = React.useState(() =>
 
