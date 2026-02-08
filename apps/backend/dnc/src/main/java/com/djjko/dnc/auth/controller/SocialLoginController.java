@@ -46,8 +46,9 @@ public class SocialLoginController {
   public ResponseEntity<Void> authorize(
       @PathVariable("provider") String provider,
       @RequestParam(value = "state", required = false) String state,
-      @RequestParam(value = "platform", required = false) String platform) {
-    String resolvedState = resolveState(state, platform);
+      @RequestParam(value = "platform", required = false) String platform,
+      @RequestParam(value = "redirect_uri", required = false) String redirectUri) {
+    String resolvedState = resolveState(state, platform, redirectUri);
     String authorizeUrl = oAuthService.buildAuthorizeUrl(provider, resolvedState);
 
     HttpHeaders headers = new HttpHeaders();
@@ -69,7 +70,9 @@ public class SocialLoginController {
       return ResponseEntity.ok(response);
     }
 
-    // 요청된 redirect_uri가 있으면 우선 사용, 없으면 기본 설정값 사용
+    // 1. 요청 파라미터로 들어온 redirect_uri가 있으면 최우선
+    // 2. 없으면 state에 저장해둔 redirect_uri 확인
+    // 3. 그마저도 없으면 기본 설정값 사용
     String targetRedirectUri = (redirectUri != null && !redirectUri.isBlank())
         ? redirectUri
         : resolveRedirectBase(state);
@@ -186,18 +189,42 @@ public class SocialLoginController {
     return buildRedirectUrl(response, appRedirectUri);
   }
 
-  private String resolveState(String state, String platform) {
+  private String resolveState(String state, String platform, String redirectUri) {
+    // 1. redirect_uri가 있으면 최우선으로 state에 포함: "uri:{base64(redirectUri)}"
+    if (redirectUri != null && !redirectUri.isBlank()) {
+      String encoded = java.util.Base64.getEncoder().encodeToString(redirectUri.getBytes(StandardCharsets.UTF_8));
+      return "uri:" + encoded;
+    }
+
     String baseState = (state == null || state.isBlank())
         ? UUID.randomUUID().toString()
         : state;
-    String normalizedPlatform = normalizePlatform(platform);
-    if (baseState.startsWith("app:") || baseState.startsWith("web:")) {
+
+    // 이미 포맷팅된 state면 그대로 반환
+    if (baseState.startsWith("app:") || baseState.startsWith("web:") || baseState.startsWith("uri:")) {
       return baseState;
     }
+
+    String normalizedPlatform = normalizePlatform(platform);
     return normalizedPlatform + ":" + baseState;
   }
 
   private String resolveRedirectBase(String state) {
+    if (state == null || state.isBlank()) {
+      return appRedirectUri;
+    }
+
+    // 1. state가 uri:로 시작하면 디코딩해서 반환
+    if (state.startsWith("uri:")) {
+      try {
+        String encoded = state.substring(4);
+        byte[] decodedBytes = java.util.Base64.getDecoder().decode(encoded);
+        return new String(decodedBytes, StandardCharsets.UTF_8);
+      } catch (Exception e) {
+        // 디코딩 실패 시 기본값으로 fallthrough
+      }
+    }
+
     String platform = extractPlatform(state);
     if ("web".equals(platform)) {
       return webRedirectUri;
@@ -209,7 +236,7 @@ public class SocialLoginController {
     if (state == null || state.isBlank()) {
       return "app";
     }
-    String normalized = state.trim().toLowerCase();
+    String normalized = state.trim(); // case sensitive 하지 않게 처리? 보통 state는 그대로 둠
     if (normalized.startsWith("web:")) {
       return "web";
     }
