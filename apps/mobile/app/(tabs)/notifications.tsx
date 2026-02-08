@@ -117,9 +117,9 @@ export default function NotificationsScreen() {
         prev.map((entry) =>
           entry.notificationId === item.notificationId
             ? {
-                ...entry,
-                readAt: updated.readAt ?? new Date().toISOString(),
-              }
+              ...entry,
+              readAt: updated.readAt ?? new Date().toISOString(),
+            }
             : entry
         )
       );
@@ -182,7 +182,13 @@ export default function NotificationsScreen() {
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace("/(tabs)");
+              }
+            }}
             accessibilityLabel="뒤로 가기"
           >
             <Ionicons name="chevron-back" size={18} color={palette.text} />
