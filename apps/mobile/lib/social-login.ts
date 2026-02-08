@@ -89,9 +89,11 @@ const parseErrorMessage = async (response: Response) => {
 };
 
 export const startSocialLogin = async (provider: SocialProvider) => {
-  const authorizeUrl = `${API_BASE_URL}/api/v1/login/${provider}/authorize?platform=app`;
-  const callbackUrl = `${API_BASE_URL}/api/v1/login/${provider}/callback`;
   const redirectUrl = Linking.createURL("auth");
+  const authorizeUrl = `${API_BASE_URL}/api/v1/login/${provider}/authorize?platform=app&redirect_uri=${encodeURIComponent(
+    redirectUrl
+  )}`;
+  const callbackUrl = `${API_BASE_URL}/api/v1/login/${provider}/callback`;
 
   const result = await WebBrowser.openAuthSessionAsync(authorizeUrl, redirectUrl);
   if (result.type !== "success" || !result.url) {
