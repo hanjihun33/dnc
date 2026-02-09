@@ -1,129 +1,98 @@
-# 배포 및 빌드 가이드 (DEPLOY_GUIDE)
+# 1. Gitlab 소스 클론 이후 빌드 및 배포할 수 있도록 정리한 문서
 
-## 1. 기술 스택 및 환경
+## 1) 환경 상세 스펙
 
 ### Backend
-- **Language**: Java 17
-- **Framework**: Spring Boot 3.5.9
-- **Build Tool**: Gradle 8.x
-- **Key Libraries**: Spring Security, Spring Data JPA, Spring Data Redis, DJL/AI (inference), Firebase Admin
+*   **Language & JDK**: Java 17 (Eclipse Temurin 17-jdk-focal)
+*   **Framework (WAS)**: Spring Boot 3.5.9 (Embedded Tomcat)
+*   **Build Tool**: Gradle (Wrapper 8.x)
+*   **IDE**: IntelliJ IDEA (Recommended, project contains `.idea` configurations)
+*   **Database**: MySQL 8.0 (Dialect: `MySQL8Dialect`)
+*   **In-Memory DB**: Redis (Session & Data)
 
-### AI Server
-- **Language**: Python 3.9+
-- **Framework**: FastAPI
-- **Libraries**: PyTorch (YOLO, ResNet), SciPy (Glucose Simulation), Uvicorn
-
-### Frontend (Mobile/Web)
-- **Framework**: React Native (Expo)
-- **Routing**: Expo Router (File-based routing)
-- **Platform**: Web (React Native for Web) & Mobile (Android/iOS)
-
-### Infrastructure & Database
-- **Database**: MySQL 8.0
-- **Cache**: Redis (Alpine image)
-- **Reverse Proxy**: Nginx (Latency handling & SSL termination)
-- **Containerization**: Docker & Docker Compose
+### Frontend (Mobile - Android)
+*   **Framework**: React Native 0.81.5 (with Expo SDK 54)
+*   **Runtime**: Node.js 18+ (LTS Version)
+*   **Build Language**: Kotlin (Gradle Plugin)
+*   **Android Build Environment**:
+    *   **JDK**: JDK 17 (Required for Gradle 8.14.3)
+    *   **Android SDK**: Managed by Expo SDK 54 (Target SDK 34/35 recommended)
+    *   **Gradle**: 8.14.3
+*   **IDE**: Android Studio / VS Code
 
 ---
 
-## 2. 빌드 및 배포
+## 2) 빌드 환경 변수
 
-### 사전 요구사항
-- JDK 17 이상 설치
-- Docker & Docker Compose 설치
-- Node.js & npm (Frontend 빌드 시)
+### Backend ([apps/backend/dnc/.env](file:///c:/dnc/S14P11C105/apps/backend/dnc/.env) or System Environment)
+> **Note**: 보안상 민감한 값은 실제 값 대신 역할만 기술합니다.
 
-### 백엔드 빌드
-```bash
-# apps/backend/dnc 디렉토리에서 실행
-./gradlew clean build -x test
-```
-* 결과물: `apps/backend/dnc/build/libs/dnc-0.0.1-SNAPSHOT.jar`
+| Key | Description |
+| :--- | :--- |
+| **Storage & S3** | |
+| `STORAGE_TYPE` | 파일 저장소 유형 (`local` or `s3`) |
+| `S3_BUCKET` | AWS S3 버킷 이름 |
+| `S3_REGION` | AWS S3 리전 (e.g., `ap-northeast-2`) |
+| `S3_PUBLIC_URL` | S3 파일 접근을 위한 Public URL Prefix |
+| `AWS_ACCESS_KEY_ID` | AWS 액세스 키 |
+| `AWS_SECRET_ACCESS_KEY` | AWS 시크릿 키 |
+| **Database & Redis** | |
+| `DB_URL` | JDBC URL (예: `jdbc:mysql://localhost:3306/dnc_db...`) |
+| `DB_USERNAME` | DB 사용자명 |
+| `DB_PASSWORD` | DB 비밀번호 |
+| **Security (JWT)** | |
+| `JWT_SECRET` | JWT 서명용 시크릿 키 (Base64) |
+| `JWT_EXPIRATION_TIME` | Access Token 만료 시간 (ms) |
+| `JWT_REFRESH_EXPIRATION_TIME` | Refresh Token 만료 시간 (ms) |
+| **OAuth (Social Login)** | |
+| `*_CLIENT_ID` | Google, Kakao, Naver, Dexcom, Caresense Client ID |
+| `*_CLIENT_SECRET` | Google, Kakao, Naver, Dexcom, Caresense Client Secret |
+| `*_REDIRECT_URI` | OAuth 인증 후 리다이렉트 될 URI |
+| **AI & External APIs** | |
+| `AI_SERVER_BASE_URL` | AI 서버(FastAPI 등) 주소 |
+| `GMS_API_KEY` | Google AI Studio / Gemini API Key |
+| `FIREBASE_SERVICE_ACCOUNT` | Firebase Admin SDK용 서비스 계정 JSON 내용 |
 
-### 프론트엔드 빌드 (Web)
-```bash
-# apps/mobile 디렉토리에서 실행
-npm install
-npx expo export -p web
-```
-* 결과물: `dist` 디렉토리 생성 (Docker 빌드 시 자동으로 처리됨)
+### Frontend ([apps/mobile/.env](file:///c:/dnc/S14P11C105/apps/mobile/.env))
 
-### 전체 서비스 배포 (Docker Compose)
-프로젝트 루트(`infra` 디렉토리 상위)에서 실행 권장하지만, 현재 `docker-compose.yml`은 `infra` 폴더 내에 위치함.
-
-```bash
-cd infra
-docker-compose up -d --build
-```
-
----
-
-## 3. 핵심 환경 변수 (Environment Variables)
-
-배포 시 `.env` 파일 또는 Docker Environment로 주입해야 하는 필수 변수들입니다.
-
-### Database & Cache
-- `DB_URL`: JDBC URL (예: `jdbc:mysql://djk-db:13306/dnc_db?serverTimezone=Asia/Seoul`)
-- `DB_USER`: DB 사용자명
-- `DB_PASSWORD`: DB 비밀번호
-- `DB_ROOT_PASSWORD`: DB Root 비밀번호
-- `MYSQL_DATABASE`: 생성할 초기 DB명 (dnc_db)
-
-### Security & Auth
-- `JWT_SECRET`: JWT 토큰 서명 키
-- `JWT_EXPIRATION_TIME`: 액세스 토큰 만료 시간 (ms)
-- `JWT_REFRESH_EXPIRATION_TIME`: 리프레시 토큰 만료 시간 (ms)
-
-### External Services (OAuth)
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
-- `KAKAO_CLIENT_ID` / `KAKAO_CLIENT_SECRET`
-- `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET`
-- `DEXCOM_CLIENT_ID` / `DEXCOM_CLIENT_SECRET` (CGM 데이터 연동)
-
-### AWS & Storage
-- `STORAGE_TYPE`: `s3` 또는 `local`
-- `AWS_ACCESS_KEY_ID`: AWS 액세스 키
-- `AWS_SECRET_ACCESS_KEY`: AWS 시크릿 키
-- `S3_BUCKET`: S3 버킷명
-- `S3_REGION`: 리전 (예: `ap-northeast-2`)
-
-### AI & API
-- `AI_SERVER_BASE_URL`: AI 서버 내부 통신 URL (예: `http://djk-ai:18000`)
-- `GMS_API_KEY`: Google Gemini Service API Key
-- `FIREBASE_SERVICE_ACCOUNT`: Firebase Admin SDK JSON 설정
+| Key | Description |
+| :--- | :--- |
+| `EXPO_PUBLIC_API_BASE_URL` | Backend API 서버 기본 주소 (e.g., `https://i14c105.p.ssafy.io`) |
 
 ---
 
-## 4. 로깅 및 모니터링
-- 모든 컨테이너는 `json-file` 드라이버로 로깅 설정됨 (`max-size: 10m`, `max-file: 3`).
-- **Nginx Access Log**: 웹 서버 요청 트래픽 모니터링
-- **Spring Boot Log**: `logs/` 디렉토리 또는 `docker logs djk-backend` 확인
-- **FastAPI Log**: `docker logs djk-ai` 확인
+## 3) 배포 시 특이사항
+
+### Backend
+1.  **TimeZone 설정**: Dockerfile 및 JVM 옵션에 `-Duser.timezone=Asia/Seoul`이 설정되어야 합니다.
+2.  **프로파일 분리**: 운영(Production) 배포 시 `application-prod.yml` 등을 사용하거나 환경 변수로 DB 접속 정보를 덮어써야 합니다.
+3.  **Logs**: [application.yml](file:///c:/dnc/S14P11C105/apps/backend/dnc/src/main/resources/application.yml)에 SQL 로그 (`org.hibernate.SQL`) 및 HikariCP 로그가 ERROR 레벨로 설정되어 있어 디버깅 시 이를 조정해야 할 수 있습니다.
+
+### Frontend (Mobile - Android APK)
+1.  **빌드 명령**:
+    *   프로젝트 루트(`apps/mobile`)에서 `npm install` 수행.
+    *   `android` 폴더로 이동 후: `./gradlew assembleRelease` (APK 생성) 또는 `./gradlew bundleRelease` (AAB 생성).
+2.  **APK 서명 (Signing)**:
+    *   현재 `build.gradle`에는 **Release 빌드도 `debug.keystore`를 사용하도록 설정**되어 있습니다. (개발 편의성 목적)
+    *   **주의**: 실제 스토어 배포 시에는 `android/app/build.gradle`의 `signingConfigs.release` 블록을 수정하여 정식 Keystore 파일을 참조하도록 변경해야 합니다.
+3.  **에뮬레이터/실기기 테스트**:
+    *   `.env`의 `EXPO_PUBLIC_API_BASE_URL`이 `localhost`인 경우, Android 에뮬레이터에서는 `http://10.0.2.2:8080`을 사용해야 합니다.
+    *   실기기 테스트 시 PC와 동일한 Wi-Fi 네트워크에서 PC의 IP 주소를 입력해야 합니다.
 
 ---
 
-## 5. 인프라 상세 설정 (Infrastructure Setup)
+## 4) 주요 계정 및 프로퍼티 정의 파일 목록
 
-### Nginx (Reverse Proxy)
-- **설정 파일**: `infra/nginx/conf.d/default.conf`
-- **도메인**: `i14c105.p.ssafy.io`
-- **역할**:
-  - 80 -> 443 HTTPS 리다이렉트
-  - `/api`, `/swagger-ui`, `/v3/api-docs` -> Backend (18080)
-  - `/ai/` -> AI Server (18000) (Basic Auth: `Team Dujjokko Only`)
-  - `/jenkins/` -> Jenkins (8080)
-  - `/` -> Frontend (180)
-- **SSL**: Let's Encrypt (`/etc/letsencrypt` 마운트)
-- **설정 특징**:
-  - `client_max_body_size 20M` (이미지 업로드)
-  - `proxy_read_timeout 300` (AI 분석 대기)
+### Backend
+*   **메인 설정 파일**: `apps/backend/dnc/src/main/resources/application.yml`
+    *   DB Connection (`spring.datasource`), JPA, JWT, OAuth, S3 설정 포함.
+*   **빌드 설정**: `apps/backend/dnc/build.gradle`
+    *   의존성 및 Spring Boot 버전 관리.
 
-### Jenkins (CI/CD)
-- **설정 파일**: `infra/docker-compose.jenkins.yml`
-- **접속**: `https://i14c105.p.ssafy.io/jenkins/`
-- **포트**: 외부 18088 매핑 (Nginx가 8080으로 프록시)
-- **Docker-in-Docker**: 호스트의 `/var/run/docker.sock` 공유
-- **워크스페이스**: `/home/ubuntu/dang-nang-kong` 마운트
-
-### Docker Network
-- **이름**: `dang-nang-kong_network` (External)
+### Frontend (Mobile)
+*   **앱 설정 및 권한**: `apps/mobile/app.json`
+    *   패키지명(`com.djjko.dnc`), 버전, 권한(Camera, Storage), 딥링크 Scheme 정의.
+*   **환경 변수**: `apps/mobile/.env`
+    *   API Base URL 정의.
+*   **Android 빌드 설정**: `apps/mobile/android/app/build.gradle`
+    *   Application ID, Version Code/Name, Signing Configs.
