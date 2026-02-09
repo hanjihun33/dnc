@@ -1,27 +1,27 @@
-# 당낭콩 프로젝트 문서 모음 (Exec)
+# 포팅 매뉴얼 (Porting Manual)
 
-이 폴더는 당낭콩 서비스의 배포, 운영, 시연을 위한 핵심 문서를 포함하고 있습니다.
-문서는 아래 순서대로 확인하시는 것을 권장합니다.
-
-## 📁 문서 목록
-
-### 1. [배포 및 빌드 가이드 (DEPLOY_GUIDE.md)](./DEPLOY_GUIDE.md)
-- **목적**: 깃랩 소스 클론 이후 빌드 및 배포 가이드.
-- **내용**: 전체 기술 스택(Java, Python, React Native) 및 라이브러리 버전 정보.
-- **핵심**: Docker Compose 기반의 전체 서비스 배포 및 빌드 명령어, Nginx/Jenkins 인프라 설정.
-
-### 2. [외부 서비스 연동 정보 (EXTERNAL_SERVICES.md)](./EXTERNAL_SERVICES.md)
-- **목적**: 프로젝트에서 사용하는 외부 서비스 정보 정리.
-- **내용**: Google/Kakao/Naver 소셜 로그인, Dexcom CGM, AWS S3, Google Gemini API 설정 값 및 용도.
-
-### 3. [DB 덤프 및 스키마 정보 (DB_DUMP_INFO.md)](./DB_DUMP_INFO.md)
-- **목적**: DB 덤프 파일 생성/복구 가이드 및 테이블 정보.
-- **내용**: AI 분석 결과(`food_analyses`), 혈당 예측(`glucose_predictions`), 코칭(`food_records`) 테이블 구조 및 Docker 환경에서의 덤프 명령어. (**최신 덤프 파일 생성 방법 포함**)
-
-### 4. [시연 시나리오 (DEMO_SCENARIO.md)](./DEMO_SCENARIO.md)
-- **목적**: 프로젝트 런칭 및 발표를 위한 시연 시나리오.
-- **내용**: 앱의 주요 기능(로그인, 홈, 식단 기록, 리포트, 설정) 시연을 위한 단계별 가이드.
-- **핵심**: AI 식단 분석 및 혈당 예측의 3단계 프로세스(Vision AI -> Generative AI -> Simulation) 흐름.
+**당낭콩 프로젝트**의 설치, 배포, 운영을 위한 통합 문서입니다.
+아래 목차를 클릭하여 각 단계별 상세 가이드를 확인하세요.
 
 ---
-> **참고**: 모든 문서는 프로젝트의 최신 상태(AI 모델 구조 및 데이터 파이프라인)를 반영하여 업데이트되었습니다.
+
+## 1. [빌드 및 배포 가이드 (DEPLOY_GUIDE.md)](./DEPLOY_GUIDE.md)
+*   **Backend**: Java 17, Spring Boot 빌드 및 실행.
+*   **AI Server**: Docker 기반 환경 구축 및 모델 서빙.
+*   **Frontend**: React Native Android APK 추출 및 배포.
+
+## 2. [외부 서비스 정보 (EXTERNAL_SERVICES.md)](./EXTERNAL_SERVICES.md)
+*   **Social Auth**: Google, Kakao, Naver 로그인 설정.
+*   **Healthcare**: Dexcom, CareSense CGM 데이터 연동.
+*   **Cloud & AI**: AWS S3, Google Gemini API 설정.
+
+## 3. [DB 덤프 및 정보 (DB_DUMP_INFO.md)](./DB_DUMP_INFO.md)
+*   **Schema**: 핵심 테이블(`users`, `glucose_data`) 및 ERD 구조 설명.
+*   **Dump**: DB 초기화 및 데이터 복구를 위한 덤프 파일 활용법.
+
+## 4. [시연 시나리오 (DEMO_SCENARIO.md)](./DEMO_SCENARIO.md)
+*   **Flow**: 로그인 -> 식사 기록(AI 분석) -> 리포트 확인 -> 설정.
+*   **Guide**: 시연 성공을 위한 사전 준비 및 체크포인트.
+
+---
+> **참고**: 본 문서는 프로젝트의 최신 상태(v1.0.2)를 기준으로 작성되었습니다.
