@@ -10,6 +10,17 @@
 *   **Database**: MySQL 8.0 (Dialect: `MySQL8Dialect`)
 *   **In-Memory DB**: Redis (Session & Data)
 
+### AI Server
+*   **Language**: Python 3.11 (Slim)
+*   **Framework**: FastAPI 0.128.0 + Uvicorn
+*   **Key Libraries**:
+    *   **Computer Vision**: OpenCV (`opencv-python`), Ultralytics (YOLOv8), Torch/Torchvision.
+    *   **Data Processing**: NumPy, Pandas, SciPy.
+*   **Container**: Docker (Base: `python:3.11-slim` with `libgl1`)
+*   **Models**:
+    *   YOLOv8 ([best1to40.pt](file:///c:/dnc/S14P11C105/apps/ai-server/ai/models/best1to40.pt))
+    *   ResNet Custom ([new_opencv_ckpt_b84_e200.pth](file:///c:/dnc/S14P11C105/apps/ai-server/ai/models/new_opencv_ckpt_b84_e200.pth))
+
 ### Frontend (Mobile - Android)
 *   **Framework**: React Native 0.81.5 (with Expo SDK 54)
 *   **Runtime**: Node.js 18+ (LTS Version)
@@ -49,9 +60,17 @@
 | `*_CLIENT_SECRET` | Google, Kakao, Naver, Dexcom, Caresense Client Secret |
 | `*_REDIRECT_URI` | OAuth 인증 후 리다이렉트 될 URI |
 | **AI & External APIs** | |
-| `AI_SERVER_BASE_URL` | AI 서버(FastAPI 등) 주소 |
+| `AI_SERVER_BASE_URL` | AI 서버(FastAPI 등) 주소 (e.g., `http://localhost:18000`) |
 | `GMS_API_KEY` | Google AI Studio / Gemini API Key |
 | `FIREBASE_SERVICE_ACCOUNT` | Firebase Admin SDK용 서비스 계정 JSON 내용 |
+
+### AI Server ([apps/ai-server/Dockerfile](file:///c:/dnc/S14P11C105/apps/ai-server/Dockerfile) & Source)
+
+| Key | Description |
+| :--- | :--- |
+| `YOLO_MODEL_PATH` | YOLOv8 모델 파일 절대 경로 (Default: [ai/models/best1to40.pt](file:///c:/dnc/S14P11C105/apps/ai-server/ai/models/best1to40.pt)) |
+| `RESNET_MODEL_PATH` | ResNet 모델 파일 절대 경로 (Default: [ai/models/new_opencv_ckpt_b84_e200.pth](file:///c:/dnc/S14P11C105/apps/ai-server/ai/models/new_opencv_ckpt_b84_e200.pth)) |
+| `PYTHONPATH` | Python 모듈 경로 (Docker 내 설정: `/app/ai-server:/app/ai-server/ai`) |
 
 ### Frontend ([apps/mobile/.env](file:///c:/dnc/S14P11C105/apps/mobile/.env))
 
@@ -67,6 +86,11 @@
 1.  **TimeZone 설정**: Dockerfile 및 JVM 옵션에 `-Duser.timezone=Asia/Seoul`이 설정되어야 합니다.
 2.  **프로파일 분리**: 운영(Production) 배포 시 `application-prod.yml` 등을 사용하거나 환경 변수로 DB 접속 정보를 덮어써야 합니다.
 3.  **Logs**: [application.yml](file:///c:/dnc/S14P11C105/apps/backend/dnc/src/main/resources/application.yml)에 SQL 로그 (`org.hibernate.SQL`) 및 HikariCP 로그가 ERROR 레벨로 설정되어 있어 디버깅 시 이를 조정해야 할 수 있습니다.
+
+### AI Server
+1.  **모델 파일 경로**: [ai/services/food_detection.py](file:///c:/dnc/S14P11C105/apps/ai-server/ai/services/food_detection.py) 내에 하드코딩된 로컬 경로가 주석으로 남아있으나, 실제 코드는 환경 변수(`YOLO_MODEL_PATH`) 또는 상대 경로(Default)를 사용하도록 구현되어 있습니다. 배포 시 모델 파일이 누락되지 않도록 주의하세요 (Docker `COPY . .` 포함됨).
+2.  **시스템 의존성**: `cv2` 실행을 위해 `libgl1`, `libglib2.0-0` 설치가 필수입니다 (Dockerfile에 포함됨).
+3.  **포트**: 기본 포트는 `18000`입니다. Backend의 `AI_SERVER_BASE_URL` 설정과 일치시켜야 합니다.
 
 ### Frontend (Mobile - Android APK)
 1.  **빌드 명령**:
