@@ -1,175 +1,122 @@
-# 포팅 매뉴얼 (Porting Manual)
+# 1. 빌드 및 배포 가이드 (DEPLOY_GUIDE.md)
 
-## 0. 개요 (Overview)
-본 문서는 **당낭콩 프로젝트**의 소스 코드를 GitLab에서 클론 받은 후, 로컬 개발 환경 또는 배포 서버(운영 환경)에서 빌드 및 실행하는 과정을 상세히 기술합니다.
+## 1) 환경 상세 스펙
 
----
-
-## 1. 사전 요구 사항 (Prerequisites)
-
-아래 소프트웨어가 시스템에 설치되어 있어야 합니다.
-
-### 공통 (Common)
-*   **Git**: 소스 코드 클론용.
-
-### Backend (Server)
-*   **JDK 17**: Eclipse Temurin 17 (LTS) 권장.
-    *   *설치 확인*: `java -version`
-*   **MySQL 8.0**: 데이터베이스 서버.
-*   **Redis**: 세션 및 캐시 저장소.
+### Backend
+*   **Language & JDK**: Java 17 (Eclipse Temurin 17-jdk-focal)
+*   **Framework (WAS)**: Spring Boot 3.5.9 (Embedded Tomcat)
+*   **Build Tool**: Gradle (Wrapper 8.x)
+*   **IDE**: IntelliJ IDEA (Recommended, project contains `.idea` configurations)
+*   **Database**: MySQL 8.0 (Dialect: `MySQL8Dialect`)
+*   **In-Memory DB**: Redis (Session & Data)
 
 ### AI Server
-*   **Docker**: 컨테이너 기반 배포 권장.
-*   **Python 3.11**: 직접 실행 시 필요. (Miniconda 또는 Venv 권장)
+*   **Language**: Python 3.11 (Slim)
+*   **Framework**: FastAPI 0.128.0 + Uvicorn
+*   **Key Libraries**:
+    *   **Computer Vision**: OpenCV (`opencv-python`), Ultralytics (YOLOv8), Torch/Torchvision.
+    *   **Data Processing**: NumPy, Pandas, SciPy.
+*   **Container**: Docker (Base: `python:3.11-slim` with `libgl1`)
+*   **Models**:
+    *   YOLOv8 ([best1to40.pt](file:///c:/dnc/S14P11C105/apps/ai-server/ai/models/best1to40.pt))
+    *   ResNet Custom ([new_opencv_ckpt_b84_e200.pth](file:///c:/dnc/S14P11C105/apps/ai-server/ai/models/new_opencv_ckpt_b84_e200.pth))
 
 ### Frontend (Mobile - Android)
-*   **Node.js 18+ (LTS)**: JavaScript 런타임.
-    *   *설치 확인*: `node -v`, `npm -v`
-*   **Android Studio**: Android SDK 및 에뮬레이터 관리.
-    *   **SDK Platform**: Android 14 (API 34) 이상 권장.
-    *   **Build Tools**: 34.0.0 이상.
-    *   *환경 변수*: `ANDROID_HOME` 설정 필수.
+*   **Framework**: React Native 0.81.5 (with Expo SDK 54)
+*   **Runtime**: Node.js 18+ (LTS Version)
+*   **Build Language**: Kotlin (Gradle Plugin)
+*   **Android Build Environment**:
+    *   **JDK**: JDK 17 (Required for Gradle 8.14.3)
+    *   **Android SDK**: Managed by Expo SDK 54 (Target SDK 34/35 recommended)
+    *   **Gradle**: 8.14.3
+*   **IDE**: Android Studio / VS Code
 
 ---
 
-## 2. 프로젝트 클론 (Clone)
+## 2) 빌드 환경 변수
 
-```bash
-# 프로젝트 전체 클론
-git clone [GITLAB_REPOSITORY_URL]
-cd S14P11C105
-```
+### Backend ([apps/backend/dnc/.env](file:///c:/dnc/S14P11C105/apps/backend/dnc/.env) or System Environment)
+> **Note**: 보안상 민감한 값은 실제 값 대신 역할만 기술합니다.
 
----
+| Key | Description |
+| :--- | :--- |
+| **Storage & S3** | |
+| `STORAGE_TYPE` | 파일 저장소 유형 (`local` or `s3`) |
+| `S3_BUCKET` | AWS S3 버킷 이름 |
+| `S3_REGION` | AWS S3 리전 (e.g., `ap-northeast-2`) |
+| `S3_PUBLIC_URL` | S3 파일 접근을 위한 Public URL Prefix |
+| `AWS_ACCESS_KEY_ID` | AWS 액세스 키 |
+| `AWS_SECRET_ACCESS_KEY` | AWS 시크릿 키 |
+| **Database & Redis** | |
+| `DB_URL` | JDBC URL (예: `jdbc:mysql://localhost:3306/dnc_db...`) |
+| `DB_USERNAME` | DB 사용자명 |
+| `DB_PASSWORD` | DB 비밀번호 |
+| **Security (JWT)** | |
+| `JWT_SECRET` | JWT 서명용 시크릿 키 (Base64) |
+| `JWT_EXPIRATION_TIME` | Access Token 만료 시간 (ms) |
+| `JWT_REFRESH_EXPIRATION_TIME` | Refresh Token 만료 시간 (ms) |
+| **OAuth (Social Login)** | |
+| `*_CLIENT_ID` | Google, Kakao, Naver, Dexcom, Caresense Client ID |
+| `*_CLIENT_SECRET` | Google, Kakao, Naver, Dexcom, Caresense Client Secret |
+| `*_REDIRECT_URI` | OAuth 인증 후 리다이렉트 될 URI |
+| **AI & External APIs** | |
+| `AI_SERVER_BASE_URL` | AI 서버(FastAPI 등) 주소 (e.g., `http://localhost:18000`) |
+| `GMS_API_KEY` | Google AI Studio / Gemini API Key |
+| `FIREBASE_SERVICE_ACCOUNT` | Firebase Admin SDK용 서비스 계정 JSON 내용 |
 
-## 3. Backend 빌드 및 배포
+### AI Server ([apps/ai-server/Dockerfile](file:///c:/dnc/S14P11C105/apps/ai-server/Dockerfile) & Source)
 
-### 3.1 환경 변수 설정
-`apps/backend/dnc/src/main/resources/application.yml` 파일을 확인하거나, 실제 운영 환경에서는 환경 변수로 주요설정을 주입해야 합니다.
+| Key | Description |
+| :--- | :--- |
+| `YOLO_MODEL_PATH` | YOLOv8 모델 파일 절대 경로 (Default: [ai/models/best1to40.pt](file:///c:/dnc/S14P11C105/apps/ai-server/ai/models/best1to40.pt)) |
+| `RESNET_MODEL_PATH` | ResNet 모델 파일 절대 경로 (Default: [ai/models/new_opencv_ckpt_b84_e200.pth](file:///c:/dnc/S14P11C105/apps/ai-server/ai/models/new_opencv_ckpt_b84_e200.pth)) |
+| `PYTHONPATH` | Python 모듈 경로 (Docker 내 설정: `/app/ai-server:/app/ai-server/ai`) |
 
-*   **주요 환경 변수** (보안상 실제 값은 제외됨)
-    *   `DB_URL`: JDBC 연결 주소 (예: `jdbc:mysql://localhost:3306/dnc_db?serverTimezone=Asia/Seoul`)
-    *   `DB_USERNAME` / `DB_PASSWORD`: 데이터베이스 계정 정보.
-    *   `JWT_SECRET`: JWT 토큰 서명 키.
-    *   `STORAGE_TYPE`: `local` 또는 `s3`. (S3 사용 시 AWS 키 필요)
+### Frontend ([apps/mobile/.env](file:///c:/dnc/S14P11C105/apps/mobile/.env))
 
-### 3.2 빌드 (Build)
-Gradle Wrapper를 사용하여 실행 가능한 JAR 파일을 생성합니다.
-
-```bash
-# Backend 디렉토리로 이동
-cd apps/backend/dnc
-
-# 실행 권한 부여 (Linux/Mac)
-chmod +x gradlew
-
-# 빌드 실행 (테스트 제외권장 - 빠른 배포시)
-./gradlew bootJar -x test
-```
-*   **결과물**: `build/libs/dnc-0.0.1-SNAPSHOT.jar`
-
-### 3.3 실행 (Run)
-```bash
-# JAR 파일 실행 (Timezone 설정 포함)
-java -Duser.timezone=Asia/Seoul -jar build/libs/dnc-0.0.1-SNAPSHOT.jar
-```
-*   **포트**: 기본값 `18080` (Dockerfile 기준)
-
----
-
-## 4. AI Server 빌드 및 배포
-
-### 4.1 Docker를 이용한 배포 (권장)
-AI 서버는 `libgl1` 등 시스템 의존성이 있으므로 Docker 사용을 권장합니다.
-
-```bash
-# AI Server 디렉토리로 이동
-cd apps/ai-server
-
-# Docker 이미지 빌드
-docker build -t dnc-ai-server .
-
-# 컨테이너 실행 (포트 18000)
-docker run -d -p 18000:18000 --name dnc-ai-server dnc-ai-server
-```
-
-### 4.2 수동 실행 (Python Venv)
-```bash
-cd apps/ai-server
-
-# 가상환경 생성 및 실행
-python -m venv venv
-# Windows: venv\Scripts\activate
-# Mac/Linux: source venv/bin/activate
-
-# 의존성 설치
-pip install -r requirements.txt
-
-# 시스템 라이브러리 설치 (Ubuntu 기준, 필요 시)
-# sudo apt-get install libgl1 libglib2.0-0
-
-# 서버 실행
-uvicorn ai.main:app --host 0.0.0.0 --port 18000
-```
+| Key | Description |
+| :--- | :--- |
+| `EXPO_PUBLIC_API_BASE_URL` | Backend API 서버 기본 주소 (e.g., `https://i14c105.p.ssafy.io`) |
 
 ---
 
-## 5. Frontend (Mobile) 빌드 및 배포
+## 3) 배포 시 특이사항
 
-### 5.1 환경 변수 설정
-`apps/mobile/.env` 파일을 생성하거나 수정합니다.
+### Backend
+1.  **TimeZone 설정**: Dockerfile 및 JVM 옵션에 `-Duser.timezone=Asia/Seoul`이 설정되어야 합니다.
+2.  **프로파일 분리**: 운영(Production) 배포 시 `application-prod.yml` 등을 사용하거나 환경 변수로 DB 접속 정보를 덮어써야 합니다.
+3.  **Logs**: [application.yml](file:///c:/dnc/S14P11C105/apps/backend/dnc/src/main/resources/application.yml)에 SQL 로그 (`org.hibernate.SQL`) 및 HikariCP 로그가 ERROR 레벨로 설정되어 있어 디버깅 시 이를 조정해야 할 수 있습니다.
 
-```ini
-# .env 예시
-EXPO_PUBLIC_API_BASE_URL=http://[BACKEND_IP]:18080
-```
-> **주의**: 에뮬레이터 사용 시 `localhost` 대신 `10.0.2.2`를 사용하거나, 실기기 테스트 시 PC의 내부 IP 주소를 사용하세요.
+### AI Server
+1.  **모델 파일 경로**: [ai/services/food_detection.py](file:///c:/dnc/S14P11C105/apps/ai-server/ai/services/food_detection.py) 내에 하드코딩된 로컬 경로가 주석으로 남아있으나, 실제 코드는 환경 변수(`YOLO_MODEL_PATH`) 또는 상대 경로(Default)를 사용하도록 구현되어 있습니다. 배포 시 모델 파일이 누락되지 않도록 주의하세요 (Docker `COPY . .` 포함됨).
+2.  **시스템 의존성**: `cv2` 실행을 위해 `libgl1`, `libglib2.0-0` 설치가 필수입니다 (Dockerfile에 포함됨).
+3.  **포트**: 기본 포트는 `18000`입니다. Backend의 `AI_SERVER_BASE_URL` 설정과 일치시켜야 합니다.
 
-### 5.2 의존성 설치
-```bash
-# Mobile 디렉토리로 이동
-cd apps/mobile
-
-# 패키지 설치
-npm install
-```
-
-### 5.3 Android APK 추출 (Build APK)
-React Native (Expo Prebuild) 프로젝트이므로, 네이티브 빌드를 수행합니다.
-
-```bash
-# Expo Prebuild (네이티브 폴더 생성)
-npx expo prebuild --platform android
-
-# Android 빌드 디렉토리로 이동
-cd android
-
-# 실행 권한 부여 (Linux/Mac)
-chmod +x gradlew
-
-# Release APK 생성
-./gradlew assembleRelease
-```
-*   **결과물 위치**: `apps/mobile/android/app/build/outputs/apk/release/app-release.apk`
-*   **참고**: `.aab` (Bundle) 파일이 필요한 경우 `./gradlew bundleRelease` 실행.
-
-### 5.4 서명 (Signing) 주의사항
-현재 프로젝트 설정(`apps/mobile/android/app/build.gradle`) 상, **Release 빌드도 `debug.keystore`를 사용하도록 설정**되어 있습니다.
-Google Play Store 배포를 위해서는 정식 서명 키(Keystore)를 생성하고 `build.gradle`의 `signingConfigs.release` 블록을 수정해야 합니다.
+### Frontend (Mobile - Android APK)
+1.  **빌드 명령**:
+    *   프로젝트 루트(`apps/mobile`)에서 `npm install` 수행.
+    *   `android` 폴더로 이동 후: `./gradlew assembleRelease` (APK 생성) 또는 `./gradlew bundleRelease` (AAB 생성).
+2.  **APK 서명 (Signing)**:
+    *   현재 `build.gradle`에는 **Release 빌드도 `debug.keystore`를 사용하도록 설정**되어 있습니다. (개발 편의성 목적)
+    *   **주의**: 실제 스토어 배포 시에는 `android/app/build.gradle`의 `signingConfigs.release` 블록을 수정하여 정식 Keystore 파일을 참조하도록 변경해야 합니다.
+3.  **에뮬레이터/실기기 테스트**:
+    *   `.env`의 `EXPO_PUBLIC_API_BASE_URL`이 `localhost`인 경우, Android 에뮬레이터에서는 `http://10.0.2.2:8080`을 사용해야 합니다.
+    *   실기기 테스트 시 PC와 동일한 Wi-Fi 네트워크에서 PC의 IP 주소를 입력해야 합니다.
 
 ---
 
-## 6. 배포 시 체크리스트
+## 4) 주요 계정 및 프로퍼티 정의 파일 목록
 
-1.  **Backend**
-    *   MySQL/Redis가 정상적으로 구동 중인가?
-    *   `application.yml`의 DB 접속 정보가 운영 환경에 맞게 변경되었는가?
-    *   서버 방화벽(Firewall)에서 18080 포트가 개방되었는가?
+### Backend
+*   **메인 설정 파일**: `apps/backend/dnc/src/main/resources/application.yml`
+    *   DB Connection (`spring.datasource`), JPA, JWT, OAuth, S3 설정 포함.
+*   **빌드 설정**: `apps/backend/dnc/build.gradle`
+    *   의존성 및 Spring Boot 버전 관리.
 
-2.  **AI Server**
-    *   컨테이너 또는 프로세스가 18000 포트에서 정상 리스닝 중인가? (`curl http://localhost:18000/`)
-    *   Backend의 `AI_SERVER_BASE_URL`이 AI 서버 주소를 올바르게 가리키는가?
-
-3.  **Frontend (Mobile)**
-    *   `.env`의 `EXPO_PUBLIC_API_BASE_URL`이 외부에서 접근 가능한 Backend 주소인가? (`localhost` 불가)
-    *   앱 권한(카메라, 저장소)이 AndroidManifest.xml에 정상적으로 명시되었는가? (Expo Config 확인)
+### Frontend (Mobile)
+*   **앱 설정 및 권한**: `apps/mobile/app.json`
+    *   패키지명(`com.djjko.dnc`), 버전, 권한(Camera, Storage), 딥링크 Scheme 정의.
+*   **환경 변수**: `apps/mobile/.env`
+    *   API Base URL 정의.
+*   **Android 빌드 설정**: `apps/mobile/android/app/build.gradle`
+    *   Application ID, Version Code/Name, Signing Configs.
