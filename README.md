@@ -191,7 +191,7 @@ apps/mobile
 ## 💚 팀원 소개
 | ![정관우]() | ![김대원]() | ![남윤서]() | ![차지훈]() | ![박상훈]() | ![손영록]() |
 |---------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| 정관우([@JeongGwanWoo](https://github.com/JeongGwanWoo)) | 김대원([@devbigone](https://github.com/devbigone)) | 남윤서([@](https://github.com/wonxxikim)) | 차지훈([@hanjihun33](https://github.com/hanjihun33)) | 박상훈([@monon06629](https://github.com/monon06629)) | 손영록([@](https://github.com/surina125)) |
+| 정관우([@JeongGwanWoo](https://github.com/JeongGwanWoo)) | 김대원([@devbigone](https://github.com/devbigone)) | 남윤서([@lazyyuns](https://github.com/lazyyuns)) | 차지훈([@hanjihun33](https://github.com/hanjihun33)) | 박상훈([@monon06629](https://github.com/monon06629)) | 손영록([@](https://github.com/surina125)) |
 | Leader / Back-End + Infra | Back-End | Back-End | Full-Stack | AI | AI |
 
 ---
@@ -224,14 +224,17 @@ apps/mobile
 - [와이어프레임](./docs/와이어프레임.md)
 - [API명세서](./docs/API명세서.md)
 - [ERD](./docs/ERD.md)
-- [목업](./docs/목업.md)
 - [아키텍처](./docs/아키텍처.md)
 
 ## 💚 프로젝트 결과물
 
-- [포팅메뉴얼](./exec/포팅_메뉴얼.pdf)
-- [중간발표자료](./docs/당낭콩_중간발표_PPT.pptx)
-- [최종발표자료](./docs/당낭콩_최종발표_PPT.pdf)
+- [포팅메뉴얼](./exec/포팅_메뉴얼.md)
+- [중간발표자료](./docs/당낭콩_중간발표.pptx)
+- [최종발표자료](./docs/당낭콩_최종발표.pdf)
+
+## 💚 시연 영상
+
+- [당낭콩 시연영상](https://youtu.be/sQhA71Rfi8A?si=BkgEeV3enu9SrsE3)
 
 ## 💚 화면 구성
 
