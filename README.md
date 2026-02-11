@@ -1,5 +1,5 @@
 # 🌱 당낭콩
-![썸네일](./docs/assets/images/thumbnail.PNG)
+![썸네일](./docs/assets/images/thumbnail.png)
 
 </div>
 
