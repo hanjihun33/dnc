@@ -189,9 +189,9 @@ apps/mobile
 ---
 
 ## 💚 팀원 소개
-| ![정관우]() | ![김대원]() | ![남윤서]() | ![차지훈]() | ![박상훈]() | ![손영록]() |
+| ![정관우](https://avatars.githubusercontent.com/u/81862961?v=4) | ![김대원](https://avatars.githubusercontent.com/u/133028211?v=4) | ![남윤서](https://avatars.githubusercontent.com/u/88392352?v=4) | ![차지훈](https://avatars.githubusercontent.com/u/223270335?v=4) | ![박상훈](https://avatars.githubusercontent.com/u/221470390?v=4) | ![손영록](https://avatars.githubusercontent.com/u/221470541?v=4) |
 |---------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| 정관우([@JeongGwanWoo](https://github.com/JeongGwanWoo)) | 김대원([@devbigone](https://github.com/devbigone)) | 남윤서([@lazyyuns](https://github.com/lazyyuns)) | 차지훈([@hanjihun33](https://github.com/hanjihun33)) | 박상훈([@monon06629](https://github.com/monon06629)) | 손영록([@](https://github.com/surina125)) |
+| 정관우([@JeongGwanWoo](https://github.com/JeongGwanWoo)) | 김대원([@devbigone](https://github.com/devbigone)) | 남윤서([@lazyyuns](https://github.com/lazyyuns)) | 차지훈([@hanjihun33](https://github.com/hanjihun33)) | 박상훈([@monon06629](https://github.com/monon06629)) | 손영록([@YeongRokSon](https://github.com/YeongRokSon)) |
 | Leader / Back-End + Infra | Back-End | Back-End | Full-Stack | AI | AI |
 
 ---
