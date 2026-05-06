@@ -58,3 +58,24 @@ apps/backend/dnc/local.properties
 .idea/
 .nys/
 nys/
+
+### Firebase / Secrets ###
+*-firebase-adminsdk-*.json
+firebase-service-account*.json
+
+### AI Model Weights ###
+*.pt
+*.pth
+*.onnx
+*.h5
+*.tflite
+
+### Binary Artifacts ###
+*.apk
+*.aab
+*.keystore
+!debug.keystore
+
+### DB Dumps ###
+exec/Dump*/
+*.sql.bak
