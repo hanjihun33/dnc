@@ -8,7 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { loadAuthSession } from '@/session';
+import { loadAuthSession, subscribeAuthSession, getAuthSession } from '@/session';
 import { registerPushTokenWithServer } from '@/push';
 import { SplashScreen } from '@/components/splash-screen';
 import {
@@ -35,6 +35,9 @@ export default function RootLayout() {
   const pendingRef = React.useRef(getSocialLoginPending());
   const backgroundRef = React.useRef(false);
 
+  const router = useRouter();
+  const segments = useSegments();
+
   React.useEffect(() => {
     let isMounted = true;
     const init = async () => {
@@ -55,6 +58,43 @@ export default function RootLayout() {
       isMounted = false;
     };
   }, []);
+
+  // [Auth Guard] Auth Session Reactive Redirect
+  React.useEffect(() => {
+    if (!isBootstrapped) return;
+
+    // Subscribe to auth state changes
+    const unsubscribe = subscribeAuthSession((session) => {
+      const inAuthGroup = segments[0] === '(auth)';
+      const isSignedIn = !!session.accessToken;
+
+      if (isSignedIn && inAuthGroup) {
+        // Logged in, redirect to main tabs
+        router.replace('/(tabs)');
+      } else if (!isSignedIn && !inAuthGroup) {
+        // Logged out, redirect to login
+        router.replace('/(auth)/login');
+      }
+    });
+
+    // Validating initial state as well
+    const session = getAuthSession();
+    const inAuthGroup = segments[0] === '(auth)';
+    const isSignedIn = !!session.accessToken;
+
+    // Only redirect if needed to avoid loops or unnecessary updates
+    if (isSignedIn && inAuthGroup) {
+      router.replace('/(tabs)');
+    } else if (!isSignedIn && !inAuthGroup) {
+      // router.replace('/(auth)/login'); 
+      // Note: We might want to allow some public screens, but typically
+      // if not signed in, go to login. For now, let's keep it simple.
+    }
+
+    return () => {
+      unsubscribe();
+    };
+  }, [isBootstrapped, segments]);
 
   React.useEffect(() => {
     return subscribeSocialLoginPending((value) => {
@@ -100,13 +140,6 @@ export default function RootLayout() {
               <Stack.Screen name="(settings)" options={{ headerShown: false }} />
               <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
             </Stack>
-
-            {/* {(showAuthOverlay || showProcessingOverlay) && (
-              <View style={styles.authOverlay} pointerEvents="auto">
-                <ActivityIndicator size="large" color="#F59E0B" />
-                <Text style={styles.authOverlayText}>로그인 처리 중입니다</Text>
-              </View>
-            )} */}
           </>
         ) : (
           <View style={styles.bootSplash} />

@@ -74,7 +74,7 @@ logging:
     com.djjko.dnc.glucose: WARN     # 로그 숨기기
 
 jwt:
-  secret: ${JWT_SECRET:9c2f4d1a7b8e3c6f5a0d2b7e9f1c4a8d9b6e3a0c5f2d0y5s}
+  secret: ${JWT_SECRET}
   expiration_time: ${JWT_EXPIRATION_TIME:3600000} # 1시간
   refresh_expiration_time: ${JWT_REFRESH_EXPIRATION_TIME:604800000} # 7일
 
@@ -83,7 +83,7 @@ oauth:
     dexcom:
       client-id: ${DEXCOM_CLIENT_ID:}
       client-secret: ${DEXCOM_CLIENT_SECRET:}
-      redirect-uri: ${DEXCOM_REDIRECT_URI:http://192.168.100.44:8080/api/v1/oauth/dexcom/callback}
+      redirect-uri: ${DEXCOM_REDIRECT_URI:http://localhost:8080/api/v1/oauth/dexcom/callback}
       auth-uri: ${DEXCOM_AUTH_URI:https://sandbox-api.dexcom.com/v3/oauth2/login}
       token-uri: ${DEXCOM_TOKEN_URI:https://sandbox-api.dexcom.com/v3/oauth2/token}
       revoke-uri: ${DEXCOM_REVOKE_URI:}
@@ -136,7 +136,7 @@ app:
   oauth-redirect-uri: ${APP_OAUTH_REDIRECT_URI:testapp://oauth}
 
 gms:
-  api-key: ${GMS_API_KEY:S14P12C105-68ff0660-15af-42a5-8b7f-05873f85dc15}
+  api-key: ${GMS_API_KEY}
   ai:
     model: ${GMS_AI_MODEL:gemini-2.5-pro}
     base-url: ${GMS_AI_BASE_URL:https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com}
